@@ -10,9 +10,12 @@
      \*  
      \* **return**  : 0 on success; errno on failure.   
      \*\\  
-int **Session::init**(const char* username, const char* password);    
- 
-   
+
+     ```c++
+     int Session::init(const char* username, const char* password);    
+     ```
+
+
 - \\\* Connect to a Ceph cluster for data reading/writing.  
    \*   
    \* Parameters:  
@@ -20,8 +23,11 @@ int **Session::init**(const char* username, const char* password);
    \*  
    \* **return**: 0 on success; errno on failure.   
    \*\\        
-int **Session::connect**(const char* auth_server_ip_addr);  
-  
+
+   ```c++
+   int Session::connect(const char* auth_server_ip_addr);  
+   ```
+
 -  \\\* Write **data** synchronously/asynchnosously to the storage cluster.  
    \*   
    \* Parameters:  
@@ -33,8 +39,11 @@ int **Session::connect**(const char* auth_server_ip_addr);
    \*  
    \* **return**: 0 on success; errno on failure.   
    \*\\   
-int **Session::write_data_sync**(char* data, const size_t data_size, const char* bucket_name, const char* object_name);  
-int **Session::write_data_async**(char* data, const size_t data_size, const char* bucket_name,  const char* object_name, aioHandle* handle);  
+
+   ```c++
+   int Session::write_data_sync(char* data, const size_t data_size, const char* bucket_name, const char* object_name);  
+   int Session::write_data_async(char* data, const size_t data_size, const char* bucket_name,  const char* object_name, aioHandle* handle);  
+   ```
 
 - \\\* Write **metadata** of an object sunchronously/asynchronously.  
    \*  
@@ -45,8 +54,11 @@ int **Session::write_data_async**(char* data, const size_t data_size, const char
    \*  
    \* **return**: 0 on success; errno on failure.    
    \*\\  
-int **Session::write_meta_sync**(map<string, string> key_value, unsigned int* pairs_written);  
-int **Session::write_meta_async**(map<string, string> key_value, unsigned int* pairs_written, aioHandle* handle);
+
+   ```c++
+   int Session::write_meta_sync(map<string, string> key_value, unsigned int* pairs_written);  
+   int Session::write_meta_async(map<string, string> key_value, unsigned int* pairs_written, aioHandle* handle);
+   ```
 
 - \\\* Read an object synchronously/asynchronously from the storage cluster.  
    \*   
@@ -59,8 +71,11 @@ int **Session::write_meta_async**(map<string, string> key_value, unsigned int* p
    \*  
    \* **return**: 0 on success; errno on failure.    
    \*\\  
-int **Session::read_sync**(const char* bucket_name, const char* object_name,  char* buffer, size_t buf_len);  
-int **Session::read_async**(const char* bucket_name, const char* object_name, char* buffer, size_t buf_len, aioHandle* handle);  
+
+   ```c++
+   int Session::read_sync(const char* bucket_name, const char* object_name,  char* buffer, size_t buf_len);  
+   int Session::read_async(const char* bucket_name, const char* object_name, char* buffer, size_t buf_len, aioHandle* handle);  
+   ```
 
 - \\\* Append data to an existing object.  
    \*  
@@ -73,8 +88,11 @@ int **Session::read_async**(const char* bucket_name, const char* object_name, ch
    \*  
    \* **return**: 0 on success; errno on failure. 
    \*\\  
-int **Session::append_data_sync**(char* data, const size_t data_size, const char* bucket_name, const char* object_name);    
-int **Session::append_data_async**(char* data, const size_t data_size, const char* bucket_name,  const char* object_name, aioHandle* handle);  
+
+   ```c++
+   int Session::append_data_sync(char* data, const size_t data_size, const char* bucket_name, const char* object_name);    
+   int Session::append_data_async(char* data, const size_t data_size, const char* bucket_name,  const char* object_name, aioHandle* handle);  
+   ```
 
 - \\\* Close data session and release all allocated resources. This method also reads/writes all pending data   
    \* and releases communication resources.    
@@ -83,7 +101,10 @@ int **Session::append_data_async**(char* data, const size_t data_size, const cha
    \*  
    \* **return**: 0 on success; errno on failure.  
    \*\\  
-int **Session::close**();
+
+   ```c++
+   int Session::close();
+   ```
 
 **TODO:**
 
@@ -102,7 +123,10 @@ int **Session::close**();
     \*  
     \* **return**: 0 on success; errno on failure.  
     \*\\  
-int **AdminOps::init**(const char* username, const char* password);  
+
+    ```c++
+    int AdminOps::init(const char* username, const char* password);
+    ```
 
 - \\\* Create a new bucket with a unique name and set its ACLs to ACLs value.  
     \*  
@@ -112,7 +136,10 @@ int **AdminOps::init**(const char* username, const char* password);
     \*  
     \* **return**: 0 on success; errno on failure.  
     \*\\  
-int **AdminOps::create_bucket**(const char* bucket_name, ACL_t ACLs);
+
+    ```c++
+    int AdminOps::create_bucket(const char* bucket_name, ACL_t ACLs);
+    ```
 
 - \\\* Delete the bucket whose name is 'bucket_name'. The bucket must be empty. 
     \*
@@ -121,7 +148,10 @@ int **AdminOps::create_bucket**(const char* bucket_name, ACL_t ACLs);
     \*  
     \* **return**: 0 on success; errno on failure.  
     \*\\  
-int **AdminOps::delete_bucket**(const char* bucker_name);
+
+    ```c++
+    int AdminOps::delete_bucket(const char* bucker_name);
+    ```
 
 - \\\* Close an administrative session to the storage cluster. All allocated resources are released.  
     \*  
@@ -129,4 +159,7 @@ int **AdminOps::delete_bucket**(const char* bucker_name);
     \*  
     \* **return**: 0 on success; errno on failure.  
     \*\\  
-int **AdminOps::close**();
+
+    ```c++
+    int AdminOps::close();
+    ```
