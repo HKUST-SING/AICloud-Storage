@@ -46,3 +46,12 @@ The very first design only provides a few basic functions for the users. It can 
   \#  **throws exception**: an exception is thrown if the operation is unsuccessful  
   ```python
   sing_data.read_data(path)
+  ``` 
+  
+  - \# **(Required)** Close the communication session and release resources.  
+  \#  
+  \# Parameters:   
+  ```python
+  sing_data.close()
+  ```
+ 
