@@ -15,7 +15,7 @@ def connect(username, password):
         raise errors.AuthError("User connected.")
 
     # initialize a user and try to connect to the storage service
-    cloud_user = context.UserCtx()
+    cloud_user = context.UserCtx(username, password)
     ops.connect_to_cluster(cloud_user)
 
 

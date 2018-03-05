@@ -75,6 +75,13 @@ class AuthError(SingIOError):
         return super.message
 
 
+class OpIOError(SingIOError):
+    """
+        This error is thrown if internal IO processing encounters
+        errors.
+    """
+    pass
+
 
 # Since the file accommodates all the user exceptions, it has been
 # decided that the file should also accommodate all the error codes
