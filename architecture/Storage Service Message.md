@@ -8,7 +8,7 @@
 
 | Data type    | Read/Write msg_type    |
 | ------------ | ---------------------- |
-| ``uint32_t`` | data_length (in bytes) |
+| ``uint64_t`` | data_length (in bytes) |
 | ``uint64_t`` | starting address       |
 
 | Data type  | Error msg_type |
