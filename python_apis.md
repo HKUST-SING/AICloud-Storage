@@ -10,7 +10,7 @@ The very first design only provides a few basic functions for the users. It can 
   \#  
   \# Examples: encoding='UTF-8', compression=None  
   ```python
-  sing_data.set_property(**kwards)
+  singstorage.set_properties(**kwargs)
   ```
   
 - \# **(Required)** Function takes a 'username' and a 'password' to authenticate the user  
@@ -22,7 +22,7 @@ The very first design only provides a few basic functions for the users. It can 
   \#  
   \#  **return**: success_code on success, failure_code on failure  
   ```python
-  sing_data.connect(username, password)
+  singstorage.connect(username, password)
   ```
  
 - \# **(Required)** For writing data string to a distributed storage system.  
@@ -31,9 +31,9 @@ The very first design only provides a few basic functions for the users. It can 
   \# - **path[in]**: a logical path used for identifying the place where data has to written to (PROTOCOL:PATH_TO_DATA)  
   \# - **data[in]**: a Python string which stores the data to be written   
   \#    
-  \#  **throws exception**: an exception is thrown if the operation is unsuccessful  
+  \#  **throw exception**: an exception is thrown if the operation is unsuccessful  
   ```python
-  sing_data.write_data(path, data)
+  singstorage.write_data(path, data)
   ```
   
   
@@ -43,15 +43,15 @@ The very first design only provides a few basic functions for the users. It can 
   \# - **path[in]**: a logical path used for identifying the place where data is read from (PROTOCOL:PATH_TO_DATA)  
   \#   
   \#  **return**: a Python string in the provided data encoding (see above)  
-  \#  **throws exception**: an exception is thrown if the operation is unsuccessful  
+  \#  **throw exception**: an exception is thrown if the operation is unsuccessful  
   ```python
-  sing_data.read_data(path)
+  singstorage.read_data(path)
   ``` 
   
   - \# **(Required)** Close the communication session and release resources.  
   \#  
   \# Parameters:   
   ```python
-  sing_data.close()
+  singstorage.close()
   ```
  
