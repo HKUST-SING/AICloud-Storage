@@ -1,3 +1,6 @@
+from __future__ import print_function
+
+
 #import SocketServer
 import socket
 import struct
@@ -8,8 +11,8 @@ PORT = 4997
 RWDATA = 1
 ERRORMSG = 2
 
-FORMAT_RWDATA = 'BBIQ'
-FORMAT_ERRORMSG = 'BBH'
+FORMAT_RWDATA = '=BBIQ'
+FORMAT_ERRORMSG = '=BBH'
 
 MESSAGESIZE = 16
 
@@ -101,8 +104,38 @@ class Client(object):
 			# the message type is undefined
 			pass
 		self.sock.sendall(msg)
-		print 'client success'
-		print message.msg_type
+		read_len = len(msg)
+		read_bytes = 0
+		final_data = []
+		while read_bytes < read_len:
+			data = self.sock.recv((read_len - read_bytes), 0)
+			if not data:
+				print ("Erorr reading data back")
+				break
+			read_bytes += len(data)
+			final_data.append(data)
+
+
+        # received message
+		recv_msg = "".join(final_data)
+		msg_type,msg_length = struct.unpack('=BB',recv_msg[0:2])
+		if msg_type == RWDATA:
+			data_length, starting_address\
+                = struct.unpack('='+FORMAT_RWDATA[3:],recv_msg[2:])
+
+			print (msg_type,msg_length,data_length,starting_address)
+
+		elif msg_type == ERRORMSG:
+			error_type,\
+			    = struct.unpack('='+FORMAT_ERRORMSG[3:],recv_msg[2:])
+			print (msg_type,msg_length,error_type)
+		else:
+			# the message type is undefined
+			pass
+			# handle receive data
+            
+		print ('client success')
+		
 		
 if __name__ == '__main__':
 	'''
@@ -114,7 +147,7 @@ if __name__ == '__main__':
 	t1.start()
 	print '2'
 	'''
-	c = Client('localhost:'+str(PORT))
+	c = Client('echo_socket')
 	c.connect()
 	
 	m = Message()
