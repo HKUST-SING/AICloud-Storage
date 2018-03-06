@@ -1,6 +1,5 @@
 ## Inter-Processing Message Structure
 
-<<<<<<< HEAD
 | Data type  | Generic                                     |
 | ---------- | ------------------------------------------- |
 | `uint8_t`  | msg_type (STATUS,AUTH,READ,WRITE,CON_REPLY) |
@@ -68,9 +67,6 @@ struct inter_processing_msg{
     };
 };
 ```
-
-
->>>>>>> 6803f73dffbb0cb7a842f664a3df9104cac3cdec
 
 ## Inter-Connecting Message
 
