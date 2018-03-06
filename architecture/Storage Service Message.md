@@ -7,7 +7,7 @@
 |            | specific content (describe in below)        |
 
 | Data type  | Authentication                              |
-| ---------- | --------------------------                  |
+| ---------- | ------------------------------------------- |
 | `uint16_t` | username_length (in bytes)                  |
 | `char*`    | username                                    |
 | `char[64]` | password (hash)                             |
