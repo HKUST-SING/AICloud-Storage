@@ -6,11 +6,11 @@
 | `uint32_t` | msg_length (in bytes)                       |
 |            | specific content (describe in below)        |
 
-| Data type  | Authentication             |
-| ---------- | -------------------------- |
-| `uint16_t` | username_length (in bytes) |
-| `char*`    | username                   |
-| `char[64]` | password (hash)            |
+| Data type  | Authentication                              |
+| ---------- | --------------------------                  |
+| `uint16_t` | username_length (in bytes)                  |
+| `char*`    | username                                    |
+| `char[64]` | password (hash)                             |
 
 | Data type  | Read                   |
 | ---------- | ---------------------- |
