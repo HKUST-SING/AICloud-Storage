@@ -8,7 +8,7 @@ from future.utils import viewitems as future_viewitems
 
 
 
-# Python std modules
+# Python std lib
 
 
 
@@ -17,6 +17,7 @@ from future.utils import viewitems as future_viewitems
 
 # Package modules
 import singstorage.singexcept as errors
+import singstorage.ipc        as ipc
 
 
 

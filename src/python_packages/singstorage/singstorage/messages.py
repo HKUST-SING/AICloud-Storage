@@ -13,6 +13,7 @@ from . utils import encoding
 
 
 # MESSAGE TYPE VALUES
+MSG_DEFAULT    =  255
 MSG_STATUS     =  0
 MSG_AUTH       =  1
 MSG_READ       =  2
@@ -27,7 +28,9 @@ class InterMessage(object):
 	"""
 		Inter-process communication message base.
 	"""
-	def __init__(self, msg_type, msg_length):
+	subcls = {} # list of subclasses : key is class 
+
+	def __init__(self, msg_type=MSG_DEFAULT, msg_length=0):
 		self.msg_type   = msg_type
 		self.msg_length = msg_length + 5
 
@@ -44,12 +47,53 @@ class InterMessage(object):
 						struct.unpack("=BI", message[0:5:1])
 
 
+	def decode_header(self, header_msg):
+		self.decode_msg(header_msg)
+
+
+	def get_header_size(self):
+		return 5
+
+
 	def get_msg_length(self):
 		return self.msg_length
 
 
+	def get_msg_type(self):
+		return self.msg_type
 
 
+	@classmethod
+	def register_subclass(cls, msg_type):
+		"""
+			Class decorator for subclasses in order to register
+			with the superclass.
+		"""
+		def add_sub(subclass):
+			cls.subcls[msg_type] = subclass
+
+			return subclass
+
+		return add_sub # register all subclasses
+
+
+
+	@classmethod
+	def create_message(cls, msg_type, **kwargs):
+		"""
+			Create and initialize a new message of type 'msg_type'
+		"""
+		MessageClass = cls.subcls.get(msg_type, None)
+			
+		if not MessageClass:
+			return None
+
+		# create a message with the passed values
+		return MessageClass(**kwargs)
+
+
+
+@InterMessage.register_subclass(MSG_AUTH)
 class AuthMessage(InterMessage):
 	"""
 		Authentication message.
@@ -103,6 +147,7 @@ class AuthMessage(InterMessage):
 		
 		
 
+@InterMessage.register_subclass(MSG_READ)
 class ReadMessage(InterMessage):
 	"""
 		Read request message.
@@ -156,6 +201,7 @@ class ReadMessage(InterMessage):
 		
 		
 	
+@InterMessage.register_subclass(MSG_WRITE)
 class WriteMessage(InterMessage):
 	"""
 		Write request message.
@@ -216,6 +262,7 @@ class WriteMessage(InterMessage):
 		
 	
 
+@InterMessage.register_subclass(MSG_STATUS)
 class StatusMessage(InterMessage):
 	"""
 		Operation status message.
@@ -248,7 +295,7 @@ class StatusMessage(InterMessage):
 		self.op_status = struct.unpack("=H", message[0:2:1])
 		
 		
-	
+@InterMessage.register_subclass(MSG_CON_REPLY)
 class ConReplyMessage(InterMessage):
 	"""
 		Connection request  message.

@@ -1,172 +1,223 @@
-from __future__ import print_function
+# Modules which contains the interprocess communication components.
+# This module should contain most of the logic and implementation
+# needed for the user.
 
 
-#import SocketServer
+# Dependency packages
+
+
+
+# Python std lib:w
 import socket
-import struct
-import ctypes
-
-PORT = 4997
-
-RWDATA = 1
-ERRORMSG = 2
-
-FORMAT_RWDATA = '=BBIQ'
-FORMAT_ERRORMSG = '=BBH'
-
-MESSAGESIZE = 16
-
-class Message(object):
-	# the msg_length will be computed after all content are filled
-	def set_generic(self,msg_type):
-		self.msg_type = msg_type
-
-	def compute_msg_length(self):
-		self.msg_length = ctypes.sizeof(ctypes.c_uint8()) + \
-		ctypes.sizeof(ctypes.c_uint8())
-
-		if self.msg_type == RWDATA:
-			self.msg_length += ctypes.sizeof(ctypes.c_uint32()) + \
-			ctypes.sizeof(ctypes.c_uint64())
-		elif self.msg_type == ERRORMSG:
-			self.msg_length += ctypes.sizeof(ctypes.c_uint16())
-
-	def set_data(self,data_length,starting_address):
-		if self.msg_type != RWDATA:
-			# this message is not for read/write data, so it shouldn't
-			# be filled with data attributes
-			# TODO: throw an error or exception
-			pass
-		else:
-			self.data_length = data_length
-			self.starting_address = starting_address
-			self.compute_msg_length()
-
-	def set_error_type(self,error_type):
-		if self.msg_type != ERRORMSG:
-			# this message is not for error message, so it shouldn't
-			# be filled with error type
-			# TODO: throw an error or exception
-			pass
-		else:
-			self.error_type = error_type
-			self.compute_msg_length()
-'''
-class Server(SocketServer.ThreadingUnixStreamServer):
-	def __init__(self,server_address):
-		self.address_family = socket.AF_UNIX
-
-		class IPCHandler(SocketServer.BaseRequestHandler):
-			def handle(self):
-				print 'start handling'
-			
-				msg = self.request.recv(2*ctypes.sizeof(ctypes.c_uint8()))
-				print 'recv'+str(len(msg))
-				msg_type,msg_length = struct.unpack('BB',msg)
-				msg = self.request.recv(msg_length-2*ctypes.sizeof(ctypes.c_uint8()))
-				if msg_type == RWDATA:
-					data_length, starting_address \
-					= struct.unpack(FORMAT_RWDATA[2:],msg)
-					print msg_type,msg_length,data_length,starting_address
-				elif msg_type == ERRORMSG:
-					error_type, \
-					= struct.unpack(FORMAT_ERRORMSG[2:],msg)
-					print msg_type,msg_length,error_type
-				else:
-					# the message type is undefined
-					pass
-				# handle receive data
+import time
+import errno
 
 
-		#SocketServer.TCPServer(self,server_address,IPCHandler)
-		SocketServer.TCPServer.__init__(self,server_address,IPCHandler)
-'''
-class Client(object):
-	def __init__(self,server_address):
-		self.addr = server_address
-		self.sock = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-
-	def connect(self):
-		self.sock.connect(self.addr)
-
-	def close(self):
-		self.sock.close()
-
-	def send(self,message):
-		if message.msg_type == RWDATA:
-			msg = struct.pack\
-			(FORMAT_RWDATA,message.msg_type,message.msg_length,\
-				message.data_length,message.starting_address)
-		elif message.msg_type == ERRORMSG:
-			msg = struct.pack\
-			(FORMAT_ERRORMSG,message.msg_type,message.msg_length,message.error_type)
-		else:
-			# the message type is undefined
-			pass
-		self.sock.sendall(msg)
-		read_len = len(msg)
-		read_bytes = 0
-		final_data = []
-		while read_bytes < read_len:
-			data = self.sock.recv((read_len - read_bytes), 0)
-			if not data:
-				print ("Erorr reading data back")
-				break
-			read_bytes += len(data)
-			final_data.append(data)
+# Package modules
+import singstorage.singexcept as sing_errs
+from   singstorage.messages import InterMessage  
 
 
-        # received message
-		recv_msg = "".join(final_data)
-		msg_type,msg_length = struct.unpack('=BB',recv_msg[0:2])
-		if msg_type == RWDATA:
-			data_length, starting_address\
-                = struct.unpack('='+FORMAT_RWDATA[3:],recv_msg[2:])
 
-			print (msg_type,msg_length,data_length,starting_address)
+CONTROL_SOCKET = 0
+CONTROL_PIPE   = 1
+CONTROL_MEMORY = 2
 
-		elif msg_type == ERRORMSG:
-			error_type,\
-			    = struct.unpack('='+FORMAT_ERRORMSG[3:],recv_msg[2:])
-			print (msg_type,msg_length,error_type)
-		else:
-			# the message type is undefined
-			pass
-			# handle receive data
-            
-		print ('client success')
-		
-		
-if __name__ == '__main__':
-	'''
-	import threading
-	s = Server('localhost:'+str(PORT))
-	print '1'
-	t1 = threading.Thread(target = s.serve_forever)
-	t1.daemon = True
-	t1.start()
-	print '2'
-	'''
-	c = Client('echo_socket')
-	c.connect()
+
+
+class ControlIPC(object):
+	"""
+		Generic interface for the control part of the 
+		inter-process communication. Different implementation
+		can be provided.
+	"""
+
+	subcls = {} # dictionary of IPC subclasses
+
+
+	def __init__(self):
+		self._connected = False # is an active ipc
+
+
+	def init_ipc(self):
+		"""
+			Initialization method of the IPC methods. Call this
+			method before the other methods get called.
+		"""
+		raise NotImplementedError("Method is not implemented.")
+
+
+
+	def connect_to_service(self, username, password):
+		"""
+			Connect to the sing storage service
+		"""
+		raise NotImplementedError("Method is not implemented.")
+
+
+	def close_conn(self):
+		"""
+			Close the connection to the sing service	
+		"""
+		raise NotImplementedError("Method is not implemented.")
+
+
+	def is_connected(self):
+		return self._connected
 	
-	m = Message()
-	m.set_generic(ERRORMSG)
-	m.set_error_type(8)
-	m.compute_msg_length()
 
-	c.send(m)
 
-	n = Message()
-	n.set_generic(RWDATA)
-	n.set_data(16,3369)
-	n.compute_msg_length()
+	def send_request(self, req_type, **kwargs):
+		raise NotImplementedError("Method is not implemented.")
 
-	c.send(n)
-	c.close()
-	'''
-	import time
-	time.sleep(10)
-	s.shutdown()
-	s.server_close()
-	'''	
+
+	def recv_request(self, req_type, **kwargs):
+		raise NotImplementedError("Method is not implemented.")
+
+
+
+	@classmethod
+	def register_subclass(cls, ipc_type):
+		"""
+			Class decorator for subclasses to register with
+			the super class.
+		"""		
+		def add_sub(subclass):
+			cls.subcls[ipc_type] = subclass
+			
+			return subclass
+
+		return add_sub # register all IPC subclasses
+
+
+	@classmethod
+	def create_control_ipc(cls, ipc_type, **kwargs):
+		"""
+			Create and initialize an ipc handle.
+		"""
+		IPCMethod = cls.subcls.get(ipc_type, None)
+
+		if not IPCMethod:
+			return None
+
+		# create a control ipc handle
+		return IPCMethod(**kwargs)
+
+
+
+@ControlIPC.register_subclass(CONTROL_SOCKET)
+class SocketIPC(ControlIPC):
+	"""
+		A control IPC implementation using UNIX domain sockets.
+	"""		
+
+	def __init__(self):
+		super(SocketIPC, self).__init__()
+		self._socket   = None
+		self._rem_addr = None
+	
+
+
+	def init_ipc(self):
+		# read the socket configuration file
+		self._rem_addr = "/tmp/sing_ipc_socket"
+		self._sock     = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+
+	def connect_to_service(self, username, password):
+		if not self._sock or not self._rem_addr:
+			raise RuntimeError("Not Initialized Socket Strucutres.")
+
+
+		# try to connect to the service
+		res = self._sock.connect_ex(self._rem_addr)
+		
+		# the only error which is handled, ECONNREFUSED
+		count = 3 # try a few times if ECONNREFUSED
+		
+		while count > 0 and res == errno.ECONNREFUSED:
+			time.sleep(1.0) # give some time to the service	
+			count -= 1      # update counter
+			res  = self._sock.connect_ex(self._rem_addr)
+
+
+		if res != 0: # not a success
+			raise IOError("Cannot connect to the sing service")
+
+		# connection has successfully connected
+		# authenticate the user
+		self.send_request(sing_msgs.MSG_AUTH, username=username,
+						  passwd=password)
+		
+		
+
+	def send_request(self, req_type, **kwargs):
+		"""
+			Send a request to the service.
+		"""
+
+		# create a message
+		msg = InterMessage.create_message(req_type, **kwargs)
+		
+		if not msg:
+			raise IOError("No such request type.")
+
+		# send the message
+		bin_data = msg.encode_msg() # encode the message into 
+								 	# a binary string
+
+
+		# try to write the message 
+		self._sock.sendall(bin_data, 0)
+
+
+
+	def recv_request(self, req_type, **kwargs):
+		"""
+			Receive a request from a service.
+		"""
+		msg = sing_msgs.create_message(req_type, **kwargs)
+		
+		if not msg:
+			raise IOError("No such request type.")
+
+		# read the header of the received message
+		header = self._sock.recv(msg.get_header_size(), 0)
+		
+
+		if len(header) != msg.get_header_size() or\
+			msg.msg_type != req_type:
+			raise IOError("Error: reading header:")	
+
+		# decode the header
+		msg.decode_header(header)
+		left_to_read = msg.msg_length - msg.get_header_size()
+		raw_data = [] # store a list of binary strings	
+
+		while left_to_read > 0: # read until data is read or 
+								# an erro occurs
+
+			read_data = self._sock.recv(left_to_read, 0)
+			
+			if not read_data:
+				# Error occured
+				raise IOError("Error: reading message content")
+
+			raw_data.append(read_data)
+			left_to_read -= len(read_data)
+
+
+		# message has successfully been read
+		
+		msg.decode_msg(b"".join(raw_data)) # decode the raw data
+										   # to a message
+
+
+		return msg # return the read message
+
+
+	def close_conn(self):
+		self._sock.close()
+		super._connected = False
+	
+
