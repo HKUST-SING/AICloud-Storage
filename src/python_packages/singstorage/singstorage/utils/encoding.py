@@ -24,6 +24,24 @@ def encode_to_bytes(data_str):
 		raise RuntimeError("Unrecognized Python interpreter.")
     
 
+def decode_to_string(data_bytes):
+	"""
+		Decode a byte string to Python string
+	"""
+	# get Python interpereter version
+	py_ver_major = sys.version_info[0]
+	py_ver_minor = sys.version_info[1]
+
+	# Python2.7
+	if py_ver_major == 2 and py_ver_minor == 7:
+		return data_bytes
+	
+	# Python3
+	elif py_ver_major == 3: # Pyton3 uses unicde strings
+		return data_bytes.decode("utf-8")
+	
+	else:
+		raise RuntimeError("Unrecognized Python interpreter.")
 
 
 

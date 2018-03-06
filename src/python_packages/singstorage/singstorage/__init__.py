@@ -1,7 +1,7 @@
 import singstorage.singexcept   as errors
 import singstorage.io_ops       as ops
 import singstorage.usercontext  as context
-
+import singstorage.messages     as messages
 
 
 # per user session context
