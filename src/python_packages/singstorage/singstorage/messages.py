@@ -9,7 +9,8 @@ import struct
 
 
 # singstorage packages 
-from . utils import encoding
+from singstorage.utils import encoding
+from singstorage       import PYTHON_MAJOR_VERSION
 
 
 # MESSAGE TYPE VALUES
@@ -22,8 +23,8 @@ MSG_CON_REPLY  =  4
 
 
 
-HASH_LENGTH = 64
-HASH_CODE = "c"*HASH_LENGTH # hash string value
+HASH_LENGTH = 32
+HASH_CODE = "B"*HASH_LENGTH # hash string value
 class InterMessage(object):
 	"""
 		Inter-process communication message base.
@@ -98,7 +99,7 @@ class AuthMessage(InterMessage):
 	"""
 		Authentication message.
 	"""
-	def __init__(self, username="", passwd=""):
+	def __init__(self, username="", passwd=b""):
 		super(AuthMessage, self).__init__(MSG_AUTH, 
 										  len(username)+HASH_LENGHT + 2)
 		self.user_name    = username
@@ -110,16 +111,24 @@ class AuthMessage(InterMessage):
 			Encode the content of the message into binary form.
 		"""
 		msg_beg, vals = super.encode_msg()
-		string_val = "c"*len(self.user_name)
+		string_val = "B"*len(self.user_name)
 		code_val = msg_beg.join(["H", string_val, HASH_CODE])
 		vals.append(len(self.user_name)) # append length value
 		
 		# encode chars
 		for char_name in self.user_name:
-			vals.append(char_name)
+			vals.append(ord(char_name))
+		
 		
 		for char_pass in self.passwd_hash:
-			vals.append(char_pass)
+			if PYTHON_MAJOR_VERSION == 2:
+				vals.append(ord(char_pass))
+
+			elif PYTHON_MAJOR_VERSION == 3:
+				vals.append(char_pass)
+
+			else:
+				pass # add logging here
 
 		# done
 		return struct.pack(code_val, *vals)
@@ -133,16 +142,27 @@ class AuthMessage(InterMessage):
 			of the message.
 		"""
 		user_lenght = struct.unapck("=H", message[0:2:1])
-		chars = "c"*(user_lenght+HASH_LENGTH)
+		chars = "B"*(user_lenght+HASH_LENGTH)
 		# now unpack the rest of the chars
 		name_pass = struct.unpack("="+chars, message[2::1])
-		tmp_name = b"".join(list(name_pass[0:user_lenght:1]))
-		tmp_pass = b"".join(list(name_pass[user_length::1]))
-	
-	
-		# decode binary strings to strings
-		self.user_name   = encoding.decode_to_string(tmp_name)
-		self.passwd_hash = encoding.decode_to_string(tmp_pass)
+		
+		# decode interger values to strings
+		self.user_name   =\
+			"".join([str(chr(ch_item))\
+			for ch_item in name_pass[0:user_length:1]])
+
+		
+		# decode the string of bytes
+		if PYTHON_MAJOR_VERSION == 3:
+			self.passwd_hash = bytes(name_pass[user_length::1])
+		
+		elif PYTHON_MAJOR_VERSION = 2:
+			self.passwd_hash =\
+			"".join([chr(ch_item) for ch_item
+								  in name_pass[user_length::1]])
+
+		else:
+			pass # add logging here		
 		
 		
 		
@@ -164,13 +184,13 @@ class ReadMessage(InterMessage):
 			Encode the content of the message into binary form.
 		"""
 		msg_beg, vals = super.encode_msg()
-		string_val = "c"*len(self.data_path)
+		string_val = "B"*len(self.data_path)
 		code_val = msg_beg.join(["H", string_val, "I"])
 		vals.append(len(self.data_path)) # append length value
 		
 		# encode chars
 		for char_name in self.data_path:
-			vals.append(char_name)
+			vals.append(ord(char_name))
 		
 		# append property bitmap
 		vals.append(self.prop_bitmap)
@@ -187,17 +207,17 @@ class ReadMessage(InterMessage):
 			of the message.
 		"""
 		path_length = struct.unapck("=H", message[0:2:1])
-		chars = "c"*path_length
+		chars = "B"*path_length
 		# now unpack the rest of the chars
 		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
-		tmp_path = b"".join(list(vals[0:user_lenght:1]))
 		
 		# decode a binary string to a Python string
-		self.data_path = encoding.decode_to_string(tmp_path)
+		self.data_path =\
+		"".join([str(chr(ch_item)) for ch_item in vals[0::1]])
 
 		# decode the property bitmap
 		self.prop_bitmap = struct.unpack("=I", 
-								  message[2+path_length:6+path_lenght:1])
+								  message[2+path_length:6+path_length:1])
 		
 		
 	
@@ -207,7 +227,7 @@ class WriteMessage(InterMessage):
 		Write request message.
 	"""
 	def __init__(self,  data_path="", properties=0, 
-				 start_addr=0, data_lenght=0):
+				 start_addr=0, data_length=0):
 		super(WriteMessage, self).__init__(MSG_WRITE, 
 										  len(data_path) + 22)
 		self.data_path    =  data_path
@@ -221,15 +241,15 @@ class WriteMessage(InterMessage):
 			Encode the content of the message into binary form.
 		"""
 		msg_beg, vals = super.encode_msg()
-		string_val = "c"*len(self.data_path)
+		string_val = "B"*len(self.data_path)
 		code_val = msg_beg.join(["H", string_val, "IQQ"])
 		vals.append(len(self.data_path)) # append lenght value
 		
 		# encode chars
-		for char_name in self.user_name:
-			vals.append(char_name)
+		for char_name in self.data_path:
+			vals.append(ord(char_name))
 	
-		# append property bitmap, memory address and data lenght	
+		# append property bitmap, memory address and data length	
 		vals.append(self.prop_bitmap)
 		vals.append(self.mem_addr)
 		vals.append(self.data_length)
@@ -247,13 +267,16 @@ class WriteMessage(InterMessage):
 			of the message.
 		"""
 		path_length = struct.unapck("=H", message[0:2:1])
-		chars = "c"*path_length
+		chars = "B"*path_length
 		# now unpack the rest of the chars
 		path_data = struct.unpack("="+chars, message[2:path_length+2:1])
-		tmp_path = b"".join(list(path_data))
-	
+
+
 		# decode a binary string to a Python string
-		self.data_path   = encoding.decode_to_string(tmp_path)
+		self.data_path =\
+		"".join([str(chr(ch_item)) for ch_item in path_data])
+	
+
 		
 		# decode the rest of the message
 		self.prop_bitmap, self.mem_addr, self.data_length =\
@@ -267,7 +290,7 @@ class StatusMessage(InterMessage):
 	"""
 		Operation status message.
 	"""
-	def __init__(self, status_type=-1):
+	def __init__(self, status_type=255):
 		super(AuthMessage, self).__init__(MSG_STATUS, 
 										  2)
 		self.op_status    = status_type
@@ -318,7 +341,6 @@ class ConReplyMessage(InterMessage):
 			Encode the content of the message into binary form.
 		"""
 		msg_beg, vals = super.encode_msg()
-		string_val = 'c'*len(self.user_name)
 		code_val   = msg_beg.join(["QIQI", HASH_CODE, HASH_CODE])
 		
 		
@@ -331,10 +353,10 @@ class ConReplyMessage(InterMessage):
 
 		# encode chars
 		for char_name in self.write_buf_name:
-			vals.append(char_name)
+			vals.append(ord(char_name))
 		
 		for char_pass in self.read_buf_name:
-			vals.append(char_pass)
+			vals.append(ord(char_pass))
 
 		# done
 		return struct.pack(code_val, *vals)
@@ -352,11 +374,15 @@ class ConReplyMessage(InterMessage):
 				struct.unapck('=QIQI', message[0:24:1])
 
 		# now unpack the rest of the chars
-		mem_names = struct.unpack('='+HASH_CODE+HAHS_CODE, message[24::1])
-		tmp_write = b"".join(list(mem_names[0:HASH_LENGHT:1]))
-		tmp_read  = b"".join(list(name_pass[HASH_LENGHT:(HASH_LENGHT < 1):1]))
-		self.write_buf_name = encoding.decode_to_string(tmp_write)
-		self.read_buf_name  = encoding.decode_to_string(tmp_read)
+		mem_names = struct.unpack('='+HASH_CODE+HASH_CODE, message[24::1])
+		
+		# decode binary strings to Python strings
+		self.write_buf_name =\
+		"".join([str(chr(ch_item)) for ch_item\
+								   in mem_names[0:HASH_LENGTH:1]])
+		self.read_buf_name  =\
+		"".join([str(chr(ch_item)) for ch_item\
+								   in mem_names[HASH_LENGTH::1]])
 		
 		
 	

@@ -174,7 +174,7 @@ class SocketIPC(ControlIPC):
 
 	def recv_request(self, req_type, **kwargs):
 		"""
-			Receive a request from a service.
+			Receive a request from the service.
 		"""
 		msg = sing_msgs.create_message(req_type, **kwargs)
 		
@@ -195,13 +195,13 @@ class SocketIPC(ControlIPC):
 		raw_data = [] # store a list of binary strings	
 
 		while left_to_read > 0: # read until data is read or 
-								# an erro occurs
+								# an error occurs
 
 			read_data = self._sock.recv(left_to_read, 0)
 			
 			if not read_data:
 				# Error occured
-				raise IOError("Error: reading message content")
+				raise IOError("Error: reading message content.")
 
 			raw_data.append(read_data)
 			left_to_read -= len(read_data)

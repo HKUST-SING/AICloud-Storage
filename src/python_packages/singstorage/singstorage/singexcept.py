@@ -7,7 +7,7 @@
 # decided that the file should also accommodate all the error codes
 # and error strings.
 
-AUTH_SUCCESS     =   0   # successful authentication
+SUCCESS          =   0   # successful authentication
 AUTH_USER        =   1   # no such user exists
 AUTH_PASSWD      =   2   # wrong password
 # ---To be continue

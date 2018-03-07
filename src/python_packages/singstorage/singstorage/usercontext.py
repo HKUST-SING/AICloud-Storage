@@ -4,6 +4,7 @@
 
 
 # Dependency modules
+from __future__ import print_function
 from future.utils import viewitems as future_viewitems
 
 
@@ -16,9 +17,10 @@ from future.utils import viewitems as future_viewitems
 
 
 # Package modules
-import singstorage.singexcept as errors
-import singstorage.ipc        as ipc
-
+import singstorage.singexcept as sing_errors
+import singstorage.ipc        as sing_ipc
+import singstorage.utils.hash as sing_hash
+import singstorage.messages   as sing_msgs
 
 
 
@@ -44,7 +46,7 @@ class UserProperties(object):
         
 		res = UserProperties.__DATA_PROPERTIES__.get(prop_key, None)
 		if not res: # no such propery
-			raise errors.PropertyException(
+			raise sing_errors.PropertyException(
 				"Property \"{0}\" does not exist".format(key))
 
 		return True
@@ -58,7 +60,7 @@ class UserProperties(object):
 		# get property options
 		options = UserProperties.__DATA_PROPERTIES__.get(prop_key)
 		if not options.get(prop_val, False): # cannot set to the value
-			raise errors.PropertyException(
+			raise sing_errors.PropertyException(
 				"Property \"{0}\" cannot be set to \"{1}\".\nAvailable values: {2}".format(prop_key, prop_val, options))
 
 		return True
@@ -86,7 +88,7 @@ class UserProperties(object):
 		""" 
 			Set data properties
 		"""
-		for prop_key, prop_val in future_viewitems(kwargs):
+		for prop_key, prop_val in future_viewitems(**kwargs):
 			self._check_key(prop_key)
 			self._check_value(prop_val)
 			# can set the property
@@ -95,7 +97,7 @@ class UserProperties(object):
         
 
 
-class UserCtx(object):
+class UserContext(object):
 	""" 
 		Stores user context for smooth communication between the 
 		Python package and the system serivce that serves data
@@ -104,10 +106,11 @@ class UserCtx(object):
     
 	def __init__(self, username, password):
 		self._user        =    username
-		self._passwd      =    password
+							   
+                               # use only a hash of the password
+		self._passwd      =    sing_hash.sha256_hash(password) 
 		self._props       =    UserProperties()
-		self._connected   =    False # if user connected
-		self._socket      =    None  # UNIX socket for cotrol msgs
+		self._ctrl        =    None  # IPC Control Channel
 
                                # tuple: (path, left_to_read)
 		self._pend_reads  =    [] # pending reads
@@ -118,7 +121,7 @@ class UserCtx(object):
 
 
 
-	def _create_send_buf(self, mem_addr, mem_size):
+	def _create_write_buf(self, mem_addr, mem_size):
 
 		class SharedMemStruct(object):
 			def __init__(self, start_addr, region_size):
@@ -176,8 +179,8 @@ class UserCtx(object):
 						else (self._mem_tail - self._mem_head)
 
 				# check how many bytes can be written in one call
-				bytes_written = min(avail, need_to_write)
-				self._mmap.write(data[0:bytes_written:1])
+				will_write = min(avail, need_to_write)
+				bytes_written = self._mmap.write(data[0:will_write:1])
 
 				# update the head pointer to the new position
 				self._mem_head = (self._mem_head + bytes_written) % self._end_addr
@@ -266,6 +269,50 @@ class UserCtx(object):
 			Initialize the user and try to connect to the 
 			sing storage service for data storage processing.
 		"""
+		self._ctrl = ControlIPC.create_control_ipc(
+					 sing_ipc.CONTROL_SOCKET)
+
+
+		if not self._ctrl:
+			raise RuntimeError("Out of memory")
+
+
+		# try to connect to the sing service
+		try:
+			self._ctrl.init_ipc()
+			self._ctrl.connect_to_service(self._user,
+										  self._passwd)
+
+		except SingIOError as exp: # some specific error
+			return exp.err_code
+
+		except:                    # system internal error 
+			return sing_errors.INTERNAL_ERROR
+
+
+		# succesfully connected to the service
+		# wait for the response from the service
+		# and initialize internal data buffers.
+		try:
+			req = self._ctrl.recv_request(sing_msgs.MSG_CON_REPLY)
+
+			# initialize the internal memory buffers
+			self._init_data_buffers(req.write_buf_addr, req.write_buf_size,
+									req.write_buf_name, req.read_buf_addr,
+									req.read_buf_size,	req.read_buf_name)
+
+		except Exception as exp:
+			return sing_errors._INTERNAL_ERROR # add logging here
+			
+
+
+		# all initialization steps have successfully completed
+		# return success
+		return sing_errors.SUCCESS
+
+
+
+
 
 	def _init_data_buffers(self, write_addr, write_size, write_name,
                                  read_addr,  read_size,  read_name):
@@ -273,8 +320,8 @@ class UserCtx(object):
 			After a successful connection establishment with the
 			sing local service, initialize the internal data structures.
 		"""
-		self._send_mem = self._create_send_buf(write_addr, write_size)
-		self._recv_mem = self._create_recv_buf(read_addr,  read_size)
+		self._send_mem = self._create_write_buf(write_addr, write_size)
+		self._recv_mem = self._create_read_buf(read_addr,  read_size)
         
         # check if the objects have been created properly
 		if not self._send_mem or not self._rec_mem:
@@ -284,6 +331,8 @@ class UserCtx(object):
         # the system may throw some exceptions
 		self._send_mem.init_buf(write_name)
 		self._rec_mem.init_buf(read_name)
+
+
 
 	def get_user_property(self, prop_key):
 		"""
@@ -299,10 +348,196 @@ class UserCtx(object):
 		self._props.set_properties(**kwargs)
 
 
+	def set_properties(self, prop_obj):
+		"""
+			Set user internal properties for data processing. 
+		"""
+		self._props = prop_obj
+
+
+
+
+
+	def write_raw_data(self, rados_obj):
+		"""
+			Write rados object to the shared memory
+		"""
+		# rados object has a length so that it could
+		# keep writing until fully written
+		ref_data = rados_obj.get_raw_data() # reference to data
+		obj_len  = rados_obj.get_len()      # length in bytes
+		
+		# keep writing until an exception occurs or
+		# the entire object has been written
+		mem_addr = self._send_mem.get_write_addr() # where data 
+												   # will be written	
+
+		written_bytes = self._send_mem(ref_data)
+
+
+		if written_bytes <= 0: # something wrong
+			raise SingIOError("Error: send_request", 
+							   sing_errors.INTERNAL_ERROR)
+
+
+		obj_len -= written_bytes # update the number of written bytes
+		
+		# send a notification to the service about the data
+		self._ctrl.send_request(sing_msgs.MSG_WRITE,
+								data_path=rados_obj.get_data_path(),
+								properties=0, start_addr=mem_addr,
+								data_length=written_bytes)
+
+
+		# wait for response 
+		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
+		# check the status of the previous message
+		if res.op_status != sing_errors.SUCCESS:
+			raise SingIOError("Error: recv_request", res.op_status)
+
+		
+		# write the rest of the data
+		std_index = written_bytes
+
+		while obj_len > 0:
+			mem_addr = self._send_mem.get_write_addr()
+			send_buf = self._avail_buffer()
+			written_bytes = self._send_mem(
+					ref_data[std_index:std_index+send_buf:1])
+
+
+			# check the number of bytes
+			if written_bytes <= 0:
+				raise SingIOError("Error: send_request", 
+								   sing_errors.INTERNAL_ERROR)
+
+			# send a requst to the service
+			self._ctrl.send_request(sing_msgs.MSG_WRITE,
+									data_path="", properties=0,
+                                    start_addr=mem_addr, 
+									data_length=written_bytes)
+
+			# update the values
+			obj_len -= written_bytes
+			std_index += written_bytes
+
+			# wait for a response from the service
+			res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
+			# check the status of the previous message
+			if res.op_status != sing_errors.SUCCESS:
+				raise SingIOError("Error: recv_request", res.op_status)
+	
+	
+
+		# done with the rados object	
+
+
+
+
+	def read_raw_data(self, rados_obj):
+		"""
+			Read a rados object from the shared memory.
+		"""
+		# rados object has a length so that it could
+		# keep writing until fully written
+		ref_data = rados_obj.get_raw_data() # reference to data
+		
+		# ask for request from the service
+		self._ctrl.send_request(sing_msgs.MSG_READ, 
+							    data_path=rados_obj.get_data_path())
+	
+
+		written_bytes = self._send_mem(ref_data)
+
+		# wait for response 
+		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
+		# check the status of the previous message
+		if res.op_status != sing_errors.SUCCESS:
+			raise SingIOError("Error: recv_request", res.op_status)
+
+		
+		# wait for the first chunk of data
+		res = self._ctrl.recv_request(sing_msgs.MSG_WRITE)
+
+		if res.data_path != rados_obj.get_data_path(): # some internal
+													   # error
+			raise SingIOError("Retrieved wrong data from storage.", 
+							  sing_errors.INTERNAL_ERROR) 
+
+
+		# read data from the shared memory
+		read_bytes, read_data = self._read_mem.read_data(res.mem_addr,
+														 res.data_length)
+
+		if read_bytes != res.data_length:
+			# an error, notify the service
+			self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+									status_type=sing_errors.INTERNAL_ERROR)
+			raise SingIOError("Cannot retrieve data", 
+							  sing_errors.INTERNAL_ERROR)
+		else:
+			# notify a success
+			self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+									status_type=sing_error.SUCCESS)
+
+
+		# append data
+		rados_obj.extend_data(read_data)
+		# wait for the next message from the service
+		while True:
+		
+			# next chunk of data
+			res = self._ctrl.recv_request(sing_msgs.MSG_WRITE)
+
+			# check if writing is complete
+			if res.data_path == "" and res.data_length == 0:
+				# notify a success
+			    self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+									status_type=sing_error.SUCCESS)
+				
+				return # done reading the rados object
+
+ 
+
+			if res.data_path != rados_obj.get_data_path(): # some internal
+										      			   # error
+			raise SingIOError("Retrieved wrong data from storage.", 
+							  sing_errors.INTERNAL_ERROR) 
+
+
+		    # read data from the shared memory
+		    read_bytes, read_data = self._read_mem.read_data(res.mem_addr,
+														 res.data_length)
+
+			if read_bytes != res.data_length:
+
+				# an error, notify the service
+				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+									status_type=sing_errors.INTERNAL_ERROR)
+				raise SingIOError("Cannot retrieve data", 
+							  sing_errors.INTERNAL_ERROR)
+			else:
+				# notify a success
+				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+									status_type=sing_error.SUCCESS)
+
+
+			# append data and loop back
+			rados_obj.extend_data(read_data)
+			
+
+
 	def  close(self):
 		"""
 			Try to close the user.
 		"""
 		# If there are no 
+		pass
 
-		self._connected = False # not connected anymore
+
+	def is_connected(self):
+		"""
+			State of the user's control socket.
+		"""
+		return self._ctrl.is_connected()
+		
