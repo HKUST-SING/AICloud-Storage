@@ -9,15 +9,15 @@ from future.utils import viewitems as future_viewitems
 
 
 # Python std lib
-
+import logging
 
 
 # singstorage modules
-import singstorage.singexcept    as sing_errors
-import singstorage.ipc           as sing_ipc
-import singstorage.utils.hash    as sing_hash
-import singstorage.messages      as sing_msgs
-import singstorage.utils.logging as sing_log
+import singstorage.singexcept        as sing_errs
+import singstorage.ipc               as sing_ipc
+import singstorage.utils.hash        as sing_hash
+import singstorage.messages          as sing_msgs
+import singstorage.utils.loc_logging as sing_log
 
 
 
@@ -66,8 +66,7 @@ class StorageProperties(object):
         
 		res = StorageProperties.__PROPERTIES__.get(prop_key, None)
 		if not res: # no such propery
-			raise sing_errors.PropertyException(
-				"Property \"{0}\" does not exist".format(key))
+			raise sing_errs.PropertyException(prop_key)
 
 		return True
 
@@ -80,8 +79,7 @@ class StorageProperties(object):
 		# get property options
 		options = StorageProperties.__PROPERTIES__.get(prop_key)
 		if not options.get(prop_val, False): # cannot set to the value
-			raise sing_errors.PropertyException(
-				"Property \"{0}\" cannot be set to \"{1}\".\nAvailable values: {2}".format(prop_key, prop_val, options))
+			raise sing_errs.PropertyException(prop_key, prop_val, options)
 
 		return True
             
@@ -261,9 +259,14 @@ class UserContext(object):
 			def read_data(self, read_addr, read_len):
 				# if the read address is out of the range
 				# throw an exception
+				tmp_logger = logging.getLogger()
+				tmp_logger.info("read_shared_memory")
+
 				if  read_addr >= self._end_addr or\
 					read_addr < self._beg_addr:
-					raise BufferError("Read Address out of Range")
+
+					tmp_logger.error("Reading address ranges are wrong")
+					raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
 
 				# read the given number of bytes and 
 				# return a tuple: (read_bytes, data_string)
@@ -290,25 +293,42 @@ class UserContext(object):
 			sing storage service for data storage processing.
 		"""
 		return
+
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("connect_to_service")
+
 		self._ctrl = ControlIPC.create_control_ipc(
 					 sing_ipc.CONTROL_SOCKET)
 
 
 		if not self._ctrl:
-			raise RuntimeError("Out of memory")
+			tmp_logger.error("Cannot create an IPC Socket")
+			raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
 
 
 		# try to connect to the sing service
+
 		try:
 			self._ctrl.init_ipc()
-			self._ctrl.connect_to_service(self._user,
-										  self._passwd)
+			res_code = self._ctrl.connect_to_service(self._user,
+					           					  self._passwd)
 
-		except SingIOError as exp: # some specific error
-			return exp.err_code
+			if res_code == sing_msgs.STAT_SUCCESS:
+				res_service = sing_errs.SUCCESS
+			elif res_code == sing_msgs.STAT_AUTH_USER:
+				res_service = sing_errs.AUTH_USER
+			elif res_code == sing_msgs.STAT_AUTH_PASS:
+				res_service = sing_msgs.AUTH_PASSWORD
+			else:
+				res_service = sing_errs.INTERNAL_ERROR
 
-		except:                    # system internal error 
-			return sing_errors.INTERNAL_ERROR
+		except: 
+			res_service = sing_errs.INTERNAL_ERROR
+
+		# failed to connect to the storage service
+		if res_service != sing_errs.SUCCESS:
+			return res_service
+
 
 
 		# succesfully connected to the service
@@ -326,13 +346,13 @@ class UserContext(object):
 									 req.read_buf_name)
 
 		except Exception as exp:
-			return sing_errors._INTERNAL_ERROR # add logging here
+			return sing_errs._INTERNAL_ERROR # add logging here
 			
 
 
 		# all initialization steps have successfully completed
-		# return success
-		return sing_errors.SUCCESS
+		# receive success
+		return sing_errs.SUCCESS
 
 
 
@@ -349,7 +369,7 @@ class UserContext(object):
         
         # check if the objects have been created properly
 		if not self._write_mem or not self._read_mem:
-			raise SingIOError("System is out of memory")
+			raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
 
         # try to connect to the memory regions
         # the system may throw some exceptions
@@ -388,7 +408,10 @@ class UserContext(object):
 		"""
 			Write rados object to the shared memory
 		"""
-		
+	
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("write_raw_data")
+	
 		# rados object has a length so that it could
 		# keep writing until fully written
 		ref_data = rados_obj.get_raw_data() # reference to data
@@ -404,8 +427,9 @@ class UserContext(object):
 
 
 		if written_bytes <= 0: # something wrong
-			raise SingIOError("Error: send_request", 
-							   sing_errors.INTERNAL_ERROR)
+			tmp_logger.error("'written_bytes' <= 0")
+			self.close()
+			raise sing_errs.InternalError(sing_errs.INT_ERR_WRITE)
 
 
 		obj_len -= written_bytes # update the number of written bytes
@@ -421,13 +445,15 @@ class UserContext(object):
 		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
 		# check the status of the previous message
 		if res.op_status != sing_msgs.STAT_SUCCESS:
-			raise SingIOError("Error: recv_request", res.op_status)
+			tmp_logger.error("write_raw_data: != STAT_SUCCESS")
+			self.close()
+			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
 
 		
 		# write the rest of the data
 		std_index = written_bytes
 
-		while obj_len > 0:
+		while obj_len > 0: # write all the data
 			mem_addr = self._write_mem.get_write_addr()
 			send_buf = self._avail_buffer()
 			written_bytes = self._write_mem(
@@ -436,8 +462,8 @@ class UserContext(object):
 
 			# check the number of bytes
 			if written_bytes <= 0:
-				raise SingIOError("Error: send_request", 
-								   sing_errors.INTERNAL_ERROR)
+				self.close()
+				raise sing_errs.InternalError(sing_errs.INT_ERR_WRITE)
 
 			# send a requst to the service
 			self._ctrl.send_request(sing_msgs.MSG_WRITE,
@@ -453,7 +479,9 @@ class UserContext(object):
 			res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
 			# check the status of the previous message
 			if res.op_status != sing_msgs.STAT_SUCCESS:
-				raise SingIOError("Error: recv_request", res.op_status)
+				logger.error("write_raw_data: != STAT_SUCCESS")
+				self.close()
+				raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 	
 	
 
@@ -466,7 +494,10 @@ class UserContext(object):
 		"""
 			Read a rados object from the shared memory.
 		"""
-	
+
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("read_raw_data")
+		
 		return	
 		ref_data = rados_obj.get_raw_data() # reference to
 											# raw data of the object
@@ -480,7 +511,9 @@ class UserContext(object):
 		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
 		# check the status of the previous message
 		if res.op_status != sing_msgs.STAT_SUCCESS:
-			raise SingIOError("Error: recv_request", res.op_status)
+			tmp_logger.error("read_raw_data: != STAT_SUCCESS")
+			self.close()
+			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
 
 		
 		# wait for the first chunk of data
@@ -488,8 +521,9 @@ class UserContext(object):
 
 		if res.data_path != rados_obj.get_data_path(): # some internal
 													   # error
-			raise SingIOError("Retrieved wrong data from storage.", 
-							  sing_errors.INTERNAL_ERROR) 
+			tmp_logger.error("read_raw_data: data_path != rados.data_path")
+			self.close()
+			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT) 
 
 
 		# read data from the shared memory
@@ -499,13 +533,16 @@ class UserContext(object):
 		if read_bytes != res.data_length:
 			# an error, notify the service
 			self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_errors.INTERNAL_ERROR)
-			raise SingIOError("Cannot retrieve data", 
-							  sing_errors.INTERNAL_ERROR)
+									status_type=sing_msgs.STAT_INTER)
+
+			tmp_logger.error("read_raw_data: read_bytes != res.data_length")
+			self.close()
+
+			raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
 		else:
 			# notify a success
 			self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_error.SUCCESS)
+									status_type=sing_msgs.STAT_SUCCESS)
 
 
 		# append data
@@ -529,8 +566,10 @@ class UserContext(object):
 
 			if res.data_path != rados_obj.get_data_path(): # some internal
 										      			   # error
-				raise SingIOError("Retrieved wrong data from storage.", 
-							  	   sing_errors.INTERNAL_ERROR) 
+
+				tmp_logger.error("read_raw_data: res.data_path != rados_obj.get_data_path()")
+				self.close()
+				raise sing_errs.InternalError(sing_errs.INT_ERR_PROT) 
 
 
 			# read data from the shared memory
@@ -541,13 +580,16 @@ class UserContext(object):
 
 				# an error, notify the service
 				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_errors.INTERNAL_ERROR)
-				raise SingIOError("Cannot retrieve data", 
-							  sing_errors.INTERNAL_ERROR)
+									status_type=sing_msgs.STAT_INTER)
+
+				tmp_logger.error("read_raw_data: read_bytes != res.data_length")
+				self.close()
+				raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
+
 			else:
 				# notify a success
 				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_error.SUCCESS)
+									status_type=sing_msgs.STAT_SUCCESS)
 
 
 			# append data and loop back
@@ -560,24 +602,28 @@ class UserContext(object):
 			Try to close the user.
 		"""
 		return
+
+
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("close")
 		
 		# first release the read/write buffers
 		try:
 			self._read_mem.close_mem()
 		except:
-			pass # log this
+			tmp_logger.error("close: self._read_mem.close_mem()")
 
 		try:
 			self._write_mem.close_mem()
 		except:
-			pass # log this
+			tmp_logger.error("close: self._write_mem.close_mem()")
 
 		# close the control communication channel
 		try:
 			self._ctrl.close_conn()
 
 		except:
-			pass # log this 
+			tmp_logger.error("close: self._ctrl.close_conn()")
 
 
 	def is_connected(self):

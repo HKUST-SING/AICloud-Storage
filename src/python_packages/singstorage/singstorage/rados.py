@@ -8,11 +8,11 @@
 
 
 # Python std lib
-
+import logging
 
 # singstorage packages
-import singstorage.usercontext   as sing_ctx
-import singstorage.utils.logging as sing_log
+import singstorage.usercontext       as sing_ctx
+import singstorage.utils.loc_logging as sing_log
 
 
 ################ LOGGING ##################

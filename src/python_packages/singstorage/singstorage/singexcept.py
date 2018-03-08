@@ -55,6 +55,7 @@ class StoreOpError(Exception):
 	def __init__(self, message):
 		super(IOError, self).__init__(message)
 		self.message  = message
+		
 
 
 	def __str__(self):
@@ -67,12 +68,12 @@ class StoreOpError(Exception):
 
 class PropertyException(StoreOpError):
 	"""Thrown when the user provides an invalid property or its value."""
-	def __init__(self, prop, value=""):
+	def __init__(self, prop, value="", av_ops=None):
 		
 		if not value:
 			super(PropertyException, self).__init__("Storage property '{0}' does not exist.".format(prop))
 		else:
-			super(PropertyException, self).__init__("Storage property '{0}' cannot be set to value '{1}'.".format(prop, value))
+			super(PropertyException, self).__init__("Storage property '{0}' cannot be set to value '{1}'.\nPossible options: {2}.".format(prop, value, av_ops))
 		
 
    
@@ -98,7 +99,7 @@ class ProtError(StoreOpError):
 
 
 
-class PathError(SingOpError):
+class PathError(StoreOpError):
 	"""
 		This exception is thrown is the given path/URL to data
 		has problems (NOT FOUND or user is not allowed to access it).
@@ -106,13 +107,13 @@ class PathError(SingOpError):
 
 	def __init__(self, given_path, access_rights=False):
 		if access_rights:
-			super.(PathError, self).__init__("You have no access rights to access the data at '{0}'.".format(given_path))
+			super(PathError, self).__init__("You have no access rights to access data at '{0}'.".format(given_path))
 		else:
 			super(PathError, self).__init__("Your given data address, '{0}', cannot be found.".format(given_path))
 		
 
     
-class AuthError(SingOpError):
+class AuthError(StoreOpError):
 	"""
 		This exception is thrown if IO operations are used
 		before connecting to the data cluster.
@@ -122,7 +123,7 @@ class AuthError(SingOpError):
 
 
 
-class InternalError(SingOpError):
+class InternalError(StoreOpError):
 	"""
 		This exception is thrown if the system experiences 
 		problems not related to the user. For example, 

@@ -11,13 +11,13 @@
 import socket
 import time
 import errno
-
+import logging
 
 
 # Package modules
-import singstorage.singexcept    as sing_errs
-from   singstorage.messages      import InterMessage  
-import singstorage.utils.logging as sing_log
+import singstorage.singexcept        as sing_errs
+from   singstorage.messages          import InterMessage  
+import singstorage.utils.loc_logging as sing_log
 
 
 
@@ -186,6 +186,8 @@ class SocketIPC(ControlIPC):
 
 		self.send_request(sing_msgs.MSG_AUTH, username=username,
 						  passwd=password)
+
+		# wait for a confirmation from the service
 		
 		
 
@@ -213,6 +215,9 @@ class SocketIPC(ControlIPC):
 		# try to write the message 
 		tmp_logger.info("Encoded message is being sent to the service")
 		self._sock.sendall(bin_data, 0)
+		res_msg = self._sock.recv_request(sing_msgs.MSG_STATUS)
+
+		return res_msg.op_status # return the status
 
 
 

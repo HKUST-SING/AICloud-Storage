@@ -1,9 +1,14 @@
 # The file contains the IO operations between the Python APIs and the
 # system service which serves API data storage requests.
 
-import singstorage.singexcept    as sing_errs
-import singstorage.rados 	     as sing_rados
-import singstorage.utils.logging as sing_log
+
+# Python std lib
+import logging
+
+# singstorage modules
+import singstorage.singexcept        as sing_errs
+import singstorage.rados 	         as sing_rados
+import singstorage.utils.loc_logging as sing_log
 
 ################ LOGGING ##################
 # create a logger for this module
@@ -29,7 +34,7 @@ logger.addHandler(ch)
 
 def connect_to_cluster(user):
 	if not user:
-		raise RuntimeError("User has not been initialized")
+		raise sing_errs.AuthError()
 
 	"""
 		Connect to the sing service and raise an exception if
