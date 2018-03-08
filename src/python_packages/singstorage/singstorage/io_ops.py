@@ -19,22 +19,23 @@ def connect_to_cluster(user):
 
 def write_data_sync(user, path, data):
 	# need to convert 'data' to bytes
-	rados_obj = sing_rados.Rados(user, path, data)
+	rados_obj = sing_rados.RadosObject(user, path, data)
 
 	# this method may throw an exception.
 	user.write_raw_data(rados_obj)
     
 
 def read_data_sync(user, path):
-	rados_obj = sing_rados.Rados(user, path)
+	rados_obj = sing_rados.RadosObject(user, path)
 
 	# this may throw an exception
 	user.read_raw_data(rados_obj)
 
-	return rados_obj.decode()
+	return rados_obj.get_raw_data() # return an instance of the 
+									# Python bytearray
 
 
 def close_conn(user):
 	# close the user
-	if user
+	if user:
 		user.close()

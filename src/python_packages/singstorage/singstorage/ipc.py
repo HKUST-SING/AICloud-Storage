@@ -217,6 +217,37 @@ class SocketIPC(ControlIPC):
 
 
 	def close_conn(self):
+
+		if not super._connected:
+			return # the IPC is closed
+
+		# send a notification to release 
+		# the resources
+
+		self.send_request(sing_msgs.MSG_STATUS,
+					      status_type=sing_msgs.STAT_CLOSE)
+
+
+
+		# wait for response
+		res = self.recv_request(sing_msgs.MSG_STATUS)
+
+		if res.os_status != sing_msgs.STAT_SUCCESS:
+			# log the response
+
+			# check for ambiguous status
+			if res.op_status == sing_msgs.STAT_AMBG:
+				# send one more time
+				self.send_request(sing_msgs.MSG_STATUS,
+								  status_type=sing_msg.STAT_CLOSE)
+
+				res = self.recv_request(sing_msgs.MSG_STATUS)
+
+				# log the response
+			
+
+		# close the socket and set the IPC as inactive
+		res = self._sock
 		self._sock.close()
 		super._connected = False
 	

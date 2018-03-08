@@ -13,7 +13,7 @@ import singstorage.messages     as messages
 
 # per user session context
 cloud_user = None
-gl_properties = context.UserProperties()
+gl_properties = context.StorageProperties()
 
 
 def connect(username, password):

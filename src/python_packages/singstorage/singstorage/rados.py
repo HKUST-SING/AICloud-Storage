@@ -11,25 +11,22 @@
 
 
 # singstorage packages
-from singstorage import PYTHON_MAJOR_VERSION
+import singstorage.usercontext as sing_ctx
 
 
-
-
-
-
-class RadosObj(object):
+class RadosObject(object):
 	"""
 		RADOS Gateway-like object for a Python environment. Each user's 
 		read/write operation creates a new instance of this class and
 		the context of the user's data is stored by the instance.
 	"""
-	def __init__(self, user, data_path, data=""):
-		self._user = user
-		self._path = data_path
-		self._data = bytearray(data, 
-					 encoding="utf-8") # raw binary data (bytes)
-		self._len  = len(data)         # length of data  (in bytes)
+	def __init__(self, user, data_path, data=bytearray(b""),
+										props=None):
+		self._user  =  user
+		self._props =  props
+		self._path  =  data_path
+		self._data  =  data        # bytes of data    
+		self._len   =  len(data)   # length of data  (in bytes)
 
 
 	def get_bytes(self, start_idx=0, end_idx=-1):
@@ -41,13 +38,13 @@ class RadosObj(object):
 			raise IndexError("Provided indeces are out of range")
 
 		if end_idx == -1:
-			return self._data(start_idx::1)
+			return self._data[start_idx::1]
 
 		elif startd_idx > end_idx:
 			raise IndexError("Wrong relationship between the lower and upper limits")
 
 		else:
-			return self._data(start_idx:end_idx:1)
+			return self._data[start_idx:end_idx:1]
 
 
 	def get_raw_data(self):
@@ -58,16 +55,40 @@ class RadosObj(object):
 
 
 	def extend_data(self, bin_data):
+		"""
+			For reading, append a chunk of binary data to 
+			the data array.
+		"""
 		self._data.extend(bin_data)
 		self._len += len(bin_data)
 
 
 	def get_len(self):
+		"""
+			Get the length of current byte array in bytes
+		"""
 		return self._len 
 
+
 	def get_data_path(self):
+		"""
+			Get the path entered by the user to access Ceph
+			cluster.
+		"""
 		return self._path
 
 
+	def get_rados_properties(self):
+		"""
+			Return a reference to the storage properties
+			which define how the object is stored.
+		"""
+		return self._props
+
+
 	def decode(self, encoding="utf-8"):
+		"""
+			This method is only if the raw data has to
+			be converted into a Python string.
+		"""
 		self._data.decode(encoding=encoding)		

@@ -10,13 +10,13 @@
 SUCCESS          =   0   # successful authentication
 AUTH_USER        =   1   # no such user exists
 AUTH_PASSWD      =   2   # wrong password
-# ---To be continue
+# ---To be continued
 INTERNAL_ERROR   =   3   # internal IO error
 
 
 # Dictionary mapping erorr codes to error messages
 ERROR_MSGS = {
-	AUTH_SUCCESS    :  "\nSuccessfully connected to the cluster.\n",
+	SUCCESS    :       "\nSuccessfully connected to the cluster.\n",
 	AUTH_USER       :  "\nWrong username.\n",
 	AUTH_PASSWD     :  "\nWrong password for input user.\n",
 	INTERNAL_ERROR  :  "\nInternal system error.\n"

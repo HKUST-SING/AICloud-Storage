@@ -13,10 +13,7 @@ from future.utils import viewitems as future_viewitems
 
 
 
-
-
-
-# Package modules
+# singstorage modules
 import singstorage.singexcept as sing_errors
 import singstorage.ipc        as sing_ipc
 import singstorage.utils.hash as sing_hash
@@ -24,14 +21,14 @@ import singstorage.messages   as sing_msgs
 
 
 
-class UserProperties(object):
+class StorageProperties(object):
 	"""
 		Class is a container for data processing properties.
 		Properties are metadata for the stored data. For example,
 		encoding, data compression, and so on.
 	"""
 
-	__DATA_PROPERTIES__ = {"encoding" : {"utf-8":True}}
+	__PROPERTIES__ = {"encoding" : {"utf-8":True}}
  
 
 	def __init__(self):
@@ -44,7 +41,7 @@ class UserProperties(object):
 			an exception.
 		"""
         
-		res = UserProperties.__DATA_PROPERTIES__.get(prop_key, None)
+		res = StorageProperties.__PROPERTIES__.get(prop_key, None)
 		if not res: # no such propery
 			raise sing_errors.PropertyException(
 				"Property \"{0}\" does not exist".format(key))
@@ -58,7 +55,7 @@ class UserProperties(object):
 			Check if the property can be set to the pro_val
 		"""
 		# get property options
-		options = UserProperties.__DATA_PROPERTIES__.get(prop_key)
+		options = StorageProperties.__PROPERTIES__.get(prop_key)
 		if not options.get(prop_val, False): # cannot set to the value
 			raise sing_errors.PropertyException(
 				"Property \"{0}\" cannot be set to \"{1}\".\nAvailable values: {2}".format(prop_key, prop_val, options))
@@ -109,15 +106,15 @@ class UserContext(object):
 							   
                                # use only a hash of the password
 		self._passwd      =    sing_hash.sha256_hash(password) 
-		self._props       =    UserProperties()
+		self._props       =    StorageProperties()
 		self._ctrl        =    None  # IPC Control Channel
 
                                # tuple: (path, left_to_read)
 		self._pend_reads  =    [] # pending reads
                                # tupel: (path, left_to_write)
 		self._pend_writes =    [] # pending writes  
-		self._send_mem    =    None  # memory pointer of send buffer 
-		self._recv_mem    =    None  # memory pointer of recv buffer
+		self._write_mem   =    None  # shared memory for writing data 
+		self._read_mem    =    None  # shared memory for reading data
 
 
 
@@ -133,7 +130,7 @@ class UserContext(object):
 				self._mmap     = None
 
 
-			def init_buff(self, mem_name):
+			def init_mem(self, mem_name):
 				self._fd_shm = posix_ipc.SharedMemory(
 							   mem_name, 0, 0, 0, read_only=False)
 				self._mmap   = mmap.mmap(self._fd_shm.fd, 0,
@@ -141,14 +138,14 @@ class UserContext(object):
                                flags=mmap.MAP_SHARED)
 
 
-			def close_buff(self):
+			def close_mem(self):
 				self._mmap.close()
 				self._fd_shm.close_fd()
 				self._mem_head = self._mem_tail =\
 				self._beg_addr = self._end_addr = None
 
 
-			def can_close_buf(self): # check before closing 
+			def can_close_mem(self): # check before closing 
                                      # if all pending data has been
                                      # approved by the storage service
 				if self._mem_head > self._mem_tail:
@@ -223,7 +220,7 @@ class UserContext(object):
 				self._mmap     = None
 
 
-			def init_buff(self, mem_name):
+			def init_mem(self, mem_name):
 				self._fd_shm = posix_ipc.SharedMemory(
 							   mem_name, 0, 0, 0, read_only=True)
 				self._mmap   = mmap.mmap(self._fd_shm.fd, 0,
@@ -231,7 +228,7 @@ class UserContext(object):
                                flags=mmap.MAP_SHARED)
 
 
-			def close_buff(self):
+			def close_mem(self):
 				self._mmap.close()
 				self._fd_shm.close_fd()
 				self._beg_addr = self._end_addr = None
@@ -269,6 +266,7 @@ class UserContext(object):
 			Initialize the user and try to connect to the 
 			sing storage service for data storage processing.
 		"""
+		return
 		self._ctrl = ControlIPC.create_control_ipc(
 					 sing_ipc.CONTROL_SOCKET)
 
@@ -297,9 +295,12 @@ class UserContext(object):
 			req = self._ctrl.recv_request(sing_msgs.MSG_CON_REPLY)
 
 			# initialize the internal memory buffers
-			self._init_data_buffers(req.write_buf_addr, req.write_buf_size,
-									req.write_buf_name, req.read_buf_addr,
-									req.read_buf_size,	req.read_buf_name)
+			self._init_shared_memory(req.write_buf_addr, 
+									 req.write_buf_size,
+									 req.write_buf_name, 
+									 req.read_buf_addr,
+									 req.read_buf_size,	
+									 req.read_buf_name)
 
 		except Exception as exp:
 			return sing_errors._INTERNAL_ERROR # add logging here
@@ -314,23 +315,23 @@ class UserContext(object):
 
 
 
-	def _init_data_buffers(self, write_addr, write_size, write_name,
-                                 read_addr,  read_size,  read_name):
+	def _init_shared_memory(self, write_addr, write_size, write_name,
+                                  read_addr,  read_size,  read_name):
 		"""
 			After a successful connection establishment with the
 			sing local service, initialize the internal data structures.
 		"""
-		self._send_mem = self._create_write_buf(write_addr, write_size)
-		self._recv_mem = self._create_read_buf(read_addr,  read_size)
+		self._write_mem = self._create_write_buf(write_addr, write_size)
+		self._read_mem  = self._create_read_buf(read_addr,  read_size)
         
         # check if the objects have been created properly
-		if not self._send_mem or not self._rec_mem:
+		if not self._write_mem or not self._read_mem:
 			raise SingIOError("System is out of memory")
 
         # try to connect to the memory regions
         # the system may throw some exceptions
-		self._send_mem.init_buf(write_name)
-		self._rec_mem.init_buf(read_name)
+		self._write_mem.init_mem(write_name)
+		self._read_mem.init_mem(read_name)
 
 
 
@@ -341,11 +342,13 @@ class UserContext(object):
 		return self._props.get_property(prop_key)
 
 
-	def set_user_properties(self, **kwargs):
+	def set_user_property(self, prop_key, prop_val):
 		"""
 			Set user internal properties for data processing.
 		"""
-		self._props.set_properties(**kwargs)
+
+		
+		self._props.set_properties({prop_key : prop_val})
 
 
 	def set_properties(self, prop_obj):
@@ -362,17 +365,19 @@ class UserContext(object):
 		"""
 			Write rados object to the shared memory
 		"""
+		
 		# rados object has a length so that it could
 		# keep writing until fully written
 		ref_data = rados_obj.get_raw_data() # reference to data
 		obj_len  = rados_obj.get_len()      # length in bytes
 		
+		return
 		# keep writing until an exception occurs or
 		# the entire object has been written
-		mem_addr = self._send_mem.get_write_addr() # where data 
-												   # will be written	
+		mem_addr = self._write_mem.get_write_addr() # where data 
+												    # will be written	
 
-		written_bytes = self._send_mem(ref_data)
+		written_bytes = self._write_mem(ref_data)
 
 
 		if written_bytes <= 0: # something wrong
@@ -392,7 +397,7 @@ class UserContext(object):
 		# wait for response 
 		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
 		# check the status of the previous message
-		if res.op_status != sing_errors.SUCCESS:
+		if res.op_status != sing_msgs.STAT_SUCCESS:
 			raise SingIOError("Error: recv_request", res.op_status)
 
 		
@@ -400,9 +405,9 @@ class UserContext(object):
 		std_index = written_bytes
 
 		while obj_len > 0:
-			mem_addr = self._send_mem.get_write_addr()
+			mem_addr = self._write_mem.get_write_addr()
 			send_buf = self._avail_buffer()
-			written_bytes = self._send_mem(
+			written_bytes = self._write_mem(
 					ref_data[std_index:std_index+send_buf:1])
 
 
@@ -424,7 +429,7 @@ class UserContext(object):
 			# wait for a response from the service
 			res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
 			# check the status of the previous message
-			if res.op_status != sing_errors.SUCCESS:
+			if res.op_status != sing_msgs.STAT_SUCCESS:
 				raise SingIOError("Error: recv_request", res.op_status)
 	
 	
@@ -438,21 +443,20 @@ class UserContext(object):
 		"""
 			Read a rados object from the shared memory.
 		"""
-		# rados object has a length so that it could
-		# keep writing until fully written
-		ref_data = rados_obj.get_raw_data() # reference to data
+	
+		return	
+		ref_data = rados_obj.get_raw_data() # reference to
+											# raw data of the object
 		
 		# ask for request from the service
 		self._ctrl.send_request(sing_msgs.MSG_READ, 
 							    data_path=rados_obj.get_data_path())
 	
 
-		written_bytes = self._send_mem(ref_data)
-
 		# wait for response 
 		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
 		# check the status of the previous message
-		if res.op_status != sing_errors.SUCCESS:
+		if res.op_status != sing_msgs.STAT_SUCCESS:
 			raise SingIOError("Error: recv_request", res.op_status)
 
 		
@@ -492,8 +496,9 @@ class UserContext(object):
 			# check if writing is complete
 			if res.data_path == "" and res.data_length == 0:
 				# notify a success
-			    self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_error.SUCCESS)
+				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+									status_type=
+									sing_msgs.STAT_SUCCESS)
 				
 				return # done reading the rados object
 
@@ -501,12 +506,12 @@ class UserContext(object):
 
 			if res.data_path != rados_obj.get_data_path(): # some internal
 										      			   # error
-			raise SingIOError("Retrieved wrong data from storage.", 
-							  sing_errors.INTERNAL_ERROR) 
+				raise SingIOError("Retrieved wrong data from storage.", 
+							  	   sing_errors.INTERNAL_ERROR) 
 
 
-		    # read data from the shared memory
-		    read_bytes, read_data = self._read_mem.read_data(res.mem_addr,
+			# read data from the shared memory
+			read_bytes, read_data = self._read_mem.read_data(res.mem_addr,
 														 res.data_length)
 
 			if read_bytes != res.data_length:
@@ -531,8 +536,25 @@ class UserContext(object):
 		"""
 			Try to close the user.
 		"""
-		# If there are no 
-		pass
+		return
+		
+		# first release the read/write buffers
+		try:
+			self._read_mem.close_mem()
+		except:
+			pass # log this
+
+		try:
+			self._write_mem.close_mem()
+		except:
+			pass # log this
+
+		# close the control communication channel
+		try:
+			self._ctrl.close_conn()
+
+		except:
+			pass # log this 
 
 
 	def is_connected(self):

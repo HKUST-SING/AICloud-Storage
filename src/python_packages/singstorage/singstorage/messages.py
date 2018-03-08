@@ -22,6 +22,17 @@ MSG_WRITE      =  3
 MSG_CON_REPLY  =  4
 
 
+# 'status_type' for MSG_STATUS messages
+STAT_SUCCESS = 0   # notifies success
+STAT_CLOSE   = 1   # require to close the connection and release resources
+STAT_AUTH    = 2   # authentication problem (username or password)
+STAT_PATH	 = 3   # data path problem ('no such path')
+STAT_DENY	 = 4   # denied access to the data at 'path'
+STAT_QUOTA   = 5   # user has exceeded his/her data quota
+STAT_AMBG    = 254 # cannot understand previously sent request
+STAT_INTER   = 255 # internal system error (release resources)
+
+
 
 HASH_LENGTH = 32
 HASH_CODE = "B"*HASH_LENGTH # hash string value
@@ -156,7 +167,7 @@ class AuthMessage(InterMessage):
 		if PYTHON_MAJOR_VERSION == 3:
 			self.passwd_hash = bytes(name_pass[user_length::1])
 		
-		elif PYTHON_MAJOR_VERSION = 2:
+		elif PYTHON_MAJOR_VERSION == 2:
 			self.passwd_hash =\
 			"".join([chr(ch_item) for ch_item
 								  in name_pass[user_length::1]])
