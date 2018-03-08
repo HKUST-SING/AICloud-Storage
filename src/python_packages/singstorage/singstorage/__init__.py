@@ -1,3 +1,10 @@
+# Python std lib
+import sys
+PYTHON_MAJOR_VERSION = sys.version_info[0]
+PYTHON_MINOR_VERSION = sys.version_info[1]
+
+
+
 import singstorage.singexcept   as errors
 import singstorage.io_ops       as ops
 import singstorage.usercontext  as context
@@ -6,6 +13,7 @@ import singstorage.messages     as messages
 
 # per user session context
 cloud_user = None
+gl_properties = context.StorageProperties()
 
 
 def connect(username, password):
@@ -16,7 +24,8 @@ def connect(username, password):
 
 	# initialize a user and try to connect to the storage service
 	if not cloud_user:
-		cloud_user = context.UserCtx(username, password)
+		cloud_user = context.UserContext(username, password)
+		cloud_user.set_properties(gl_properties)
 
 	ops.connect_to_cluster(cloud_user)
 
@@ -48,4 +57,4 @@ def set_properties(**kwargs):
 		Function updates the user's internal state that
 		considers data properties.
 	"""   
-	pass
+	gl_properties.set_properties(**kwargs)

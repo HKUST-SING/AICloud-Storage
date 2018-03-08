@@ -29,7 +29,7 @@ The very first design only provides a few basic functions for the users. It can 
   \#  
   \# Parameters:  
   \# - **path[in]**: a logical path used for identifying the place where data has to written to (PROTOCOL:PATH_TO_DATA)  
-  \# - **data[in]**: a Python string which stores the data to be written   
+  \# - **data[in]**: a Pythob bytearray object which stores the data to be written (raw bytes -- supported by Python3 and Python2.7 ) 
   \#    
   \#  **throw exception**: an exception is thrown if the operation is unsuccessful  
   ```python
@@ -42,7 +42,7 @@ The very first design only provides a few basic functions for the users. It can 
   \# Parameters:  
   \# - **path[in]**: a logical path used for identifying the place where data is read from (PROTOCOL:PATH_TO_DATA)  
   \#   
-  \#  **return**: a Python string in the provided data encoding (see above)  
+  \#  **return**: a Python bytearray object (bytes) (see above)  
   \#  **throw exception**: an exception is thrown if the operation is unsuccessful  
   ```python
   singstorage.read_data(path)

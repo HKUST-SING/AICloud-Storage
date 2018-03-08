@@ -10,7 +10,7 @@
 | ---------- | ------------------------------------------- |
 | `uint16_t` | username_length (in bytes)                  |
 | `char*`    | username                                    |
-| `char[64]` | password (hash)                             |
+| `char[32]` | password (hash)                             |
 
 | Data type  | Read                   |
 | ---------- | ---------------------- |
@@ -36,8 +36,8 @@
 | `uint32_t` | write_buffer_size    |
 | `uint64_t` | read_buffer_address  |
 | `uint32_t` | read_buffer_size     |
-| `char[64]` | write_buffer_name    |
-| `char[64]` | read_buffer_name     |
+| `char[32]` | write_buffer_name    |
+| `char[32]` | read_buffer_name     |
 
 
 ## Inter-Connecting Message

@@ -1,4 +1,4 @@
-import sys
+from singstorage import PYTHON_MAJOR_VERSION, PYTHON_MINOR_VERSION
 
 
 def encode_to_bytes(data_str):
@@ -8,16 +8,12 @@ def encode_to_bytes(data_str):
 		communication.
 	""" 
 
-	# get Pyhton interpreter version
-	py_ver_major = sys.version_info[0] 
-	py_ver_minor = sys.version_info[1]   
-
 	# Python2.7
-	if py_ver_major == 2 and py_ver_minor == 7:
+	if PYTHON_MAJOR_VERSION == 2 and PYTHON_MINOR_VERSION == 7:
 		return data_str # Python2 strings are byte strings
 
 	# Python3
-	elif py_ver_major == 3: # Python3 uses unicode strings
+	elif PYTHON_MAJOR_VERSION == 3: # Python3 uses unicode strings
 		return data_str.encode("utf-8") 
 
 	else:
@@ -26,18 +22,15 @@ def encode_to_bytes(data_str):
 
 def decode_to_string(data_bytes):
 	"""
-		Decode a byte string to Python string
+		Decode a byte string to a Python string
 	"""
-	# get Python interpereter version
-	py_ver_major = sys.version_info[0]
-	py_ver_minor = sys.version_info[1]
 
 	# Python2.7
-	if py_ver_major == 2 and py_ver_minor == 7:
+	if PYTHON_MAJOR_VERSION == 2 and PYTHON_MINOR_VERSION == 7:
 		return data_bytes
 	
 	# Python3
-	elif py_ver_major == 3: # Pyton3 uses unicde strings
+	elif PYTHON_MAJOR_VERSION == 3: # Pyton3 uses unicde strings
 		return data_bytes.decode("utf-8")
 	
 	else:
