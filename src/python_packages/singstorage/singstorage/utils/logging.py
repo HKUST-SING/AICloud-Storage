@@ -2,9 +2,9 @@
 # to collect information about the system.
 
 
-# Dependency pakcages
-
-
-
 # Python std
+import sys
 import logging
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+
+PACK_LOG_LEVEL=logging.DEBUG

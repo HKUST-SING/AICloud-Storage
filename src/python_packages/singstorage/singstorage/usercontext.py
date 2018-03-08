@@ -4,7 +4,6 @@
 
 
 # Dependency modules
-from __future__ import print_function
 from future.utils import viewitems as future_viewitems
 
 
@@ -14,10 +13,34 @@ from future.utils import viewitems as future_viewitems
 
 
 # singstorage modules
-import singstorage.singexcept as sing_errors
-import singstorage.ipc        as sing_ipc
-import singstorage.utils.hash as sing_hash
-import singstorage.messages   as sing_msgs
+import singstorage.singexcept    as sing_errors
+import singstorage.ipc           as sing_ipc
+import singstorage.utils.hash    as sing_hash
+import singstorage.messages      as sing_msgs
+import singstorage.utils.logging as sing_log
+
+
+
+################ LOGGING ##################
+# create a logger for this module
+logger = logging.getLogger(__name__)
+
+# create console handler and set level to debug
+ch     = logging.StreamHandler()
+ch.setLevel(sing_log.PACK_LOG_LEVEL) # set to only handle some logs
+
+# create a custom formatter
+formatter = logging.Formatter("[%(levelname)8s] - %(name)s:%(lineno)s ---- %(message)10s")
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add handler to logger
+logger.addHandler(ch)
+
+
+####### LOGGING ENDS HERE #############
+
 
 
 

@@ -11,7 +11,31 @@
 
 
 # singstorage packages
-import singstorage.usercontext as sing_ctx
+import singstorage.usercontext   as sing_ctx
+import singstorage.utils.logging as sing_log
+
+
+################ LOGGING ##################
+# create a logger for this module
+logger = logging.getLogger(__name__)
+
+# create console handler and set level to debug
+ch     = logging.StreamHandler()
+ch.setLevel(sing_log.PACK_LOG_LEVEL) # set to only handle some logs
+
+# create a custom formatter
+formatter = logging.Formatter("[%(levelname)8s] - %(name)s:%(lineno)s ---- %(message)10s")
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add handler to logger
+logger.addHandler(ch)
+
+
+####### LOGGING ENDS HERE #############
+
+
 
 
 class RadosObject(object):

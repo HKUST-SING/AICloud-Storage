@@ -7,21 +7,45 @@
 
 
 
-# Python std lib:w
+# Python std lib
 import socket
 import time
 import errno
 
 
+
 # Package modules
-import singstorage.singexcept as sing_errs
-from   singstorage.messages import InterMessage  
+import singstorage.singexcept    as sing_errs
+from   singstorage.messages      import InterMessage  
+import singstorage.utils.logging as sing_log
 
 
 
-CONTROL_SOCKET = 0
-CONTROL_PIPE   = 1
-CONTROL_MEMORY = 2
+################ LOGGING ##################
+# create a logger for this module
+logger = logging.getLogger(__name__)
+
+# create console handler and set level to debug
+ch     = logging.StreamHandler()
+ch.setLevel(sing_log.PACK_LOG_LEVEL) # set to only handle some logs
+
+# create a custom formatter
+formatter = logging.Formatter("[%(levelname)8s] - %(name)s:%(lineno)s ---- %(message)10s")
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add handler to logger
+logger.addHandler(ch)
+
+
+####### LOGGING ENDS HERE #############
+
+# Inter-process control types
+CONTROL_EMPTY  = 0
+CONTROL_SOCKET = 1
+CONTROL_PIPE   = 2
+CONTROL_MEMORY = 3
 
 
 
@@ -125,27 +149,41 @@ class SocketIPC(ControlIPC):
 
 
 	def connect_to_service(self, username, password):
+
+		# get logger
+		tmp_logger = logging.getLoggger(__name__)
+
 		if not self._sock or not self._rem_addr:
-			raise RuntimeError("Not Initialized Socket Strucutres.")
+			# log the case
+			tmp_logger.error("Control socket or remote addres is None.")
+
+			raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
 
 
 		# try to connect to the service
 		res = self._sock.connect_ex(self._rem_addr)
+
+		if res != 0: # try a few more times
 		
-		# the only error which is handled, ECONNREFUSED
-		count = 3 # try a few times if ECONNREFUSED
+			tmp_logger.warn("Control Socket did not connect at the first attempt. res_code: {0}".format(res))
+
+			# the only error which is handled, ECONNREFUSED
+			count = 3 # try a few times if ECONNREFUSED
 		
-		while count > 0 and res == errno.ECONNREFUSED:
-			time.sleep(1.0) # give some time to the service	
-			count -= 1      # update counter
-			res  = self._sock.connect_ex(self._rem_addr)
+			while count > 0 and res == errno.ECONNREFUSED:
+				time.sleep(1.0) # give some time to the service	
+				count -= 1      # update counter
+				res  = self._sock.connect_ex(self._rem_addr)
 
 
-		if res != 0: # not a success
-			raise IOError("Cannot connect to the sing service")
+			if res != 0: # not a success
+				tmp_logger.error("Cannot connect to the service after a few attempts.")
+				raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 
 		# connection has successfully connected
 		# authenticate the user
+		tmp_logger.info("Socket has connected to the storage service.")
+
 		self.send_request(sing_msgs.MSG_AUTH, username=username,
 						  passwd=password)
 		
@@ -156,11 +194,16 @@ class SocketIPC(ControlIPC):
 			Send a request to the service.
 		"""
 
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("send_request: {0}".format(req_type))
+		
 		# create a message
 		msg = InterMessage.create_message(req_type, **kwargs)
 		
 		if not msg:
-			raise IOError("No such request type.")
+			tmp_logger.error("Cannot create an IPC message in send_request")
+			
+			raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 
 		# send the message
 		bin_data = msg.encode_msg() # encode the message into 
@@ -168,6 +211,7 @@ class SocketIPC(ControlIPC):
 
 
 		# try to write the message 
+		tmp_logger.info("Encoded message is being sent to the service")
 		self._sock.sendall(bin_data, 0)
 
 
@@ -176,10 +220,16 @@ class SocketIPC(ControlIPC):
 		"""
 			Receive a request from the service.
 		"""
+
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("recv_request: ".format(req_type))
+
 		msg = sing_msgs.create_message(req_type, **kwargs)
 		
+
 		if not msg:
-			raise IOError("No such request type.")
+			tmp_logger.error("recv_request: msg is None")
+			raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 
 		# read the header of the received message
 		header = self._sock.recv(msg.get_header_size(), 0)
@@ -187,7 +237,9 @@ class SocketIPC(ControlIPC):
 
 		if len(header) != msg.get_header_size() or\
 			msg.msg_type != req_type:
-			raise IOError("Error: reading header:")	
+
+			tmp_logger.error("wrong msg: exp: {0}, received: {1}".format(req_type, msg.msg_type))
+			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)	
 
 		# decode the header
 		msg.decode_header(header)
@@ -201,7 +253,8 @@ class SocketIPC(ControlIPC):
 			
 			if not read_data:
 				# Error occured
-				raise IOError("Error: reading message content.")
+				tmp_logger.error("socket.recv returns None")
+				raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
 
 			raw_data.append(read_data)
 			left_to_read -= len(read_data)
@@ -213,13 +266,21 @@ class SocketIPC(ControlIPC):
 										   # to a message
 
 
+
 		return msg # return the read message
 
 
 	def close_conn(self):
+		"""
+			Close the UNIX socket.
+		"""
 
 		if not super._connected:
 			return # the IPC is closed
+
+
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("close_conn")
 
 		# send a notification to release 
 		# the resources
@@ -232,12 +293,16 @@ class SocketIPC(ControlIPC):
 		# wait for response
 		res = self.recv_request(sing_msgs.MSG_STATUS)
 
-		if res.os_status != sing_msgs.STAT_SUCCESS:
+		if res.op_status != sing_msgs.STAT_SUCCESS:
 			# log the response
+			tmp_logger.warn("Received status to close is not SUCCESS. status: {0}".format(res.op_status))
 
 			# check for ambiguous status
 			if res.op_status == sing_msgs.STAT_AMBG:
+				
 				# send one more time
+				tmp_logger.warn("received STAT_AMG")
+
 				self.send_request(sing_msgs.MSG_STATUS,
 								  status_type=sing_msg.STAT_CLOSE)
 
@@ -247,7 +312,6 @@ class SocketIPC(ControlIPC):
 			
 
 		# close the socket and set the IPC as inactive
-		res = self._sock
 		self._sock.close()
 		super._connected = False
 	

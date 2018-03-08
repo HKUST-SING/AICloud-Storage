@@ -5,6 +5,8 @@ PYTHON_MINOR_VERSION = sys.version_info[1]
 
 
 
+# import singsotrage packages
+import singstorage.utils.logging # enable logging
 import singstorage.singexcept   as errors
 import singstorage.io_ops       as ops
 import singstorage.usercontext  as context
