@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-using singaistorageipc;
+using namespace singaistorageipc;
 
 typedef std::function<void()> VoidCallback;
 
