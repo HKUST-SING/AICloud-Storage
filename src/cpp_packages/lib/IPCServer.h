@@ -25,7 +25,7 @@ public:
 	 * Create a new IPC Server.
 	 */
 	explicit IPCServer(IPCSocketPoolContext context);
-	~IPCServer();
+	~IPCServer() = default;
 
 	/**
      * Configure server to bind to the following addresses.
