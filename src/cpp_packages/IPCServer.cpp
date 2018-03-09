@@ -4,22 +4,27 @@
 
 #pragma once
 
+#include <iostream>
+
 #include <folly/io/async/EventBaseManager.h>
 #include <folly/executors/thread_factory/NamedThreadFactory.h>
 #include <folly/system/ThreadName.h>
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/executors/IOThreadPoolExecutor.h>
+#include <folly/executors/ThreadPoolExecutor.h>
 
 #include "lib/IPCServer.h"
 
 using folly::EventBaseManager;
 using folly::IOThreadPoolExecutor;
+using folly::ThreadPoolExecutor;
 using folly::AsyncServerSocket;
+using folly::SocketAddress;
 
 namespace ipc{
 
 IPCServer::IPCServer(IPCSocketPoolContext context){
-	this.context_ = std::make_shared<IPCSocketPoolContext>(std::move(context));
+	this->context_ = std::make_shared<IPCSocketPoolContext>(std::move(context));
 }
 
 void IPCServer::bind(std::vector<folly::SocketAddress>&& addrs) {
@@ -38,18 +43,22 @@ public:
     	auto evb = IOThreadPoolExecutor::getEventBase(h);
     	CHECK(evb) << "Invariant violated - started thread must have an EventBase";
     	evb->runInEventBaseThread([=](){
-      		for (auto& factory: context_->handlerFactories) {
+      		/*
+		for (auto& factory: context_->handlerFactories) {
         		factory->onServerStart(evb);
       		}
+		*/
     	});
 	}
 	void threadStopped(ThreadPoolExecutor::ThreadHandle* h) override {
     	IOThreadPoolExecutor::getEventBase(h)->runInEventBaseThread([&](){
-    	for (auto& factory: context_->handlerFactories) {
-        	factory->onServerStop();
-      	}
-    });
-  }
+    		/*
+		for (auto& factory: context_->handlerFactories) {
+        		factory->onServerStop();
+      		}
+		*/
+    	});
+  	}
 private:
 	std::shared_ptr<IPCSocketPoolContext> context_;
 };
@@ -74,7 +83,7 @@ public:
      */
 	void connectionAccepted(int fd,const SocketAddress& clientAddr)
 	noexcept override{
-		std::cout << << "fd: " << fd << "\n";
+		std::cout << "fd: " << fd << "\n";
 	};
 
 	/**
@@ -129,8 +138,8 @@ public:
 };
 
 
-void IPCServer::start(std::function<void()> onSuccess = nullptr,
-		   std::function<void(std::exception_ptr)> onError = nullptr){
+void IPCServer::start(std::function<void()> onSuccess,
+		   std::function<void(std::exception_ptr)> onError){
 	mainEventBase_ = EventBaseManager::get()->getEventBase();
 	auto listen_pool = std::make_shared<IOThreadPoolExecutor>(context_->listener_threads,
 		std::make_shared<folly::NamedThreadFactory>("IPCServer"));
@@ -148,7 +157,7 @@ void IPCServer::start(std::function<void()> onSuccess = nullptr,
 			serverSocket->bind(*i);
 			// TODO: build a acceptable function
             AcceptCallback a;
-			serverSocket->addAcceptCallback(&a,&mainEventBase_);
+			serverSocket->addAcceptCallback(&a,mainEventBase_);
             serverSocket->listen(context_->listenBacklog);
 
 			auto f = [&](){
