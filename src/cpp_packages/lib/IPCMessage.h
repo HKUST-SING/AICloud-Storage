@@ -12,7 +12,7 @@
 #define WRITE     3
 #define CON_REPLY 4
 
-namespace IPC{
+namespace singaistorageipc{
 
 /**
  * All lengthes in message are counted in bytes.

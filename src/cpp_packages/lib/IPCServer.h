@@ -15,7 +15,7 @@
  */
 #include "IPCSocketPoolContext.h"
 
-namespace ipc{
+namespace singaistorageipc{
 
 //class SignalHandler;
 

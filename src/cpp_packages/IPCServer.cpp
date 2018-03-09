@@ -21,7 +21,7 @@ using folly::ThreadPoolExecutor;
 using folly::AsyncServerSocket;
 using folly::SocketAddress;
 
-namespace ipc{
+namespace singaistorageipc{
 
 IPCServer::IPCServer(IPCSocketPoolContext context){
 	this->context_ = std::make_shared<IPCSocketPoolContext>(std::move(context));
@@ -83,7 +83,7 @@ public:
      */
 	void connectionAccepted(int fd,const SocketAddress& clientAddr)
 	noexcept override{
-		std::cout << "fd: " << fd << "\n";
+		std::cout << "server:fd: " << fd << "\n";
 	};
 
 	/**
@@ -179,6 +179,7 @@ void IPCServer::start(std::function<void()> onSuccess,
 	// TODO:Install signal handler
 
 	mainEventBase_->loopForever();
+    std::cout << "server start\n";
 }
 
 

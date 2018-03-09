@@ -15,7 +15,7 @@
  */
 //#include "RequestHandlerFactory.h"
 
-namespace ipc{
+namespace singaistorageipc{
 
 /**
  * Configure context for IPC server
