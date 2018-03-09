@@ -113,7 +113,7 @@ private:
      */
     //std::vector<const folly::AsyncServerSocket*> sockets_;
 
-    std::share_ptr<IPCSocketPoolContext> context_;
+    std::shared_ptr<IPCSocketPoolContext> context_;
 
     /**
      * Event base in which we binded server sockets.

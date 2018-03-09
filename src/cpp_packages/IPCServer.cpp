@@ -8,6 +8,7 @@
 #include <folly/executors/thread_factory/NamedThreadFactory.h>
 #include <folly/system/ThreadName.h>
 #include <folly/io/async/AsyncServerSocket.h>
+#include <folly/executors/IOThreadPoolExecutor.h>
 
 #include "lib/IPCServer.h"
 
@@ -18,14 +19,14 @@ using folly::AsyncServerSocket;
 namespace ipc{
 
 IPCServer::IPCServer(IPCSocketPoolContext context){
-	context_ = std::make_shared<IPCSocketPoolContext>(std::move(context));
+	this.context_ = std::make_shared<IPCSocketPoolContext>(std::move(context));
 }
 
-void IPCServer::bind(std::vector<IPConfig>&& addrs) {
+void IPCServer::bind(std::vector<folly::SocketAddress>&& addrs) {
   addresses_ = std::move(addrs);
 }
 
-void IPCServer::bind(std::vector<IPConfig> const& addrs) {
+void IPCServer::bind(std::vector<folly::SocketAddress> const& addrs) {
   addresses_ = addrs;
 }
 
