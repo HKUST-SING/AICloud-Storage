@@ -13,7 +13,7 @@
 /**
  * Internal dependence
  */
-#include "RequestHandlerFactory.h"
+//#include "RequestHandlerFactory.h"
 
 namespace ipc{
 
@@ -48,7 +48,7 @@ public:
      * Chain length may only be 1 now, but we keep the chain feature for
      * future development.
      */
-    std::vector<std::unique_ptr<RequestHandlerFactory>> handlerFactories;
+    //std::vector<std::unique_ptr<RequestHandlerFactory>> handlerFactories;
 
     /**
      * This idle timeout serves following purpose -
