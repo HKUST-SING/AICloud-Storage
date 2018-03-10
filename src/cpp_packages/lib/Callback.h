@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <iostream>
+
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/io/async/AsyncTransport.h>
 
@@ -31,7 +33,7 @@ public:
      */
 	void connectionAccepted(int fd,const folly::SocketAddress& clientAddr)
 	noexcept override{
-		std::cout << "fd:" << fd << std::endl;
+		std::cout << "connection:" << fd << std::endl;
 	};
 
 	/**
@@ -88,8 +90,119 @@ public:
 /*
  * This callback will be invoked when a socket can be read by server.
  */
-//class ServerReadCallback : public folly::AsyncReader::ReadCallback{
+class ServerReadCallback : public folly::AsyncReader::ReadCallback{
+public:
+	// TODO: User need set buffer size when create this callback
+	explicit ServerReadCallback(size_t buf,
+		const std::shared_ptr<AsyncSocket>& socket)
+	: buffersize_(buf),
+	  socket_(socket){};
 
-//};
+	/**
+     * When data becomes available, getReadBuffer() will be invoked to get the
+     * buffer into which data should be read.
+     *
+     * This method allows the ReadCallback to delay buffer allocation until
+     * data becomes available.  This allows applications to manage large
+     * numbers of idle connections, without having to maintain a separate read
+     * buffer for each idle connection.
+     *
+     * It is possible that in some cases, getReadBuffer() may be called
+     * multiple times before readDataAvailable() is invoked.  In this case, the
+     * data will be written to the buffer returned from the most recent call to
+     * readDataAvailable().  If the previous calls to readDataAvailable()
+     * returned different buffers, the ReadCallback is responsible for ensuring
+     * that they are not leaked.
+     *
+     * If getReadBuffer() throws an exception, returns a nullptr buffer, or
+     * returns a 0 length, the ReadCallback will be uninstalled and its
+     * readError() method will be invoked.
+     *
+     * getReadBuffer() is not allowed to change the transport state before it
+     * returns.  (For example, it should never uninstall the read callback, or
+     * set a different read callback.)
+     *
+     * @param bufReturn getReadBuffer() should update *bufReturn to contain the
+     *                  address of the read buffer.  This parameter will never
+     *                  be nullptr.
+     * @param lenReturn getReadBuffer() should update *lenReturn to contain the
+     *                  maximum number of bytes that may be written to the read
+     *                  buffer.  This parameter will never be nullptr.
+     */
+    void getReadBuffer(void** bufReturn, size_t* lenReturn);
+
+    bool isBufferMovable() noexcept override{
+    	return true;
+    }
+
+    size_t maxBufferSize() const override{
+    	return buffersize_;
+    }
+
+    /**
+     * readBufferAvailable() will be invoked when data has been successfully
+     * read.
+     *
+     * Note that only either readBufferAvailable() or readDataAvailable() will
+     * be invoked according to the return value of isBufferMovable(). The timing
+     * and aftereffect of readBufferAvailable() are the same as
+     * readDataAvailable()
+     *
+     * @param readBuf The unique pointer of read buffer.
+     */
+
+    void readBufferAvailable(std::unique_ptr<IOBuf> /*readBuf*/) noexcept;
+
+    /**
+     * readEOF() will be invoked when the transport is closed.
+     *
+     * The read callback will be automatically uninstalled immediately before
+     * readEOF() is invoked.
+     */
+    //virtual void readEOF() noexcept；
+
+     /**
+     * readError() will be invoked if an error occurs reading from the
+     * transport.
+     *
+     * The read callback will be automatically uninstalled immediately before
+     * readError() is invoked.
+     *
+     * @param ex        An exception describing the error that occurred.
+     */
+    //void readErr(const AsyncSocketException& ex) noexcept;
+
+private:
+	size_t buffersize_;
+	std::shared_ptr<AsyncSocket> socket_;
+};
+
+class ServerWriteCallback : public folly::AsyncWriter:WriteCallBack{
+public:
+	explicit ServerWriteCallback(int fd):fd_(fd){};
+	/**
+     * writeSuccess() will be invoked when all of the data has been
+     * successfully written.
+     *
+     * Note that this mainly signals that the buffer containing the data to
+     * write is no longer needed and may be freed or re-used.  It does not
+     * guarantee that the data has been fully transmitted to the remote
+     * endpoint.  For example, on socket-based transports, writeSuccess() only
+     * indicates that the data has been given to the kernel for eventual
+     * transmission.
+     */
+    void writeSuccess() noexcept;
+
+    /**
+     * writeError() will be invoked if an error occurs writing the data.
+     *
+     * @param bytesWritten      The number of bytes that were successfull
+     * @param ex                An exception describing the error that occurred.
+     */
+    void writeErr(size_t bytesWritten, 
+    	const AsyncSocketException& ex) noexcept;
+private:
+	int fd_
+};
 
 }
