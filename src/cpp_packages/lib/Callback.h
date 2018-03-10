@@ -178,9 +178,7 @@ public:
 
     void readDataAvailable(size_t len) noexcept override{};
 
-    bool isBufferMovable() noexcept override{
-      return false;
-    }
+    void readEOF() noexcept override{};
 
 private:
 	size_t buffersize_;
