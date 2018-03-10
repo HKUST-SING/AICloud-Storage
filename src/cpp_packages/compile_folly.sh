@@ -8,5 +8,6 @@ if [ $# -eq 0 ]; then
   echo "No arguments supplied"
 fi
 
+output=$(echo $1|cut -d "." -f 1)
 
-g++ -std=c++14 "$@" -lfolly -lpthread -lglog -levent -ldl -ldouble-conversion
+g++ -std=c++14 "$@" -lfolly -lpthread -lglog -levent -ldl -ldouble-conversion -o $output
