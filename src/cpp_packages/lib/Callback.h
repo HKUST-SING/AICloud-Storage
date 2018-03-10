@@ -11,6 +11,8 @@
 #include <folly/io/async/AsyncSocket.h>
 #include <folly/io/async/EventBaseManager.h>
 #include <folly/io/IOBuf.h>
+#include <folly/io/IOBufQueue.h>
+#include <folly/SocketAddress.h>
 
 namespace singaistorageipc{
 /*

@@ -4,10 +4,13 @@
 
 #include "lib/Callback.h"
 
+#include <folly/io/IOBufQueue.h>
+#include <folly/SocketAddress.h>
+
 
 namespace singaistorageipc{
 
-void ServerAcceptCallback::(int fd,const folly::SocketAddress& clientAddr)noexcept{
+void ServerAcceptCallback::connectionAccepted(int fd,const folly::SocketAddress& clientAddr)noexcept{
 		folly::AsyncSocket s(std::move
         	(folly::EventBaseManager::get()->getEventBase()),fd);
         ServerReadCallback cb(10,std::make_shared<folly::AsyncSocket>(s));
