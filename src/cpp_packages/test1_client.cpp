@@ -1,5 +1,4 @@
-#include "../lib/IPCServer.h"
-#include "../lib/IPCSocketPoolContext.h"
+#include "lib/Callback.h"
 
 #include <folly/SocketAddress.h>
 #include <folly/io/async/AsyncSocket.h>
@@ -45,6 +44,11 @@ int main(int argc, char** argv){
 	cb.successCallback = [](){std::cout<<"client success\n";};
 	cb.errorCallback = [](){std::cout<<"client fail\n";};
 	socket->connect(&cb,addr,30);
+
+  ServerWriteCallback wcb(socket->getFd());
+  char* str = "p";
+  socket->write(&wcb,str,1);
+
 	evb.loop();
 
 	return 0;
