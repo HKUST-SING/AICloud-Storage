@@ -2,7 +2,7 @@
  * This head file contains all callback we need to use.
  */
 
-#pragma once;
+#pragma once
 
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/io/async/AsyncTransport.h>
@@ -29,7 +29,7 @@ public:
      *                    client's address.  This struct is only guaranteed to
      *                    remain valid until connectionAccepted() returns.
      */
-	void connectionAccepted(int fd,const SocketAddress& clientAddr)
+	void connectionAccepted(int fd,const folly::SocketAddress& clientAddr)
 	noexcept override{
 		std::cout << "fd:" << fd << std::endl;
 	};

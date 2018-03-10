@@ -1,7 +1,7 @@
 /*
  * Parse arguments at the start of macheine.
  */
-#pragma once;
+#pragma once
 
 #include <map>
 
@@ -13,8 +13,9 @@ public:
 		argc(argc),
 		argv(argv){};
 
-	map<char,int> parse(int argc,char** argv){
-		return nullptr;
+	std::map<char,int> parse(int argc,char** argv){
+		std::map<char,int> a;
+		return a;
 	};
 
 private:
