@@ -176,6 +176,12 @@ public:
      */
     void readErr(const folly::AsyncSocketException& ex) noexcept override{};
 
+    void readDataAvailable(size_t len) noexcept override{};
+
+    bool isBufferMovable() noexcept override{
+      return false;
+    }
+
 private:
 	size_t buffersize_;
 	std::shared_ptr<folly::AsyncSocket> socket_;
