@@ -9,6 +9,7 @@
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocket.h>
+#include <folly/io/async/EventBaseManagement.h>
 #include <folly/io/IOBuf.h>
 
 namespace singaistorageipc{
@@ -35,7 +36,10 @@ public:
      */
 	void connectionAccepted(int fd,const folly::SocketAddress& clientAddr)
 	noexcept override{
-		std::cout << "connection:" << fd << std::endl;
+		folly::AsyncSocket s(std::move
+            (folly::EventBaseManager::get()->getEventBase()),fd);
+        ServerReadCallback cb(10,std::make_shared<folly::AsyncSocket>(s));
+        s.setReadCB(&cb);
 	};
 
 	/**
@@ -131,7 +135,7 @@ public:
      *                  maximum number of bytes that may be written to the read
      *                  buffer.  This parameter will never be nullptr.
      */
-    void getReadBuffer(void** bufReturn, size_t* lenReturn);
+    void getReadBuffer(void** bufReturn, size_t* lenReturn) override;
 
     bool isBufferMovable() noexcept override{
     	return true;
@@ -177,6 +181,7 @@ public:
 private:
 	size_t buffersize_;
 	std::shared_ptr<folly::AsyncSocket> socket_;
+    folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
 };
 
 class ServerWriteCallback : public folly::AsyncWriter::WriteCallback{
