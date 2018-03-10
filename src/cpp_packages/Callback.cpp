@@ -13,10 +13,10 @@
 namespace singaistorageipc{
 
 void ServerAcceptCallback::connectionAccepted(int fd,const folly::SocketAddress& clientAddr)noexcept{
-		folly::AsyncSocket s(std::move
-        	(folly::EventBaseManager::get()->getEventBase()),fd);
-        ServerReadCallback cb(10,std::make_shared<folly::AsyncSocket>(s));
-        s.setReadCB(&cb);
+	auto s = folly::AsyncSocket::newSocket(folly::EventBaseManager::get()->getEventBase(),fd);
+//        ServerReadCallback cb(10,s);
+	ServerReadCallback cb(10,s);
+        s->setReadCB(&cb);
 };
 
 void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){

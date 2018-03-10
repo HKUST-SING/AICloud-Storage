@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include <folly/io/async/AsyncServerSocket.h>
+#include <folly/io/async/AsyncSocketException.h>
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocket.h>
 #include <folly/io/async/EventBaseManager.h>
@@ -96,7 +97,7 @@ public:
 class ServerReadCallback : public folly::AsyncReader::ReadCallback{
 public:
 	// TODO: User need set buffer size when create this callback
-	explicit ServerReadCallback(size_t buf,
+	ServerReadCallback(size_t buf,
 		const std::shared_ptr<folly::AsyncSocket>& socket)
 	: buffersize_(buf),
 	  socket_(socket){};
@@ -173,7 +174,7 @@ public:
      *
      * @param ex        An exception describing the error that occurred.
      */
-    //void readErr(const AsyncSocketException& ex) noexcept;
+    void readErr(const folly::AsyncSocketException& ex) noexcept override{};
 
 private:
 	size_t buffersize_;
@@ -183,7 +184,7 @@ private:
 
 class ServerWriteCallback : public folly::AsyncWriter::WriteCallback{
 public:
-	explicit ServerWriteCallback(int fd):fd_(fd){};
+	ServerWriteCallback(int fd):fd_(fd){};
 	/**
      * writeSuccess() will be invoked when all of the data has been
      * successfully written.
