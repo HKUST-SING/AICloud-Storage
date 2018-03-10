@@ -6,6 +6,8 @@
 
 #include <folly/io/IOBufQueue.h>
 #include <folly/SocketAddress.h>
+#include <folly/io/async/AsyncSocket.h>
+#include <folly/io/async/AsyncSocketException.h>
 
 
 namespace singaistorageipc{
