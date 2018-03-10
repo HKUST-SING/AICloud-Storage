@@ -2,18 +2,18 @@
 
 #include <iostream>
 
-
+#include "lib/Callback.h"
 
 
 namespace singaistorageipc{
 
-void writeSuccess() override{
-    	std::cout << fd_ << ":write successfully" << std::endl
+void ServerWriteCallback::writeSuccess() noexcept{
+    	std::cout << fd_ << ":write successfully" << std::endl;
 };
 
 void ServerWriteCallback::writeErr(size_t bytesWritten, 
-    	const AsyncSocketException& ex) override{
-    	std::cout << fd_ << ":" << ex.what() << std::endl;
+    	const folly::AsyncSocketException& ex) noexcept{
+    	std::cout << fd_ << ":error in write" << std::endl;
 };
 
 }

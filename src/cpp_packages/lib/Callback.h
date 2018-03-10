@@ -8,6 +8,8 @@
 
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/io/async/AsyncTransport.h>
+#include <folly/io/async/AsyncSocket.h>
+#include <folly/io/IOBuf.h>
 
 namespace singaistorageipc{
 /*
@@ -94,7 +96,7 @@ class ServerReadCallback : public folly::AsyncReader::ReadCallback{
 public:
 	// TODO: User need set buffer size when create this callback
 	explicit ServerReadCallback(size_t buf,
-		const std::shared_ptr<AsyncSocket>& socket)
+		const std::shared_ptr<folly::AsyncSocket>& socket)
 	: buffersize_(buf),
 	  socket_(socket){};
 
@@ -133,11 +135,11 @@ public:
 
     bool isBufferMovable() noexcept override{
     	return true;
-    }
+    };
 
     size_t maxBufferSize() const override{
     	return buffersize_;
-    }
+    };
 
     /**
      * readBufferAvailable() will be invoked when data has been successfully
@@ -151,7 +153,7 @@ public:
      * @param readBuf The unique pointer of read buffer.
      */
 
-    void readBufferAvailable(std::unique_ptr<IOBuf> /*readBuf*/) noexcept;
+    void readBufferAvailable(std::unique_ptr<folly::IOBuf> /*readBuf*/) noexcept;
 
     /**
      * readEOF() will be invoked when the transport is closed.
@@ -174,10 +176,10 @@ public:
 
 private:
 	size_t buffersize_;
-	std::shared_ptr<AsyncSocket> socket_;
+	std::shared_ptr<folly::AsyncSocket> socket_;
 };
 
-class ServerWriteCallback : public folly::AsyncWriter:WriteCallBack{
+class ServerWriteCallback : public folly::AsyncWriter::WriteCallback{
 public:
 	explicit ServerWriteCallback(int fd):fd_(fd){};
 	/**
@@ -191,7 +193,7 @@ public:
      * indicates that the data has been given to the kernel for eventual
      * transmission.
      */
-    void writeSuccess() noexcept;
+    void writeSuccess() noexcept override;
 
     /**
      * writeError() will be invoked if an error occurs writing the data.
@@ -200,9 +202,9 @@ public:
      * @param ex                An exception describing the error that occurred.
      */
     void writeErr(size_t bytesWritten, 
-    	const AsyncSocketException& ex) noexcept;
+    	const folly::AsyncSocketException& ex) noexcept override;
 private:
-	int fd_
+	int fd_;
 };
 
 }
