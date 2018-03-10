@@ -1,5 +1,5 @@
-#include "lib/IPCServer.h"
-#include "lib/IPCSocketPoolContext.h"
+#include "../lib/IPCServer.h"
+#include "../lib/IPCSocketPoolContext.h"
 
 #include <folly/SocketAddress.h>
 #include <folly/io/async/AsyncSocket.h>
@@ -35,16 +35,8 @@ class ConnCallback : public folly::AsyncSocket::ConnectCallback {
 };
 
 int main(int argc, char** argv){
-	IPCSocketPoolContext context;
-	IPCServer server(context);
 
 	folly::SocketAddress addr = folly::SocketAddress::makeFromPath("server_socket");
-	std::vector<folly::SocketAddress> a = {addr};
-
-	server.bind(a);
-	std::thread t([&](){
-		server.start();
-	});
 
 	folly::EventBase evb;
 	std::shared_ptr<folly::AsyncSocket> socket = folly::AsyncSocket::newSocket(&evb);

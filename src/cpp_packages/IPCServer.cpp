@@ -160,10 +160,10 @@ void IPCServer::start(std::function<void()> onSuccess,
 			serverSocket->addAcceptCallback(&a,mainEventBase_);
             serverSocket->listen(context_->listenBacklog);
 
-			auto f = [&](){
+//			auto f = [&](){
 				serverSocket->startAccepting();
-			};
-			listen_pool->add(f);
+//			};
+//			listen_pool->add(f);
 		}
 	}catch (const std::exception& ex) {
     	stop();
