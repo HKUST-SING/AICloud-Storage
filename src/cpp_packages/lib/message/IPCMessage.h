@@ -44,7 +44,7 @@ public:
 		return msgLength_;
 	};
 
-private:
+protected:
 	MessageType msgType_;
 
 	uint32_t msgLength_;
