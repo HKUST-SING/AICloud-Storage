@@ -25,15 +25,16 @@ public:
 		CON_REPLY = 4
 	};
 
-	virtual uint32_t computeLength();
+	virtual IPCMessage();
 
 	/**
 	 * Parse a message. If the message don't meet the type, just return false.
-	 *
-	 * parse() and createMsg() should call computeLength().
 	 */
 	virtual bool parse(std::unique_ptr<folly::IOBuf>);
 
+	/**
+	 * createMsg() should call computeLength().
+	 */
 	virtual std::unique_ptr<folly::IOBuf> createMsg();
 
 	MessageType getType(){
@@ -48,6 +49,8 @@ protected:
 	MessageType msgType_;
 
 	uint32_t msgLength_;
+private:
+	virtual uint32_t computeLength();
 };
 
 }
