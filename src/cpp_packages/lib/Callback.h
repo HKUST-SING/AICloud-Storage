@@ -72,9 +72,8 @@ public:
     ServerReadCallback(size_t buf,
         const std::shared_ptr<folly::AsyncSocket>& socket)
     : buffersize_(buf),
-      socket_(socket){
-        wcb(socket.get()->getFd());
-      };
+      socket_(socket),
+      wcb(socket.get()->getFd()){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
