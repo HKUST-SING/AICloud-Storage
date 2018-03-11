@@ -34,6 +34,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 			<< readBuffer_.front()->data() 
 			<< ":" << readBuffer_.front()->length()
 			<< std::endl;
+	socket_->writeChain(&wcb,std::move(readBuffer_.front()));
 };
 
 void ServerReadCallback::readBufferAvailable(
