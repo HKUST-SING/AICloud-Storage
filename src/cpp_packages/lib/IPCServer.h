@@ -10,7 +10,7 @@
 /**
  * Internal dependence
  */
-#include "lib/IPCContext.h"
+#include "IPCContext.h"
 
 namespace singaistorageipc{
 
