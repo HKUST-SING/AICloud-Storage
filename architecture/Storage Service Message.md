@@ -12,11 +12,11 @@
 | `char*`    | username                                    |
 | `char[32]` | password (hash)                             |
 
-| Data type  | Read                   |
-| ---------- | ---------------------- |
-| `uint16_t` | path_length (in bytes) |
-| `char*`    | path_value             |
-| `uint32_t` | properties (bitmap)    |
+| Data type  | Read                    |
+| ---------- | ----------------------- |
+| `uint16_t` | path_length (in bytes)  |
+| `char*`    | path_value              |
+| `uint32_t` | properties (bitmap/flag)|
 
 | Data type  | Write                  |
 | ---------- | ---------------------- |
@@ -29,6 +29,8 @@
 | Data type  | Status      |
 | ---------- | ----------- |
 | `uint16_t` | status_type |
+| `uint16_t` |   op_code   |
+| `char*`    |  data_path  |
 
 | Data type  | CON_REPLY            |
 | ---------- | -------------------- |
