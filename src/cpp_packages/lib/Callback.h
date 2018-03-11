@@ -17,7 +17,7 @@
 
 namespace singaistorageipc{
 
-class ClientConnectionCallback : public folly::AsyncSocket::ConnectionEventCallback{
+class ClientConnectionCallback : public folly::AsyncServerSocket::ConnectionEventCallback{
 public:
     void onConnectionAccepted(const int socket,
             const SocketAddress& addr) noexcept override{};
