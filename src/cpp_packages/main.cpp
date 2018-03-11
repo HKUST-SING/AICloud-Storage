@@ -3,7 +3,7 @@
 #include "lib/ParseArg.h"
 #include "lib/IPCServer.h"
 #include "lib/IPCContext.h"
-#include "lib/message/IPCAuthentication.h"
+#include "lib/message/IPCAuthenticationMessage.h"
 
 using namespace singaistorageipc;
 

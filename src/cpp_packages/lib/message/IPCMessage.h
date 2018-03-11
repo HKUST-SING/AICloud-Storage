@@ -25,8 +25,6 @@ public:
 		CON_REPLY = 4
 	};
 
-	virtual IPCMessage();
-
 	/**
 	 * Parse a message. If the message don't meet the type, just return false.
 	 */
