@@ -20,13 +20,13 @@
 
 ###Method
 
-`Future <Task> write (Task);`
+`Future <Task> writeStoreObj (Task);`
 
-`Future <Task> read (Task);`
+`Future <Task> readStoreObj (Task);`
 
-`Future <Task> delete (Task);`
+`Future <Task> deleteStoreObj (Task);`
 
-`Future <Task> completeRead(Task);`
+`Future <Task> completeReadStoreObj(Task);`
 
 
 
