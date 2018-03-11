@@ -29,6 +29,11 @@ void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
 
 void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	readBuffer_.postallocate(len);
+	std::cout << "read data available:"<< isBufferMovable() << std::endl;
+	std::cout << socket_->getFd() << ":" 
+			<< readBuffer_.front()->data() 
+			<< ":" << readBuffer_.front()->length()
+			<< std::endl;
 };
 
 void ServerReadCallback::readBufferAvailable(
