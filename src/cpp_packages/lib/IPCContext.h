@@ -1,6 +1,8 @@
 /*
  * IPCContext includes the argument needed in IPCServer
  */
+#pragma once
+
 #include <folly/SocketAddress.h> 
 
 #include "callback/ServerAcceptCallback.h"
