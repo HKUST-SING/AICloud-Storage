@@ -1,6 +1,7 @@
 /*
  * Define the message structure used in IPC
  */
+#pragma once
 
 #include <folly/io/IOBuf.h>
 
