@@ -49,7 +49,8 @@ int main(int argc, char** argv){
   ServerWriteCallback wcb(socket->getFd());
   std::string data = "pssadd";
   auto buf = folly::IOBuf::copyBuffer(data.c_str(), data.length());
-  socket->write(&wcb,std::move(buf));
+  std::cout << "write data:" << buf->data()<< std::endl;
+  socket->writeChain(&wcb,std::move(buf));
 
 	evb.loop();
 
