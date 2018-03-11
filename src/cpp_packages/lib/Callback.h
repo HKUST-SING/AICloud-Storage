@@ -16,6 +16,26 @@
 #include <folly/SocketAddress.h>
 
 namespace singaistorageipc{
+
+class ClientConnectionCallback : public folly::AsyncSocket::ConnectionEventCallback{
+public:
+    void onConnectionAccepted(const int socket,
+            const SocketAddress& addr) noexcept override{};
+    void onConnectionAcceptError(const int err) noexcept noexcept override{};
+    void onConnectionDropped(const int socket,
+            const SocketAddress& addr) noexcept override{}; 
+    void onConnectionEnqueuedForAcceptorCallback(
+        const int socket,
+        const SocketAddress& addr) noexcept override{};
+    void onConnectionDequeuedByAcceptorCallback(
+        const int socket,
+        const SocketAddress& addr) noexcept override{};
+    void onBackoffStarted() noexcept override{};
+    void onBackoffEnded() noexcept override{};
+    void onBackoffError() noexcept override{};
+};
+
+
 /*
  *This callback will be invoked when a connection event happen.
  */

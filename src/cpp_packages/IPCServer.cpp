@@ -28,6 +28,8 @@ void IPCServer::start(){
     socket->bind(addr);
     ServerAcceptCallback cb;
     socket->addAcceptCallback(&cb,std::move(evb));
+    ClientConnectionCallback ccb;
+    socket->setConnectionEventCallback(&ccb);
     socket->listen(10);
     socket->startAccepting();
     std::cout << "server starting......" << std::endl;
