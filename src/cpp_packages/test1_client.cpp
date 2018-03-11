@@ -50,7 +50,7 @@ int main(int argc, char** argv){
   std::string data = "pssadd";
   auto buf = folly::IOBuf::copyBuffer(data.c_str(), data.length());
   socket->writeChain(&wcb,std::move(buf));
-
+  socket->close();
 	evb.loop();
 
 	return 0;

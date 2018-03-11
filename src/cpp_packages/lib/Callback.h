@@ -112,6 +112,7 @@ public:
 
 private:
     std::vector<std::shared_ptr<folly::AsyncSocket>> sockets_pool_;
+    std::vector<std::shared_ptr<ServerReadCallback>> readcallbacks_pool_;
 };
 
 /*
