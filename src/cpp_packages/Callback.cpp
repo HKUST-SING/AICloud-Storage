@@ -26,7 +26,7 @@ void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
     *lenReturn = res.second;	
 };
 
-void ServerReadCallback::readDataAvailable(size_t len){
+void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	readBuffer_.postallocate(len);
 };
 
