@@ -18,10 +18,10 @@ namespace singaistorageipc{
 class IPCMessage{
 public:
 	enum class MessageType : uint8_t{
-		STATUS = 0;
-		AUTH = 1;
-		READ = 2;
-		WRITE = 3;
+		STATUS = 0,
+		AUTH = 1,
+		READ = 2,
+		WRITE = 3,
 		CON_REPLY = 4
 	};
 
