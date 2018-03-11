@@ -24,7 +24,7 @@ namespace singaistorageipc{
 void IPCServer::start(){
     auto evb = folly::EventBaseManager::get()->getEventBase();
     auto socket = folly::AsyncServerSocket::newSocket(std::move(evb));
-    folly::SocketAddress addr = folly::SocketAddress::makeFromPath("server_socket");
+    folly::SocketAddress addr = folly::SocketAddress::makeFromPath("/tmp/sing_ipc_socket");
     socket->bind(addr);
     ServerAcceptCallback cb;
     socket->addAcceptCallback(&cb,std::move(evb));

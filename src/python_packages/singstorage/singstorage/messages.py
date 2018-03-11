@@ -113,7 +113,7 @@ class AuthMessage(InterMessage):
 	"""
 	def __init__(self, username="", passwd=b""):
 		super(AuthMessage, self).__init__(MSG_AUTH, 
-										  len(username)+HASH_LENGHT + 2)
+										  len(username)+HASH_LENGTH + 2)
 		self.user_name    = username
 		self.passwd_hash  = passwd      
 
@@ -122,9 +122,10 @@ class AuthMessage(InterMessage):
 		"""
 			Encode the content of the message into binary form.
 		"""
-		msg_beg, vals = super.encode_msg()
+		msg_beg, vals = super(AuthMessage, self).encode_msg()
+
 		string_val = "B"*len(self.user_name)
-		code_val = msg_beg.join(["H", string_val, HASH_CODE])
+		code_val = "".join([msg_beg, "H", string_val, HASH_CODE])
 		vals.append(len(self.user_name)) # append length value
 		
 		# encode chars
@@ -132,7 +133,7 @@ class AuthMessage(InterMessage):
 			vals.append(ord(char_name))
 		
 		
-		for char_pass in self.passwd_hash:
+		for char_pass in self.passwd_hash[0:HASH_LENGTH:1]:
 			if PYTHON_MAJOR_VERSION == 2:
 				vals.append(ord(char_pass))
 
@@ -195,9 +196,9 @@ class ReadMessage(InterMessage):
 		"""
 			Encode the content of the message into binary form.
 		"""
-		msg_beg, vals = super.encode_msg()
+		msg_beg, vals = super(ReadMessage, self).encode_msg()
 		string_val = "B"*len(self.data_path)
-		code_val = msg_beg.join(["H", string_val, "I"])
+		code_val = "".join([msg_beg, "H", string_val, "I"])
 		vals.append(len(self.data_path)) # append length value
 		
 		# encode chars
@@ -252,9 +253,9 @@ class WriteMessage(InterMessage):
 		"""
 			Encode the content of the message into binary form.
 		"""
-		msg_beg, vals = super.encode_msg()
+		msg_beg, vals = super(WriteMessage, self).encode_msg()
 		string_val = "B"*len(self.data_path)
-		code_val = msg_beg.join(["H", string_val, "IQQ"])
+		code_val = "".join([msg_beg, "H", string_val, "IQQ"])
 		vals.append(len(self.data_path)) # append lenght value
 		
 		# encode chars
@@ -303,7 +304,7 @@ class StatusMessage(InterMessage):
 		Operation status message.
 	"""
 	def __init__(self, status_type=255):
-		super(AuthMessage, self).__init__(MSG_STATUS, 
+		super(StatusMessage, self).__init__(MSG_STATUS, 
 										  2)
 		self.op_status    = status_type
 		    
@@ -312,8 +313,8 @@ class StatusMessage(InterMessage):
 		"""
 			Encode the content of the message into binary form.
 		"""
-		msg_beg, vals = super.encode_msg()
-		code_val = msg_beg.join(["H"])
+		msg_beg, vals = super(StatusMessage, self).encode_msg()
+		code_val =  "".join([msg_beg, "H"])
 		vals.append(self.op_status)
 
 		# done
@@ -352,8 +353,8 @@ class ConReplyMessage(InterMessage):
 		"""
 			Encode the content of the message into binary form.
 		"""
-		msg_beg, vals = super.encode_msg()
-		code_val   = msg_beg.join(["QIQI", HASH_CODE, HASH_CODE])
+		msg_beg, vals = super(ConReplyMessage, self).encode_msg()
+		code_val   = "".join([msg_beg, "QIQI", HASH_CODE, HASH_CODE])
 		
 		
 		# set the required values

@@ -292,12 +292,12 @@ class UserContext(object):
 			Initialize the user and try to connect to the 
 			sing storage service for data storage processing.
 		"""
-		return
+		#return
 
 		tmp_logger = logging.getLogger(__name__)
 		tmp_logger.info("connect_to_service")
 
-		self._ctrl = ControlIPC.create_control_ipc(
+		self._ctrl = sing_ipc.ControlIPC.create_control_ipc(
 					 sing_ipc.CONTROL_SOCKET)
 
 
@@ -322,7 +322,7 @@ class UserContext(object):
 			else:
 				res_service = sing_errs.INTERNAL_ERROR
 
-		except: 
+		except:
 			res_service = sing_errs.INTERNAL_ERROR
 
 		# failed to connect to the storage service

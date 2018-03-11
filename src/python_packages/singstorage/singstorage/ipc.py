@@ -17,6 +17,7 @@ import logging
 # Package modules
 import singstorage.singexcept        as sing_errs
 from   singstorage.messages          import InterMessage  
+import singstorage.messages	     as sing_msgs
 import singstorage.utils.loc_logging as sing_log
 
 
@@ -151,7 +152,7 @@ class SocketIPC(ControlIPC):
 	def connect_to_service(self, username, password):
 
 		# get logger
-		tmp_logger = logging.getLoggger(__name__)
+		tmp_logger = logging.getLogger(__name__)
 
 		if not self._sock or not self._rem_addr:
 			# log the case
@@ -215,7 +216,7 @@ class SocketIPC(ControlIPC):
 		# try to write the message 
 		tmp_logger.info("Encoded message is being sent to the service")
 		self._sock.sendall(bin_data, 0)
-		res_msg = self._sock.recv_request(sing_msgs.MSG_STATUS)
+		res_msg = self.recv_request(sing_msgs.MSG_STATUS)
 
 		return res_msg.op_status # return the status
 
@@ -229,7 +230,7 @@ class SocketIPC(ControlIPC):
 		tmp_logger = logging.getLogger(__name__)
 		tmp_logger.info("recv_request: ".format(req_type))
 
-		msg = sing_msgs.create_message(req_type, **kwargs)
+		msg = InterMessage.create_message(req_type, **kwargs)
 		
 
 		if not msg:
@@ -238,7 +239,7 @@ class SocketIPC(ControlIPC):
 
 		# read the header of the received message
 		header = self._sock.recv(msg.get_header_size(), 0)
-		
+               	
 
 		if len(header) != msg.get_header_size() or\
 			msg.msg_type != req_type:
