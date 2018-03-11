@@ -3,6 +3,7 @@
 #include <folly/SocketAddress.h>
 #include <folly/io/async/AsyncSocket.h>
 #include <folly/io/async/EventBase.h>
+#include <folly/io/IOBuf.h>
 
 #include <iostream>
 
@@ -46,8 +47,9 @@ int main(int argc, char** argv){
 	socket->connect(&cb,addr,30);
 
   ServerWriteCallback wcb(socket->getFd());
-  char* str = "p";
-  socket->write(&wcb,str,1);
+  std::string data = "pssadd";
+  auto buf = folly::IOBuf::copyBuffer(data.c_str(), data.length());
+  socket->write(&wcb,std::move(buf));
 
 	evb.loop();
 
