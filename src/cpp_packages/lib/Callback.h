@@ -95,7 +95,7 @@ public:
      * been made yet).
      */
 	void acceptStarted() noexcept override{
-
+        
 	};
 
 	/**
@@ -107,8 +107,11 @@ public:
      * after acceptStopped() is invoked.
      */
 	void acceptStopped() noexcept override{
-
+        sockets_pool_.clear();
 	};
+
+private:
+    std::vector<std::shared_ptr<folly::AsyncSocket>> sockets_pool_;
 };
 
 /*
