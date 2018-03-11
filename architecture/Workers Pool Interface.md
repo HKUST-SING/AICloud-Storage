@@ -26,7 +26,7 @@
 
 `Future <Task> deleteStoreObj (Task);`
 
-`Future <Task> completeRead(Task);`
+`Future <Task> completeReadStoreObj(Task);`
 
 
 
