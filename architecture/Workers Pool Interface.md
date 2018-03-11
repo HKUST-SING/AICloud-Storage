@@ -15,7 +15,8 @@
 4. Data address (shared memory)
 5. Data length (shared memory)
 6. Transction ID (uint32_t)
-7. Op code
+7. Worker ID (uint32_t)
+7. Op code (result infomation)
 
 ###Method
 
@@ -25,7 +26,7 @@
 
 `Future <Task> delete (Task);`
 
-
+`Future <Task> completeRead(Task);`
 
 
 
