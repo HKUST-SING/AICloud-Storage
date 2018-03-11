@@ -2,7 +2,10 @@
 
 #include <iostream>
 
-#include "lib/Callback.h"
+#include "lib/callback/ClientConnectionCallback.h"
+#include "lib/callback/ServerAcceptCallback.h"
+#include "lib/callback/ServerReadCallback.h"
+#include "lib/callback/ServerWriteCallback.h"
 
 #include <folly/io/IOBufQueue.h>
 #include <folly/SocketAddress.h>

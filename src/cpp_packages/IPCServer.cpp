@@ -16,7 +16,8 @@
 /**
  * Internal dependence
  */
-#include "lib/Callback.h"
+#include "lib/callback/ServerAcceptCallback.h"
+#include "lib/callback/ClientConnectionCallback.h"
 #include "lib/IPCServer.h"
 
 namespace singaistorageipc{
