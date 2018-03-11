@@ -26,6 +26,10 @@ void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
     *lenReturn = res.second;	
 };
 
+void ServerReadCallback::readDataAvailable(size_t len){
+	readBuffer_.postallocate(len);
+};
+
 void ServerReadCallback::readBufferAvailable(
 	std::unique_ptr<folly::IOBuf> readBuf)noexcept{
 	std::cout << socket_->getFd() << ":" 

@@ -95,7 +95,7 @@ public:
      * been made yet).
      */
 	void acceptStarted() noexcept override{
-        
+
 	};
 
 	/**
@@ -199,7 +199,7 @@ public:
      */
     void readErr(const folly::AsyncSocketException& ex) noexcept override{};
 
-    void readDataAvailable(size_t len) noexcept override{};
+    void readDataAvailable(size_t len) noexcept override;
 
     void readEOF() noexcept override{};
 
