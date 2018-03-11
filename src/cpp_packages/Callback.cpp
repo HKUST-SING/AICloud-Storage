@@ -30,13 +30,12 @@ void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
 void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	readBuffer_.postallocate(len);
 	std::cout << "read data available:"<< isBufferMovable() << std::endl;
+	auto buf = std::move(readBuffer_.pop_front());
 	std::cout << socket_->getFd() << ":" 
-			<< readBuffer_.front()->data() 
-			<< ":" << readBuffer_.front()->length()
-			<< std::endl;
-	auto buf = folly::IOBuf::copyBuffer(readBuffer_.front()->data(),
-		readBuffer_.front()->length());
-	socket_->writeChain(&wcb,std::move(buf));
+			<< buf->data() 
+			<< ":" << buf->length()
+			<< std::endl; 
+	//socket_->writeChain(&wcb,std::move(buf));
 };
 
 void ServerReadCallback::readBufferAvailable(
