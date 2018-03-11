@@ -15,8 +15,8 @@ namespace singaistorageipc{
 void ServerAcceptCallback::connectionAccepted(int fd,const folly::SocketAddress& clientAddr)noexcept{
 	auto s = folly::AsyncSocket::newSocket(folly::EventBaseManager::get()->getEventBase(),fd);
 //        ServerReadCallback cb(10,s);
-	auto cb = std::make_shared(new ServerReadCallback(1000,s));
-        s->setReadCB(cb);
+	auto cb = std::shared_ptr<ServerReadCallback>(new ServerReadCallback(1000,s));
+        s->setReadCB(cb.get());
     sockets_pool_.emplace_back(s);
     readcallbacks_pool_.emplace_back(cb);
 };
