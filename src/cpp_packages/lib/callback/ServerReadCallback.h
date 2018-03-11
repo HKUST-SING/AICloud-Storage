@@ -19,9 +19,9 @@ public:
     // TODO: User need set buffer size when create this callback
     ServerReadCallback(size_t buf,
         const std::shared_ptr<folly::AsyncSocket>& socket)
-    : buffersize_(buf),
+    : bufferSize_(buf),
       socket_(socket),
-      wcb(socket.get()->getFd()){};
+      wcb_(socket.get()->getFd()){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -61,7 +61,7 @@ public:
     };
 
     size_t maxBufferSize() const override{
-        return buffersize_;
+        return bufferSize_;
     };
 
     /**
@@ -102,10 +102,10 @@ public:
     void readEOF() noexcept override{};
 
 private:
-    size_t buffersize_;
+    size_t bufferSize_;
     std::shared_ptr<folly::AsyncSocket> socket_;
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
-    ServerWriteCallback wcb;
+    ServerWriteCallback wcb_;
 };
 
 }

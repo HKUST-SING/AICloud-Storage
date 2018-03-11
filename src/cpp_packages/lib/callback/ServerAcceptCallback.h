@@ -79,12 +79,12 @@ public:
      * after acceptStopped() is invoked.
      */
 	void acceptStopped() noexcept override{
-        sockets_pool_.clear();
+        socketsPool_.clear();
 	};
 
 private:
-    std::vector<std::shared_ptr<folly::AsyncSocket>> sockets_pool_;
-    std::vector<std::shared_ptr<ServerReadCallback>> readcallbacks_pool_;
+    std::vector<std::shared_ptr<folly::AsyncSocket>> socketsPool_;
+    std::vector<std::shared_ptr<ServerReadCallback>> readcallbacksPool_;
 };
 
 

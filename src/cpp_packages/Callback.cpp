@@ -20,8 +20,8 @@ void ServerAcceptCallback::connectionAccepted(int fd,const folly::SocketAddress&
 //        ServerReadCallback cb(10,s);
 	auto cb = std::shared_ptr<ServerReadCallback>(new ServerReadCallback(1000,s));
         s->setReadCB(cb.get());
-    sockets_pool_.emplace_back(s);
-    readcallbacks_pool_.emplace_back(cb);
+    socketsPool_.emplace_back(s);
+    readcallbacksPool_.emplace_back(cb);
 };
 
 void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
