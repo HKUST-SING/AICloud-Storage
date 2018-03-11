@@ -10,13 +10,18 @@
 /**
  * Internal dependence
  */
+#include "lib/IPCContext.h"
 
 namespace singaistorageipc{
 
 class IPCServer final{
 public:
+	IPCServer(IPCContext context):context_(context){};
+
     void start();
 
+private:
+	IPCContext context_;
 };
 
 }

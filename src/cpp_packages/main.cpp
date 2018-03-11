@@ -2,12 +2,14 @@
 
 #include "lib/ParseArg.h"
 #include "lib/IPCServer.h"
+#include "lib/IPCContext.h"
 
 using namespace singaistorageipc;
 
 int main(int argc,char** argv){
 	Parser p(argc,argv);
-	IPCServer s;
+	IPCContext c("/tmp/ipc_server_socket",10);
+	IPCServer s(c);
 	s.start();
 
 	return 0;

@@ -2,15 +2,7 @@
  * Define the message structure used in IPC
  */
 
-/**
- * The following values are used in `msg_type`.
- */
-
-#define STATUS    0
-#define AUTH      1
-#define READ      2
-#define WRITE     3
-#define CON_REPLY 4
+#include <folly/io/IOBuf.h>
 
 namespace singaistorageipc{
 
@@ -22,50 +14,39 @@ namespace singaistorageipc{
  *
  * All properties are bitmap.
  */
-typedef struct{
-	uint16_t status_type;			
-}StatusINFO;
+class IPCMessage{
+public:
+	enum class MessageType : uint8_t{
+		STATUS = 0;
+		AUTH = 1;
+		READ = 2;
+		WRITE = 3;
+		CON_REPLY = 4
+	};
 
-typedef struct{
-	uint16_t username_length;
-	char* username;
-	char[64] password;
-}AuthINFO;
+	virtual uint32_t computeLength();
 
-typedef struct{
-	uint16_t path_length;
-	char* path_value;
-	uint32_t properties;
-}ReadINFO;
+	/**
+	 * Parse a message. If the message don't meet the type, just return false.
+	 *
+	 * parse() and createMsg() should call computeLength().
+	 */
+	virtual bool parse(std::unique_ptr<folly::IOBuf>);
 
-typedef struct{
-	uint16_t path_length;
-	char* path_value;
-	uint32_t properties;
-	uint64_t starting_address;
-	uint64_t data_length;
-}WriteINFO;
+	virtual std::unique_ptr<folly::IOBuf> createMsg();
 
-typedef struct{
-	uint64_t write_buffer_address;
-	uint32_t write_buffer_size;
-	uint64_t read_buffer_address;
-	uint32_t read_buffer_size;
-	char[32] write_buffer_name;
-	char[32] read_buffer_name;
-}ReplyINFO;
+	MessageType getType(){
+		return msgType_;
+	};
 
+	uint32_t getLength(){
+		return msgLength_;
+	};
 
-typedef struct IPCMessage{
-	uint8_t msg_type;
-	uint32_t msg_length;
-	union{
-		StatusINFO status;
-		AuthINFO auth;
-		ReadINFO read;
-		WriteINFO write;
-		ReplyINFO reply; 
-	}
-} IPCMessage;
+private:
+	MessageType msgType_;
+
+	uint32_t msgLength_;
+};
 
 }
