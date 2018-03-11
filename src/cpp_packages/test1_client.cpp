@@ -46,12 +46,14 @@ int main(int argc, char** argv){
 	cb.errorCallback = [](){std::cout<<"client fail\n";};
 	socket->connect(&cb,addr,30);
 
+  ServerReadCallback rcb(1000,socket);
+  socket->setReadCB(&rcb);
+
   ServerWriteCallback wcb(socket->getFd());
   std::string data = "pssadd";
   auto buf = folly::IOBuf::copyBuffer(data.c_str(), data.length());
   socket->writeChain(&wcb,std::move(buf));
-  socket->close();
-	evb.loop();
+	evb.loopForever();
 
 	return 0;
 }
