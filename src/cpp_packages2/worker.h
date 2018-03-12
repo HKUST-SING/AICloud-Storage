@@ -18,20 +18,7 @@ namespace singaistorageipc
 class Worker
 {
 
-  private:
-    std::mutex initLock_;
-    std::condition_variable initCond_;
-    bool init_ = false;
-    std::atomic<unsigned int> norefs_;
-    unsigned int id_; 
-    std::vector< std::pair<uint32_t, StoreObj> > pendObjs_;
-
-    Security* secure_; // pointer to the security module
-
-
   public:
-
-    bool done_ = false; // if the worker has completed its work
 
     /** 
      * A worker interface which executes Ceph requests on behalf
@@ -138,6 +125,17 @@ class Worker
         init_cond.wait(tmp);
       }
     }
+
+
+  bool done_ = false; // if the worker has completed its work
+
+  protected:
+    std::mutex initLock_;
+    std::condition_variable initCond_;
+    bool init_ = false;
+    std::atomic<unsigned int> norefs_;
+    unsigned int id_; 
+    Security* secure_; // pointer to the security module
   
 
 }; // class Worker
