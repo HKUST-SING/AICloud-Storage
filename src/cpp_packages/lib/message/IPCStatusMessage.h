@@ -9,7 +9,7 @@
 
 #include <folly/io/IOBuf.h>
 
-#include <lib/message/IPCMessage.h>
+#include "IPCMessage.h"
 
 namespace singaistorageipc{
 

@@ -4,8 +4,8 @@
 #include <folly/io/async/AsyncSocket.h>
 #include <folly/io/async/EventBaseManager.h>
 
-#include <lib/callback/ServerAcceptCallback.h>
-#include <lib/callback/ServerReadCallback.h>
+#include "ServerAcceptCallback.h"
+#include "ServerReadCallback.h"
 
 namespace singaistorageipc{
 

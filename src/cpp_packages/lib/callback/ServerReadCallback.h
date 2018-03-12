@@ -6,8 +6,7 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/AsyncSocketException.h>
 
-#include <lib/callback/ServerWriteCallback.h>
-#include <lib/message/IPCMessage.h>
+#include "ServerWriteCallback.h"
 
 
 namespace singaistorageipc{
@@ -112,8 +111,6 @@ private:
     std::shared_ptr<folly::AsyncSocket> socket_;
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
-
-    IPCMessage getMessage(std::unique_ptr<folly::IOBuf>);
 };
 
 }
