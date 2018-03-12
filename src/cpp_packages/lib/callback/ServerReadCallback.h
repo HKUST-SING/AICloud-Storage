@@ -6,7 +6,8 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/AsyncSocketException.h>
 
-#include "ServerWriteCallback.h"
+#include <lib/callback/ServerWriteCallback.h>
+#include <lib/message/IPCMessage.h>
 
 
 namespace singaistorageipc{
@@ -22,6 +23,10 @@ public:
     : bufferSize_(buf),
       socket_(socket),
       wcb_(socket.get()->getFd()){};
+
+    ~ServerReadCallback(){
+        readBuffer_.clear();
+    };
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -57,7 +62,7 @@ public:
     void getReadBuffer(void** bufReturn, size_t* lenReturn) override;
 
     bool isBufferMovable() noexcept override{
-        return true;
+        return false;
     };
 
     size_t maxBufferSize() const override{
@@ -76,7 +81,8 @@ public:
      * @param readBuf The unique pointer of read buffer.
      */
 
-    void readBufferAvailable(std::unique_ptr<folly::IOBuf> /*readBuf*/) noexcept override;
+    void readBufferAvailable(std::unique_ptr<folly::IOBuf> /*readBuf*/) 
+     noexcept override{};
 
     /**
      * readEOF() will be invoked when the transport is closed.
@@ -84,7 +90,9 @@ public:
      * The read callback will be automatically uninstalled immediately before
      * readEOF() is invoked.
      */
-    //virtual void readEOF() noexcept；
+    virtual void readEOF() noexcept override{
+        readBuffer_.clear();
+    }；
 
      /**
      * readError() will be invoked if an error occurs reading from the
@@ -99,13 +107,13 @@ public:
 
     void readDataAvailable(size_t len) noexcept override;
 
-    void readEOF() noexcept override{};
-
 private:
     size_t bufferSize_;
     std::shared_ptr<folly::AsyncSocket> socket_;
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
+
+    IPCMessage getMessage(std::unique_ptr<folly::IOBuf>);
 };
 
 }

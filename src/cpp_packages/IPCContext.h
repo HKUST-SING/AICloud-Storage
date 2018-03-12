@@ -5,8 +5,8 @@
 
 #include <folly/SocketAddress.h> 
 
-#include "callback/ServerAcceptCallback.h"
-#include "callback/ClientConnectionCallback.h"
+#include <lib/callback/ServerAcceptCallback.h>
+#include <lib/callback/ClientConnectionCallback.h>
 
 namespace singaistorageipc{
 

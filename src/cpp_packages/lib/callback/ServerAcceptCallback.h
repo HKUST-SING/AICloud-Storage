@@ -4,7 +4,7 @@
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/SocketAddress.h>
 
-#include "ServerReadCallback.h"
+#include <lib/callback/ServerReadCallback.h>
 
 namespace singaistorageipc{
 
@@ -80,6 +80,7 @@ public:
      */
 	void acceptStopped() noexcept override{
         socketsPool_.clear();
+        readcallbacksPool_.clear();
 	};
 
 private:

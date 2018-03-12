@@ -1,8 +1,8 @@
 #pragma once
 
 #include "lib/ParseArg.h"
-#include "lib/IPCServer.h"
-#include "lib/IPCContext.h"
+#include "IPCServer.h"
+#include "IPCContext.h"
 
 using namespace singaistorageipc;
 
