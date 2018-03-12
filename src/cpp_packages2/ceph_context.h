@@ -29,22 +29,24 @@ class CephContext
     CephContext() = delete; // no dfault constructor
     ~CephContext();
     CephContext& operator=(const CephContext&) = delete;
-    CephContext(const CephContext&); // supports copy constructor
-    CephContext(std::string&& userName, std::string&& clusterName, 
-                const uint64_t flags);
-    CephContext(const std::string& userName, 
+    CephContext(const CephContext&);   // support copy constructor
+    CephContext(CephContext&&)=delete; // rados does not support
+
+    CephContext(const char* conf, std::string&& userName, 
+                std::string&& clusterName, const uint64_t flags);
+
+    CephContext(const char* conf, const std::string& userName, 
                 const std::string& clusterName, const uint64_t flags);
  
     
-    bool initAndConnect(const char* confFile);
+    bool initAndConnect();
     /**
      * Initializes the ceph context. Must be called from the same thread
      * after construction. The method initialized the cluster handle
      * and tries to connect to the cluster.
      * 
-     * @param: confile: path to Ceph configuration file.
      *
-     * @return: true on succes, false on failure
+     * @return: true on succes, false on failure.
      */
 
 
@@ -140,6 +142,8 @@ class CephContext
     std::string clusterName_; // cluster name
     std::string accessName_;  // username used for accessing 
                               //data in cluster
+
+    const char* confFile_;    // Ceph configuration file
 
     uint64_t accessFlags_;    // access flags (Ceph specific)
     std::map<std::string, librados::IoCtx> ioOps_; // IO handles 

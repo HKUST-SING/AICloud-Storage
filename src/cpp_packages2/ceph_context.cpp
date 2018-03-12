@@ -12,19 +12,23 @@ namespace singaistorageipc
 using std::string;
 
 
-CephContext::CephContext(const string& userName, const string& clusterName,
+CephContext::CephContext(const char* conf, const string& userName, 
+                         const string& clusterName,
                          const uint64_t flags)
 : clusterName_(clusterName), 
   accessName_(userName),
+  confFile_(conf),
   accessFlags_(flags),
   init_(false)
 {}
 
 
-CephContext::CephContext(string&& userName, string&& clusterName,
+CephContext::CephContext(const char* conf, string&& userName, 
+                         string&& clusterName,
                          const uint64_t flags)
 : clusterName_(std::move(clusterName)), 
   accessName_(std::move(userName)),
+  confFile_(conf),
   accessFlags_(flags),
   init_(false)
 {}
@@ -34,8 +38,10 @@ CephContext::CephContext(const CephContext& other)
 : clusterName_(other.clusterName_),
   accessName_(other.accessName_),
   accessFlags_(other.accessFlags_),
+  confFile_(other.confFile_),
   init_(false)
 {}
+
 
 
 CephContext::~CephContext()
@@ -46,12 +52,21 @@ CephContext::~CephContext()
     init_ = false;
   }
 
+  // reset the configuration file
+  confFile_ = nullptr; 
+
 }
 
 
 bool
-CephContext::initAndConnect(const char* confile)
+CephContext::initAndConnect()
 {
+
+  if(init_) // already initialized
+  {
+   return true;
+  }
+
   // try first to initialize the rados handle
   int ret = cluster_.init2(accessName_.c_str(), clusterName_.c_str(),
                            accessFlags_);
@@ -66,7 +81,7 @@ CephContext::initAndConnect(const char* confile)
 
 
   // read a Ceph configuration file to configure the cluster handle
-  ret = cluster_.conf_read_file(confile);
+  ret = cluster_.conf_read_file(confFile_);
   
   if(ret < 0)
   {

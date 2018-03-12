@@ -9,11 +9,12 @@
 #include <cstdint>
 #include <map>
 #include <cstdint>
+#include <memory>
 
 
 // Facebook folly
 #include <folly/futures/Promise.h>
-
+#include <folly/futures/Future.h>
 
 // Ceph libraries
 #include <rados/librados.hpp>
@@ -22,6 +23,7 @@
 #include "store_obj.h"
 #include "worker.h"
 #include "concurrent_queue.h"
+#include "ceph_context.h"
 
 namespace singaistorageipc
 {
@@ -44,12 +46,13 @@ class StoreWorker: public Worker
     StoreWorker& operator=(const Worker&) = delete; // no assigment
 
     
-    StoreWorker(const unsigned int id, Security* sec);
+    StoreWorker(const CephContext& ctx, const unsigned int id, 
+                std::shared_ptr<Security> sec);
 
     virtual ~StoreWorker(); // destructor shall be virtual
 
 
-    virtual void initialize() override; // initialize the worker
+    virtual bool initialize() override; // initialize the worker
     virtual void destroy() override;    // destroy the worker
   
     virtual Future<Task> writeStoreObj(const Task& task) override;
@@ -134,13 +137,14 @@ class StoreWorker: public Worker
                             // the consumer servs them.
 
 
-    //std::map<uint32_t, StoreObj> pendTasks_; // completed remotely 
+    std::map<uint32_t, StoreObj> pendTasks_; // completed remotely 
                                              // tasks, pending for 
                                              // further processing
                                              // locally
 
-  
 
+    CephContext cephCtx_;                   // for ceph communication  
+                                            // (accesing the Cluster)
 }; // class Worker
 
 

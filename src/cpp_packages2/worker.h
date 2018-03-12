@@ -8,6 +8,7 @@
 #include <vector>
 #include <utility>
 #include <cstdint>
+#include <memory>
 
 
 // Facebook folly lib
@@ -43,13 +44,19 @@ class Worker
     Worker& operator=(const Worker&) = delete; // no assigment
 
     
-    Worker(const unsigned int id, Security* sec);
+    Worker(const unsigned int id, std::shared_ptr<Security> sec)
+    : id_(id), secure_(sec)
+    {}
+    
 
-    virtual ~Worker(); // destructor shall be virtual
+    virtual ~Worker() // destructor shall be virtual
+    {
+     secure_ = nullptr; // reduce the number of references
+    } 
 
 
-    virtual void initialize() {} // initialize the worker
-    virtual void destroy() {}    // destroy the worker
+    virtual bool initialize() {return true;} // initialize the worker
+    virtual void destroy() {}               // destroy the worker
   
     virtual Future<Task> writeStoreObj(const Task& task) = 0;
     /**
@@ -146,7 +153,7 @@ class Worker
     bool init_ = false;
     std::atomic<unsigned int> norefs_;
     unsigned int id_; 
-    Security* secure_; // pointer to the security module
+    std::shared_ptr<Security> secure_; // pointer to the security module
   
 
 }; // class Worker
