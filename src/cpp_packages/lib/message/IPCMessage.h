@@ -28,12 +28,12 @@ public:
 	/**
 	 * Parse a message. If the message don't meet the type, just return false.
 	 */
-	virtual bool parse(std::unique_ptr<folly::IOBuf>);
+	virtual bool parse(std::unique_ptr<folly::IOBuf>) = 0;
 
 	/**
 	 * createMsg() should call computeLength().
 	 */
-	virtual std::unique_ptr<folly::IOBuf> createMsg();
+	virtual std::unique_ptr<folly::IOBuf> createMsg() = 0;
 
 	MessageType getType(){
 		return msgType_;
@@ -48,7 +48,7 @@ protected:
 
 	uint32_t msgLength_;
 private:
-	virtual uint32_t computeLength();
+	virtual uint32_t computeLength() = 0;
 };
 
 }

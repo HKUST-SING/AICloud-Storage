@@ -13,17 +13,15 @@
 
 namespace singaistorageipc{
 
-class IPCStatueMessage : public IPCMessage{
+class IPCStatusMessage : public IPCMessage{
 public:
-	IPCStatueMessage(){
+	IPCStatusMessage(){
 		msgType_ = IPCMessage::MessageType::STATUS;
 	};
 
 	bool parse(std::unique_ptr<folly::IOBuf> msg) override{
 		auto data = msg.get()->data();
 		auto length = msg.get()->length();
-
-		void *begin = data;
 
 		IPCMessage::MessageType *msgtype = (IPCMessage::MessageType *)data;
 		if(*msgtype != IPCMessage::MessageType::STATUS){
@@ -44,7 +42,8 @@ public:
 		memcpy(&opCode_,data,sizeof(uint16_t));
 
 		data += sizeof(uint16_t);
-		pathVal_ = std::string((char*)data,begin + length - data);
+		auto tail = msg.get()->tail();
+		pathVal_ = std::string((char*)data,tail-data);
 
 		return true;
 	};
