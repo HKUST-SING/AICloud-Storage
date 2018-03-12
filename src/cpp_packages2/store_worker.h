@@ -32,21 +32,6 @@ class StoreWorker: public Worker
 
   public:
 
-
-    struct CephComm
-    {
-      librados::Rados cluster_; // one cluster at most
-      std::string clusterName_; // cluster name
-      std::string  accessName_; // user name used for accessing
-                                // the Ceph storage cluster
-      uint64_t    accessFlags_; // falgs for Ceph usage
-      std::map<std::string, librados::IoCtx> ioOps_; 
-                                           // references to possible
-                                           // communications
-    }
-
-
-
     /** 
      * First rough implmentaiton of the storage worker. This worker
      * provides no gurantee that data has been stored proerly, or 
@@ -149,13 +134,11 @@ class StoreWorker: public Worker
                             // the consumer servs them.
 
 
-    std::map<uint32_t, StoreObj> pendTasks_; // completed remotely 
+    //std::map<uint32_t, StoreObj> pendTasks_; // completed remotely 
                                              // tasks, pending for 
                                              // further processing
                                              // locally
 
-
-   ceph::libardos:
   
 
 }; // class Worker

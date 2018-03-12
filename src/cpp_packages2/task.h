@@ -2,7 +2,7 @@
 namespace singaistorageipc
 {
 
-class Security
+class Task
 {
 }; // class Security
 

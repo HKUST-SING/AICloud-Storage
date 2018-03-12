@@ -9,7 +9,7 @@ namespace singaistorageipc
 {
 
 
-typename <class T>
+template <class T>
 class ConcurrentQueue
 {
 
@@ -23,7 +23,7 @@ class ConcurrentQueue
     ConcurrentQueue();
     ~ConcurrentQueue();
     ConcurrentQueue(const ConcurrentQueue&) = delete;
-    operator=(const ConcurrentQueue&) = delete;
+    ConcurrentQueue& operator=(const ConcurrentQueue&) = delete;
 
 
     T pop();
@@ -56,8 +56,14 @@ class ConcurrentQueue
 
 
 
-}; // ConcurrentQueue
+}; // class ConcurrentQueue
+} // namespace singaistorageipc
 
+
+
+
+namespace singaistorageipc
+{
 
 // template class implementation
 
@@ -73,12 +79,12 @@ T ConcurrentQueue<T>::pop()
 {
   std::unique_lock<std::mutex> tmp(mutex_);
 
-  while(tasks._empty()) // wait until there is something to pop
+  while(queue_.empty()) // wait until there is something to pop
   { 
     cond_.wait(tmp);
   }
 
-  auto item = queue_.front()
+  auto item = queue_.front();
   queue_.pop();
 
   return std::move(item);
@@ -102,7 +108,7 @@ bool ConcurrentQueue<T>::push(const T& item)
 template <class T>
 bool ConcurrentQueue<T>::push(T&& item)
 {
-  std::unique_lock tmp(mutex_);
+  std::unique_lock<std::mutex> tmp(mutex_);
   queue_.push(std::move(item));
   
   tmp.unlock();

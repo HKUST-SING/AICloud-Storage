@@ -1,6 +1,8 @@
 
 #pragma once
 
+
+// C++ std lib
 #include <mutex>
 #include <condition_variable> 
 #include <vector>
@@ -8,12 +10,21 @@
 #include <cstdint>
 
 
+// Facebook folly lib
+#include <folly/futures/Future.h>
+
+
+// Project lib
 #include "store_obj.h"
+#include "security.h"
+#include "task.h"
 
 
 namespace singaistorageipc
 {
 
+
+using folly::Future;
 
 class Worker
 {
@@ -122,7 +133,7 @@ class Worker
       
       while(!init_) // wait for the worker to be initialized
       {
-        init_cond.wait(tmp);
+        initCond_.wait(tmp);
       }
     }
 
@@ -130,8 +141,8 @@ class Worker
   bool done_ = false; // if the worker has completed its work
 
   protected:
-    std::mutex initLock_;
-    std::condition_variable initCond_;
+    mutable std::mutex initLock_;
+    mutable std::condition_variable initCond_;
     bool init_ = false;
     std::atomic<unsigned int> norefs_;
     unsigned int id_; 
