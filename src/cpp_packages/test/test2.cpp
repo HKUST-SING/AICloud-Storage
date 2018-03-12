@@ -1,11 +1,16 @@
 //#include "lib/IPCServer.h"
 //#include "lib/IPCSocketPoolContext.h"
-
-#include <folly/SocketAddress.h>
 //#include <folly/io/async/AsyncSocket.h>
 //#include <folly/io/async/EventBase.h>
 
 #include <iostream>
+#include <cstring>
+
+#include "../lib/message/IPCAuthenticationMessage.h"
+#include "../lib/message/IPCConnectionReplyMessage.h"
+#include "../lib/message/IPCReadRequestMessage.h"
+#include "../lib/message/IPCWriteRequestMessage.h"
+#include "../lib/message/IPCStatusMessage.h"
 
 //using namespace singaistorageipc;
 
@@ -34,11 +39,23 @@ class ConnCallback : public folly::AsyncSocket::ConnectCallback {
   VoidCallback errorCallback;
 };
 */
+
+void setUsername(const std::string& name){
+	std::string a = name;
+	std::cout << a << std::endl;
+};
+
+using namespace singaistorageipc;
+
 int main(int argc, char** argv){
 	//IPCSocketPoolContext context;
 	//IPCServer server(context);
-	std::cout << "h" << std::endl;
-	folly::SocketAddress addr = folly::SocketAddress::makeFromPath("server_socket");
+	IPCAuthenticationMessage msg;
+	IPCConnectionReplyMessage msg2;
+	IPCReadRequestMessage msg3;
+	IPCWriteRequestMessage msg4;
+	IPCStatusMessage msg5;
+	std::cout << "finish" << std::endl;
 	//std::vector<folly::SocketAddress> a = {addr};
 /*
 	server.bind(a);

@@ -1,6 +1,7 @@
 /**
- * This message is used for client authentication
+ * This message is used for client read request and server write response.
  */
+
 #pragma once
 
 #include <cstring>
@@ -12,10 +13,12 @@
 
 namespace singaistorageipc{
 
-class IPCAuthenticationMessage : public IPCMessage{
+class IPCReadRequestMessage : public IPCMessage{
 public:
-	IPCAuthenticationMessage(){
-		msgType_ = IPCMessage::MessageType::AUTH;
+	IPCReadRequestMessage(){
+		msgType_ = IPCMessage::MessageType::READ;
+		pathLength_ = 0;
+		properties_ = 0;
 	};
 
 	bool parse(std::unique_ptr<folly::IOBuf> msg) override{
@@ -23,7 +26,7 @@ public:
 		auto length = msg.get()->length();
 
 		IPCMessage::MessageType *msgtype = (IPCMessage::MessageType *)data;
-		if(*msgtype != IPCMessage::MessageType::AUTH){
+		if(*msgtype != IPCMessage::MessageType::READ){
 			return false;
 		}
 
@@ -35,13 +38,13 @@ public:
 		}
 
 		data += sizeof(uint32_t);
-		memcpy(&usernameLength_,data,sizeof(uint16_t));
+		memcpy(&pathLength_,data,sizeof(uint16_t));
 
 		data += sizeof(uint16_t);
-		username_ = std::string((char*)data,usernameLength_);
+		pathVal_ = std::string((char*)data,pathLength_);
 
-		data += usernameLength_ * sizeof(char);
-		memcpy(password_,data,32*sizeof(char));
+		data += pathLength_ * sizeof(char);
+		memcpy(&properties_,data,sizeof(uint32_t));
 
 		return true;
 	};
@@ -56,51 +59,53 @@ public:
 		memcpy(tmp,&msgLength_,sizeof(uint32_t));
 		tmp += sizeof(uint32_t);
 
-		memcpy(tmp,&usernameLength_,sizeof(uint16_t));
+		memcpy(tmp,&pathLength_,sizeof(uint16_t));
 		tmp += sizeof(uint16_t);
 
-		memcpy(tmp,username_.c_str(),usernameLength_ * sizeof(char));
-		tmp += usernameLength_ * sizeof(char);
+		memcpy(tmp,pathVal_.c_str(),pathLength_ * sizeof(char));
+		tmp += pathLength_ * sizeof(char);
 
-		memcpy(tmp,password_,32*sizeof(char));
+		memcpy(tmp,&properties_,sizeof(uint32_t));
 
 		auto iobuf = folly::IOBuf::copyBuffer(buffer,msgLength_);
 
 		return std::move(iobuf);
 	};
 
-	void setUsername(const std::string& name){
-		username_ = name;
-		usernameLength_ = username_.length() * sizeof(char);
+
+
+	void setPath(const std::string& val){
+		pathVal_ = val;
+		pathLength_ = pathVal_.length() * sizeof(char);
 	};
 
-	void setPassword(char *val){
-		memcpy(password_,val,32*sizeof(char));
+	void setProperties(uint32_t p){
+		properties_ = p;
 	};
 
-	uint16_t getUsernameLength(){
-		return usernameLength_;
+	uint16_t getPathLength(){
+		return pathLength_;
 	};
 
-	std::string getUsername(){
-		return username_;
+	std::string getPath(){
+		return pathVal_;
 	};
 
-	void getPassword(char *rval){
-		memcpy(rval,password_,32*sizeof(char));
+	uint32_t getProperties(){
+		return properties_;
 	};
 
 private:
-	uint16_t usernameLength_;
-	std::string username_;
-	char password_[32];
+	uint16_t pathLength_;
+	std::string pathVal_;
+	uint32_t properties_;
 
 	uint32_t computeLength() override{
 		msgLength_ = sizeof(IPCMessage::MessageType)
 					+ sizeof(uint32_t)
 					+ sizeof(uint16_t)
-					+ (usernameLength_ * sizeof(char))
-					+ (32 * sizeof(char));
+					+ (pathLength_ * sizeof(char))
+					+ sizeof(uint32_t);
 		return msgLength_;
 	};
 };
