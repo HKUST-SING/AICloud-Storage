@@ -24,9 +24,9 @@ public:
 	/**
 	 * Used for create a request.
 	 */
-	Task(std::string username, std::string path, OpType opType,
-		uint64_t dataAddr, uint32_t dataSize, uint32_t tranID,
-		uint32_t workerID = 0)
+	Task(const std::string& username, const std::string& path, 
+		OpType opType, uint64_t dataAddr, uint32_t dataSize,
+		uint32_t tranID, uint32_t workerID = 0)
 		:username_(username),path_(path),opType_(opType),
 		dataAddr_(dataAddr),dataSize_(dataSize),tranID_(tranID),
 		workerID_(workerID){};
@@ -34,8 +34,8 @@ public:
 	/**
 	 * Used for create a response.
 	 */
-	Task(std::string username, std::string path, uint32_t tranID,
-		uint32_t workerID, OpCode opCode)
+	Task(const std::string& username, const std::string& path,
+		uint32_t tranID, uint32_t workerID, OpCode opCode)
 		:username_(username),path_(path),tranID_(tranID),
 		workerID_(workerID),opCode_(opCode){};
 

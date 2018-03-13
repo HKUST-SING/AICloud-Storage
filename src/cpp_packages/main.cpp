@@ -1,4 +1,3 @@
-#pragma once
 
 #include "lib/ParseArg.h"
 #include "IPCServer.h"

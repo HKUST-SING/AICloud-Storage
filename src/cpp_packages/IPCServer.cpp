@@ -1,7 +1,6 @@
 /* Can test
  * IPC server object.
  */
-#pragma once
 
 #include <iostream>
 

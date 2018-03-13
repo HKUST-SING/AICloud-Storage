@@ -1,4 +1,3 @@
-#pragma once
 
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/IOBuf.h>
