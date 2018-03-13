@@ -1,7 +1,5 @@
 // C++ std lib
-#include <algorithm>
 #include <cstring>
-
 
 // Project lib
 #include "store_obj.h"
@@ -13,12 +11,11 @@ StoreObj::StoreObj(const char* glKey, const uint32_t noShreds,
                    const uint64_t totalSize)
 : shreds_(noShreds),
   size_(totalSize),
-  std::strcpy(globalId_, glKey),
   totalRead_(0),
   containData_(0)
 
 {
-
+  std::strcpy(globalId_, glKey);
 }
 
 
@@ -27,80 +24,135 @@ StoreObj::StoreObj(StoreObj&& other)
 : shreds_(other.shreds_),
   size_(other.size_),
   totalRead_(other.totalRead_),
-  conatinData_(other.containData_),
-  strcpy(globalId_, other.globalId_),
-  radosObjs_(std::move(radosObjs_))
-{}
+  containData_(other.containData_),
+  radosObjs_(std::move(other.radosObjs_))
+{
+  std::strcpy(globalId_, other.globalId_);
+}
     
 
 bool 
 StoreObj::appendToShred(const uint32_t shredIdx, librados::bufferlist& bl)
 {
   // first check if it is the last one
-  if()
+  if(radosObjs_.empty())
+  {
+    return false; // must create a shred first
+  }
+
+ 
+  // check if to the last shred to append
+  if(radosObjs_.back().index_ == shredIdx)
+  { // fast and convenient append
+    radosObjs_.back().rawData_.claim_append(bl, 
+               librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE); 
+                                // potentially zero-copy append
+   
+    // update potential number of bytes to read
+    containData_ += static_cast<uint64_t>(bl.length()); 
+    return true; // successful append 
+   
+  }
+  
+
+
+  // look for the shred and try to append to its end
+  for(auto& radObj : radosObjs_) // look for the index, and 
+                                 // if it is found, append data
+  {
+    if(radObj.index_ == shredIdx)
+    {
+      radObj.rawData_.claim_append(bl, 
+             librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE); 
+                              // potentially zero-copy append
+
+      // update length
+      containData_ += static_cast<uint64_t>(bl.length());
+      return true; // successful append
+    }
+  }
+
+  return false; // cannot find the shred
 }
 
 
-    void createShred(const std::string& shredKey, const uint32_t shredIdx,
-                   librados::bufferlist&& bl);
-    /** 
-     * Method for creating a new object shred (Rados object).
-     * 
-     * @param: shredKey: shred key (Rados key)
-     * @param: shredIdx: shred index within this storage object
-     * @param: bl: initial data for creating a new shred
-     */
- 
 
-   char* getRawBytes(uint64_t& needBytes);
-   /** 
-    * Return the required number of bytes if possible and 
-    * update the internal offsets.
-    *
-    * @param needBytes: number of bytes requested to read
-    *
-    * @return: pointer to the data and number of bytes returned
-    */
+bool
+StoreObj::createShred(const std::string& shredKey, const uint32_t shredIdx,
+                   librados::bufferlist& bl)
+{
+  // append the shred to back of the objects
+  ObjShred tmpObj(shredIdx, shredKey); // create a new shred
   
+  // append to the end
+  radosObjs_.push_back(std::move(tmpObj)); // added data
 
-   inline uint64_t availableData() const
-   /**
-    * Returns the number of bytes available for reading in total.
-    */
-   {
-     return containData_;
-   }
-
-   inline uint64_t storeObjComplete() const
-   /** 
-    * Check if the entire object has already been read.
-    *
-    * @return: true if the entire storage object has beeen read;
-    */
-   
-    {
-      return (totalRead_ == size_);
-    }
+  // append the raw data
+  radosObjs_.back().rawData_.claim_append(bl, 
+                  librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE);
 
 
-  private:
-    uint32_t total_;                  // total number of shreds that
-                                      // make up one storage object
+  // update the total number of available data
+  containData_ += static_cast<uint64_t>(bl.length());
 
-    uint64_t size_;                   // size of the storage object 
-                                      // in bytes
-    uint64_t totalRead_;              // total number of bytes read
-                                      // from this object 
-
-
-    uint64_t containData_;            // bytes of data that are available
-                                      // for reading
-
-    const char[GLOBAL_ID_LENGTH];     // global storage object id
+  return true; // success
+}
  
-    std::vector<ObjShred> radosObjs_; // Rados objects that make up
-                                      // this storage object
 
-}; // class StoreOj
+char*
+StoreObj::getRawBytes(uint64_t& needBytes)
+{
+  // read data sequentially and return bytes of a shred
+  
+  // start at the front
+
+  if(containData_ == 0) // no data for reading
+  {
+    needBytes = 0;
+    return nullptr;
+  }  
+
+
+  while(radosObjs_.front().offset_ == radosObjs_.front().rawData_.length())
+  { // consider the front to be read
+    // remove it
+    radosObjs_.pop_front(); // pop the front and its data
+    
+  }
+
+ 
+  auto& tmpFront = radosObjs_.front(); // get reference to the front
+  const uint64_t canRead = static_cast<uint64_t>(tmpFront.rawData_.length() - tmpFront.offset_);
+
+  unsigned int readOffset = 0; // for returning data
+
+  // check if can read is larger than needBytes
+  if(needBytes > canRead)
+  {
+    needBytes     = canRead; // set the number of bytes to return
+    containData_ -= canRead; // update the number of available bytes
+    totalRead_   += canRead;  // update the number of read bytes (total)
+
+    readOffset   = tmpFront.offset_; // get read offset
+    // need to pop in the next read call
+    tmpFront.offset_ = tmpFront.rawData_.length();
+    
+    
+  }
+  else // read just a part of the front shred
+  {
+    containData_  -= needBytes; // update the number of available bytes
+    totalRead_    += needBytes; // update the number of read bytes (total)
+    
+    readOffset  = tmpFront.offset_; // read offset
+    // need to update the offset of the front shred
+    tmpFront.offset_ += static_cast<unsigned int>(needBytes);
+  }
+
+
+  // return the address of data to read
+  return (tmpFront.rawData_.c_str() + readOffset);
+}
+  
 
 } // namesapce singaistorageipc
