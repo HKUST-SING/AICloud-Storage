@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 namespace singaistorageipc{
 
@@ -14,7 +15,8 @@ public:
 	enum class OpType : uint8_t{
 		READ = 1,
 		WRITE = 2,
-		DELETE = 3
+		DELETE = 3,
+        CLOSE  = 4
 	};
 
 	// result infomation
@@ -51,6 +53,33 @@ public:
 		  workerID_(workerID),
           opCode_(opCode)
      {}
+
+	/** 
+	* Copy constructor.
+	*/
+	Task(const Task& other)
+    : username_(other.username_),
+      path_(other.path_),
+      tranID_(other.tranID_),
+      workerID_(other.workerID_),
+      opCode_(other.opCode_)
+    {}
+
+	/**
+     * Move constructor.
+     */
+     Task(Task&& other)
+     : username_(std::move(other.username_)),
+       path_(std::move(other.path_)),
+       tranID_(other.tranID_),
+       workerID_(other.workerID_),
+       opCode_(other.opCode_)
+     {}
+
+
+
+
+   
 
 
 	inline const std::string& getUsername() const
