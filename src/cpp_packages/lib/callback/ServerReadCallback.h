@@ -10,6 +10,8 @@
 #include <folly/io/async/AsyncSocketException.h>
 
 #include "ServerWriteCallback.h"
+#include "../message/IPCReadRequestMessage.h"
+#include "../message/IPCWriteRequestMessage.h"
 
 
 namespace singaistorageipc{
@@ -98,7 +100,7 @@ public:
         writeRequest_.clear();
         lastReadResponse_.clear();
         lastWriteResponse_.clear();
-    }；
+    };
 
      /**
      * readError() will be invoked if an error occurs reading from the
@@ -128,9 +130,9 @@ private:
     std::unordered_map<std::string,IPCReadRequestMessage> lastWriteResponse_;
 
 
-    void handleAuthticationRequest(folly::unique_ptr<IOBuf> data);
-    void handleReadRequest(folly::unique_ptr<IOBuf> data);
-    void handleWriteRequest(folly::unique_ptr<IOBuf> data);
+    void handleAuthticationRequest(std::unique_ptr<folly::IOBuf> data);
+    void handleReadRequest(std::unique_ptr<folly::IOBuf> data);
+    void handleWriteRequest(std::unique_ptr<folly::IOBuf> data);
 
     // Return whether this is the first request of this object.
     bool insertReadRequest(IPCReadRequestMessage msg);

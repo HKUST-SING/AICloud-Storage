@@ -1,5 +1,5 @@
 #pragma once
-\
+
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncSocket.h>
@@ -17,11 +17,11 @@ namespace singaistorageipc{
 
 bool ServerReadCallback::insertReadRequest(
 	IPCReadRequestMessage msg){
-	auto search = readRequest_->find(msg.getPath());
-	if(search == readRequest_->end()){
+	auto search = readRequest_.find(msg.getPath());
+	if(search == readRequest_.end()){
 		std::queue<IPCReadRequestMessage> queue;
 		queue.emplace(msg);
-		readRequest_->emplace(msg.getPath(),queue);
+		readRequest_.emplace(msg.getPath(),queue);
 		return true;
 	}
 	else{
@@ -32,11 +32,11 @@ bool ServerReadCallback::insertReadRequest(
 
 bool ServerReadCallback::insertWriteRequest(
 	IPCWriteRequestMessage msg){
-	auto search = writeRequest_->find(msg.getPath());
-	if(search == writeRequest_->end()){
+	auto search = writeRequest_.find(msg.getPath());
+	if(search == writeRequest_.end()){
 		std::queue<IPCWriteRequestMessage> queue;
 		queue.emplace(msg);
-		writeRequest_->emplace(msg.getPath(),queue);
+		writeRequest_.emplace(msg.getPath(),queue);
 		return true;
 	}
 	else{
@@ -46,7 +46,7 @@ bool ServerReadCallback::insertWriteRequest(
 }
 
 void ServerReadCallback::handleAuthticationRequest(
-	folly::unique_ptr<IOBuf> data){
+	std::unique_ptr<folly::IOBuf> data){
 	IPCAuthenticationMessage auth_msg;
 	// If parse fail, stop processing.
 	if(!auth_msg.parse(std::move(data))){
@@ -68,11 +68,11 @@ void ServerReadCallback::handleAuthticationRequest(
 	 * TODO: Fulfill the content.
 	 */
 	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb,std::move(send_iobuf));
+	socket_->writeChain(&wcb_,std::move(send_iobuf));
 };
 
 void ServerReadCallback::handleReadRequest(
-	folly::unique_ptr<IOBuf> data){
+	std::unique_ptr<folly::IOBuf> data){
 	IPCReadRequestMessage read_msg;
 	// If parse fail, stop processing.
 	if(!read_msg.parse(std::move(data))){
@@ -115,7 +115,7 @@ void ServerReadCallback::handleReadRequest(
 			return ;
 		}
 
-		IPCWriteRequestMessage lastresponse = kv_pair->second.
+		IPCWriteRequestMessage lastresponse = kv_pair->second;
 
 		/**
 		 * TODO: check whether last response represent
@@ -170,11 +170,11 @@ void ServerReadCallback::handleReadRequest(
 	 */
 
 	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb,std::move(send_iobuf));
+	socket_->writeChain(&wcb_,std::move(send_iobuf));
 }
 
 void ServerReadCallback::handleWriteRequest(
-	folly::unique_ptr<IOBuf> data){
+	std::unique_ptr<folly::IOBuf> data){
 	IPCWriteRequestMessage write_msg;
 	// If parse fail, stop processing.
 	if(!write_msg.parse(std::move(data))){
@@ -217,7 +217,7 @@ void ServerReadCallback::handleWriteRequest(
 			return ;
 		}
 
-		IPCWriteRequestMessage lastresponse = kv_pair->second.
+		IPCReadRequestMessage lastresponse = kv_pair->second;
 
 		/**
 		 * TODO: check whether this request represent
@@ -232,7 +232,7 @@ void ServerReadCallback::handleWriteRequest(
 
 			if(writerequests.empty()){
 				// No other more requests need to process.
-				writeRequest_.erase(read_msg.getPath());
+				writeRequest_.erase(write_msg.getPath());
 			}
 			else{
 				// Get the next request.
@@ -271,7 +271,7 @@ void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
 
 void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	readBuffer_.postallocate(len);
-	std::cout << "read data available:"<< isBufferMovable() << std::endl;
+	//std::cout << "read data available:"<< isBufferMovable() << std::endl;
 	/**
 	 * Get the message, now it still std::unique_ptr<folly::IOBuf>
 	 */

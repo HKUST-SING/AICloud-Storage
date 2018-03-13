@@ -27,8 +27,6 @@ void insert(
 	}
 	else{
 		search->second.emplace(msg);
-		map->erase(msg.getPath());
-		map->emplace(msg.getPath(),search->second);
 	}
 }
 
@@ -73,6 +71,7 @@ int main(int argc, char** argv){
 	search = map.find(r3.getPath());
 	IPCReadRequestMessage r = search->second.front();
 	std::cout << r.getPath() << std::endl;
+	std::cout << search->second.size() << std::endl;
 	search->second.pop();
 	
 	search = map.find(r3.getPath());
