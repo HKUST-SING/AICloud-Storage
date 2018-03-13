@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <string>
 
 namespace singaistorageipc{
 
@@ -25,54 +26,81 @@ public:
 	 * Used for create a request.
 	 */
 	Task(const std::string& username, const std::string& path, 
-		OpType opType, uint64_t dataAddr, uint32_t dataSize,
-		uint32_t tranID, uint32_t workerID = 0)
-		:username_(username),path_(path),opType_(opType),
-		dataAddr_(dataAddr),dataSize_(dataSize),tranID_(tranID),
-		workerID_(workerID){};
+        const OpType opType, const uint64_t dataAddr, 
+        const uint32_t dataSize, const uint32_t tranID,
+		const uint32_t workerID = 0)
+		: username_(username),
+          path_(path),
+          opType_(opType),
+		  dataAddr_(dataAddr),
+          dataSize_(dataSize),
+          tranID_(tranID),
+		  workerID_(workerID)
+
+    {}
 
 	/**
 	 * Used for create a response.
 	 */
-	Task(const std::string& username, const std::string& path,
-		uint32_t tranID, uint32_t workerID, OpCode opCode)
-		:username_(username),path_(path),tranID_(tranID),
-		workerID_(workerID),opCode_(opCode){};
+	Task(const std::string& username, const std::string& path, 
+         const uint32_t tranID, const uint32_t workerID, 
+         const OpCode opCode)
+		: username_(username),
+          path_(path),
+          tranID_(tranID),
+		  workerID_(workerID),
+          opCode_(opCode)
+     {}
 
 
-	std::string getUsername(){
+	inline const std::string& getUsername() const
+    {
 		return username_;
 	}
 
-	std::string getPath(){
+
+	inline const std::string& getPath() const
+    {
 		return path_;
 	}
 
-	OpCode getOpType(){
+
+	inline OpType getOpType() const
+    {
 		return opType_;
 	}
 
-	uint64_t getDataAddress(){
+    
+	inline uint64_t getDataAddress() const
+    {
 		return dataAddr_;
 	}
 
-	uint32_t getDataSize(){
+
+	inline uint32_t getDataSize() const 
+    {
 		return dataSize_;
 	}
 
-	uint32_t getTransctionID(){
+
+	inline uint32_t getTransctionID() const
+    {
 		return tranID_;
 	}
 
-	uint32_t getWorkerID(){
+
+	inline uint32_t getWorkerID() const
+    {
 		return workerID_;
 	}
 
-	OpCode getOpCode(){
+	inline OpCode getOpCode() const
+    {
 		return opCode_;
 	}
 
-private:
+
+public:
 	std::string username_;
 	std::string path_;
 	OpType opType_;
@@ -82,7 +110,7 @@ private:
 	uint32_t workerID_;
 	OpCode opCode_;
 
-};
+}; // class Task
 
 
-}
+} // namesapce singaistorageipc
