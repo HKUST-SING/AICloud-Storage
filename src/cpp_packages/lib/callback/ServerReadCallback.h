@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_map>
+#include <queue>
+
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocket.h>
 #include <folly/io/IOBuf.h>
@@ -91,6 +94,10 @@ public:
      */
     virtual void readEOF() noexcept override{
         readBuffer_.clear();
+        readRequest_.clear();
+        writeRequest_.clear();
+        lastReadResponse_.clear();
+        lastWriteResponse_.clear();
     }；
 
      /**
@@ -111,6 +118,24 @@ private:
     std::shared_ptr<folly::AsyncSocket> socket_;
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
+
+    std::unordered_map<std::string,
+        std::queue<IPCReadRequestMessage>> readRequest_;
+    std::unordered_map<std::string,
+        std::queue<IPCWriteRequestMessage>> writeRequest_;
+
+    std::unordered_map<std::string,IPCWriteRequestMessage> lastReadResponse_;
+    std::unordered_map<std::string,IPCReadRequestMessage> lastWriteResponse_;
+
+
+    void handleAuthticationRequest(folly::unique_ptr<IOBuf> data);
+    void handleReadRequest(folly::unique_ptr<IOBuf> data);
+    void handleWriteRequest(folly::unique_ptr<IOBuf> data);
+
+    // Return whether this is the first request of this object.
+    bool insertReadRequest(IPCReadRequestMessage msg);
+    bool insertWriteRequest(IPCWriteRequestMessage msg);
+
 };
 
 }
