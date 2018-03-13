@@ -20,10 +20,10 @@
 #include <rados/librados.hpp>
 
 // Project
-#include "store_obj.h"
-#include "worker.h"
-#include "concurrent_queue.h"
-#include "ceph_context.h"
+#include "StoreObj.h"
+#include "Worker.h"
+#include "ConcurrentQueue.h"
+#include "CephContext.h"
 
 namespace singaistorageipc
 {
@@ -53,7 +53,7 @@ class StoreWorker: public Worker
 
 
     virtual bool initialize() override; // initialize the worker
-    virtual void destroy() override;    // destroy the worker
+    virtual void stop() override;       // stop the worker
   
     virtual Future<Task> writeStoreObj(const Task& task) override;
     /**
@@ -88,7 +88,7 @@ class StoreWorker: public Worker
      
 
 
-    inline unsigned int getWorkerId() const
+    inline uint32_t getWorkerId() const
     /** Return a unique worker ID within the same program.
      *
      */    
@@ -128,6 +128,8 @@ class StoreWorker: public Worker
     }
 
 
+    virtual void processTasks() override
+    {}
 
   private:
     ConcurrentQueue<std::pair<folly::Promise<Task>, const Task&> > tasks_; 

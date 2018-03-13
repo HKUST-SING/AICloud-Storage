@@ -2,7 +2,7 @@
 #include <cstring>
 
 // Project lib
-#include "store_obj.h"
+#include "StoreObj.h"
 
 namespace singaistorageipc
 {

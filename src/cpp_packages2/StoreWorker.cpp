@@ -7,7 +7,7 @@
 
 
 // Project
-#include "store_worker.h"
+#include "StoreWorker.h"
 
 
 
@@ -47,6 +47,12 @@ StoreWorker::initialize()
   return res;
 }
 
+void
+StoreWorker::stop()
+{
+  // reset the run flag
+  work_.clear();
+}
 
 
 Future<Task> 

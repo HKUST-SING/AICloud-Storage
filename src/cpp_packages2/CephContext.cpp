@@ -3,7 +3,7 @@
 
 
 // Project lib
-#include "ceph_context.h"
+#include "CephContext.h"
 
 
 namespace singaistorageipc
@@ -37,8 +37,8 @@ CephContext::CephContext(const char* conf, string&& userName,
 CephContext::CephContext(const CephContext& other)
 : clusterName_(other.clusterName_),
   accessName_(other.accessName_),
-  accessFlags_(other.accessFlags_),
   confFile_(other.confFile_),
+  accessFlags_(other.accessFlags_),
   init_(false)
 {}
 

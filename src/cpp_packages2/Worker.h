@@ -5,8 +5,7 @@
 // C++ std lib
 #include <mutex>
 #include <condition_variable> 
-#include <vector>
-#include <utility>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 
@@ -16,15 +15,15 @@
 
 
 // Project lib
-#include "store_obj.h"
-#include "security.h"
-#include "task.h"
+#include "Security.h"
+#include "Task.h"
 
 
 namespace singaistorageipc
 {
 
 
+// Facebook folly Future
 using folly::Future;
 
 class Worker
@@ -44,8 +43,10 @@ class Worker
     Worker& operator=(const Worker&) = delete; // no assigment
 
     
-    Worker(const unsigned int id, std::shared_ptr<Security> sec)
-    : id_(id), secure_(sec)
+    Worker(const uint32_t id, std::shared_ptr<Security> sec)
+    : work_(true),
+      id_(id),
+      secure_(sec)
     {}
     
 
@@ -56,7 +57,7 @@ class Worker
 
 
     virtual bool initialize() {return true;} // initialize the worker
-    virtual void destroy() {}               // destroy the worker
+    virtual void stop() {}                   // stop the worker
   
     virtual Future<Task> writeStoreObj(const Task& task) = 0;
     /**
@@ -91,7 +92,7 @@ class Worker
      
 
 
-    inline unsigned int getWorkerId() const
+    inline uint32_t getWorkerId() const
     /** Return a unique worker ID within the same program.
      *
      */    
@@ -145,14 +146,23 @@ class Worker
     }
 
 
-  bool done_ = false; // if the worker has completed its work
+    /** 
+     * The running method of the worker. The method is the core
+     * of the worker since it defines the work. Implementations
+     * choose how to handle the tasks.
+     *
+     */
+    virtual void processTasks() = 0;   
+
+
+    std::atomic_flag work_; // if the worker has completed its work
 
   protected:
     mutable std::mutex initLock_;
     mutable std::condition_variable initCond_;
     bool init_ = false;
     std::atomic<unsigned int> norefs_;
-    unsigned int id_; 
+    uint32_t id_; 
     std::shared_ptr<Security> secure_; // pointer to the security module
   
 
