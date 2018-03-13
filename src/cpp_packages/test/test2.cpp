@@ -13,6 +13,7 @@
 #include "../lib/message/IPCReadRequestMessage.h"
 #include "../lib/message/IPCWriteRequestMessage.h"
 #include "../lib/message/IPCStatusMessage.h"
+#include "../lib/message/IPCCloseMessage.h"
 
 using namespace singaistorageipc;
 

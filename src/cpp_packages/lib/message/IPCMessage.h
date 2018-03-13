@@ -22,7 +22,8 @@ public:
 		AUTH = 1,
 		READ = 2,
 		WRITE = 3,
-		CON_REPLY = 4
+		CON_REPLY = 4,
+		CLOSE = 5
 	};
 
 	/**

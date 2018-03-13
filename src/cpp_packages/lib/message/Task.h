@@ -11,9 +11,9 @@ class Task{
 
 public:
 	enum class OpType : uint8_t{
-		READ = 1;
-		WRITE = 2;
-		DELETE = 3;
+		READ = 1,
+		WRITE = 2,
+		DELETE = 3
 	};
 
 	// result infomation
