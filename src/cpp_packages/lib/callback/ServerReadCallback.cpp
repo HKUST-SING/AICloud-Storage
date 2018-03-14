@@ -20,6 +20,7 @@
 #include "../message/IPCConnectionReplyMessage.h"
 #include "../message/IPCReadRequestMessage.h"
 #include "../message/IPCWriteRequestMessage.h"
+#include "../message/IPCDeleteRequestMessage.h"
 #include "../message/IPCStatusMessage.h"
 #include "../utils/Hash.h"
 #include "../utils/BFCAllocator.h"
@@ -371,25 +372,21 @@ void ServerReadCallback::handleWriteRequest(
 			/**
 			 * Check whether there is pending request.
 			 */
+			/*
 			if(!contextmap->second->pendingList_.empty()){
-				/**
-				 * There are still other request.
-				 */
+				 // There are still other request.
 				writecontext = contextmap->second;
 				write_msg = writecontext->pendingList_.front();
 				writecontext->pendingList_.pop();
-				//Goto the place of new arriving.
-				goto NEWHANDLEPOINT;
-			}
-			else{
+			}*/
+			
 				/**
 				 * There are no other request.
 				 */
-				writecontext = contextmap->second;
-				tranID = writecontext->tranID_;
-				workerID = writecontext->workerID_;
-				writeContextMap_.erase(path);
-			}
+			writecontext = contextmap->second;
+			tranID = writecontext->tranID_;
+			workerID = writecontext->workerID_;
+			writeContextMap_.erase(path);
 		}
 	}
 	else{ //if(isfinish)
@@ -399,7 +396,6 @@ void ServerReadCallback::handleWriteRequest(
 			 */
 			writecontext = std::make_shared<WriteRequestContext>();
 			writeContextMap_.emplace(path,writecontext);
-NEWHANDLEPOINT:
 			tranID = std::rand();
 			isfirstwrite = true;
 		}
@@ -439,6 +435,38 @@ NEWHANDLEPOINT:
 	writecontext->tranID_ = tranID;
 	writecontext->workerID_ = workerID;
 	writecontext->lastResponse_ = reply;
+}
+
+void ServerReadCallback::handleDeleteRequest(
+	std::unique_ptr<folly::IOBuf> data){
+	IPCDeleteRequestMessage delete_msg;
+	// If parse fail, stop processing.
+	if(!delete_msg.parse(std::move(data))){
+		return;
+	}
+
+	std::string path = delete_msg.getPath();
+	std::string username = delete_msg.getUsername();
+	/**
+	 * TODO: check whether this operation is vaild.
+	 *
+	 * Now, we just grant each operation.
+	 */
+
+	/**
+	 * TODO: send the delete operation to the ceph
+	 *       and save the `tranID`.
+	 */
+	uint32_t tranID = rand();
+	Task task(username,path,Task::OpType::DELETE,0,0,tranID);
+
+	/**
+	 * Reply the result.
+	 */
+	IPCStatusMessage reply;
+	reply.setStatusType(0);
+	auto send_iobuf = reply.createMsg();
+	socket_->writeChain(&wcb_,std::move(send_iobuf));
 }
 
 void ServerReadCallback::handleCloseRequest(){
@@ -481,6 +509,10 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 
 		case IPCMessage::MessageType::WRITE :
 			handleWriteRequest(std::move(rec_iobuf));
+			break;
+
+		case IPCMessage::MessageType::DELETE :
+			handleDeleteRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::CLOSE :

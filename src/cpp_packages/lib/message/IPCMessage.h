@@ -23,7 +23,8 @@ public:
 		READ = 2,
 		WRITE = 3,
 		CON_REPLY = 4,
-		CLOSE = 5
+		CLOSE = 5,
+		DELETE = 6
 	};
 
 	/**
