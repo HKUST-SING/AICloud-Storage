@@ -17,7 +17,7 @@ import logging
 # Package modules
 import singstorage.singexcept        as sing_errs
 from   singstorage.messages          import InterMessage  
-import singstorage.messages	     as sing_msgs
+import singstorage.messages	         as sing_msgs
 import singstorage.utils.loc_logging as sing_log
 
 
@@ -156,7 +156,7 @@ class SocketIPC(ControlIPC):
 
 		if not self._sock or not self._rem_addr:
 			# log the case
-			tmp_logger.error("Control socket or remote addres is None.")
+			tmp_logger.error("Control socket or remote address is None.")
 
 			raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
 
@@ -184,15 +184,15 @@ class SocketIPC(ControlIPC):
 		# connection has successfully connected
 		# authenticate the user
 		tmp_logger.info("Socket has connected to the storage service.")
-
-		self.send_request(sing_msgs.MSG_AUTH, username=username,
+		self.send_request(sing_msgs.MSG_AUTH, 0, username=username,
 						  passwd=password)
 
 		# wait for a confirmation from the service
+		return self.recv_request(sing_msgs.MSG_CON_REPLY)
 		
 		
 
-	def send_request(self, req_type, **kwargs):
+	def send_request(self, req_type, req_id, **kwargs):
 		"""
 			Send a request to the service.
 		"""
@@ -201,7 +201,7 @@ class SocketIPC(ControlIPC):
 		tmp_logger.info("send_request: {0}".format(req_type))
 		
 		# create a message
-		msg = InterMessage.create_message(req_type, **kwargs)
+		msg = InterMessage.create_message(req_type, req_id, **kwargs)
 		
 		if not msg:
 			tmp_logger.error("Cannot create an IPC message in send_request")
@@ -216,11 +216,7 @@ class SocketIPC(ControlIPC):
 		# try to write the message 
 		tmp_logger.info("Encoded message is being sent to the service")
 		self._sock.sendall(bin_data, 0)
-		res_msg = self.recv_request(sing_msgs.MSG_STATUS)
-
-		return res_msg.op_status # return the status
-
-
+		
 
 	def recv_request(self, req_type, **kwargs):
 		"""
@@ -230,7 +226,7 @@ class SocketIPC(ControlIPC):
 		tmp_logger = logging.getLogger(__name__)
 		tmp_logger.info("recv_request: ".format(req_type))
 
-		msg = InterMessage.create_message(req_type, **kwargs)
+		msg = InterMessage.create_message(req_type, 0, **kwargs)
 		
 
 		if not msg:
@@ -238,17 +234,48 @@ class SocketIPC(ControlIPC):
 			raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 
 		# read the header of the received message
-		header = self._sock.recv(msg.get_header_size(), 0)
+		tmp_header = [] 
+		header_size = msg.get_header_size();
+        
+		while header_size > 0:
+			tm_hr = self._sock.recv(header_size, 0)
+          
+			if not tm_hr: # internal error
+				tmp_logger.error("Cannot read header") 
+				raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
+          
+			# append the data and update the byte counter
+			tmp_header.append(tm_hr)
+			header_size -= len(tm_hr)
                	
-
-		if len(header) != msg.get_header_size() or\
-			msg.msg_type != req_type:
-
-			tmp_logger.error("wrong msg: exp: {0}, received: {1}".format(req_type, msg.msg_type))
-			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)	
-
+		# combine the header into one binary string
+		header = b"".join(tmp_header)
+     
 		# decode the header
 		msg.decode_header(header)
+        
+		# need to check if the reuired message type
+		# match the received one
+		if req_type != msg.msg_type:
+			# special case -- status message received
+			if msg.msg_type != sing_msgs.MSG_STATUS:
+				# error
+				tmp_logger.error(
+					"wrong message received: requested = {0}, received = {1}".format(req_type, msg.msg_type))
+				raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
+			# a status message received instead of the requested
+			tmp_msg = InterMessage.create_message(sing_msgs.MSG_STATUS, 0)
+			if not tmp_msg: # memory problem
+				tmp_logger.errror("Out of memory")
+				raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
+
+			tmp_msg.msg_type   = sing_msgs.MSG_STATUS
+			tmp_msg.msg_id     = msg.msg_id
+			tmp_msg.msg_length = msg.msg_length
+            # reassign the message
+			msg = tmp_msg
+
+			
 		left_to_read = msg.msg_length - msg.get_header_size()
 		raw_data = [] # store a list of binary strings	
 
@@ -291,8 +318,7 @@ class SocketIPC(ControlIPC):
 		# send a notification to release 
 		# the resources
 
-		self.send_request(sing_msgs.MSG_STATUS,
-					      status_type=sing_msgs.STAT_CLOSE)
+		self.send_request(sing_msgs.MSG_CLOSE)
 
 
 
@@ -309,8 +335,7 @@ class SocketIPC(ControlIPC):
 				# send one more time
 				tmp_logger.warn("received STAT_AMG")
 
-				self.send_request(sing_msgs.MSG_STATUS,
-								  status_type=sing_msg.STAT_CLOSE)
+				self.send_request(sing_msgs.MSG_CLOSE)
 
 				res = self.recv_request(sing_msgs.MSG_STATUS)
 
@@ -318,7 +343,10 @@ class SocketIPC(ControlIPC):
 			
 
 		# close the socket and set the IPC as inactive
-		self._sock.close()
-		super._connected = False
-	
-
+		try:
+			self._sock.close()
+		except:
+			# ignore exceptions
+			pass
+		finally:
+			super._connected = False # mark as closed
