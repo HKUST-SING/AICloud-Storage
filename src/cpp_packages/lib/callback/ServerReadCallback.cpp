@@ -147,6 +147,9 @@ void ServerReadCallback::handleReadRequest(
 	// Whether this read request is an new request.
 	uint32_t pro = read_msg.getProperties();
 	bool isnewcoming;
+	if(pro == 1){
+		isnewcoming = true;
+	}
 
 
 	std::string path = read_msg.getPath();
@@ -354,9 +357,6 @@ void ServerReadCallback::handleWriteRequest(
 	IPCReadRequestMessage reply;
 	reply.setPath(path);
 
-	/**
-	 * TODO: need discuss.
-	 */
 	if(isfinish){
 		/**
 		 * TODO: Set properties with flag is unset.
@@ -423,6 +423,10 @@ NEWHANDLEPOINT:
 		/**
 		 * TODO: set the flag.
 		 */
+		reply.setProperties(1);
+	}
+	else{
+		reply.setProperties(0);
 	}
 	auto send_iobuf2 = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf2));
