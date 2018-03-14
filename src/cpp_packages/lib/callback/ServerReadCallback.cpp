@@ -51,7 +51,7 @@ void ServerReadCallback::handleAuthticationRequest(
 	 */
 	std::string username = auth_msg.getUsername();
 	char pw[32];
-	auth_msg.get(pw);
+	auth_msg.getPassword(pw);
 
 	/**
 	 * TODO: Check result and send back to the client.
@@ -115,7 +115,7 @@ void ServerReadCallback::handleAuthticationRequest(
 	/**
 	 * Register allocater for share memory.
 	 */
-	readSMAllocator_ = BFCAllocator::create(0,readSMSize_);
+	readSMAllocator_ = BFCAllocator::Create(0,readSMSize_);
 	///writeSMAllocator_ = BFCAllocator::create(1,writeSMSize_);
 
 	/**
@@ -165,7 +165,7 @@ void ServerReadCallback::handleReadRequest(
 			 * There is other read request processing
 			 * on the same object.
 			 */
-			contextmap->second->pendingList.emplace(read_msg);
+			contextmap->second->pendingList_.emplace(read_msg);
 			return ;
 		}
 		else{
@@ -198,7 +198,7 @@ void ServerReadCallback::handleReadRequest(
 		}
 
 		IPCWriteRequestMessage lastresponse 
-			= contextmap->second->lastresponse_;
+			= contextmap->second->lastResponse_;
 
 		/**
 		 * Check whether last response represent
@@ -271,14 +271,14 @@ void ServerReadCallback::handleReadRequest(
 		auto send_iobuf = reply.createMsg();
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
 		// Update the last response.
-		contextmap->second->lastresponse_ = reply;
+		contextmap->second->lastResponse_ = reply;
 		// TODO: Make sure that the client will comfirm this message, too.
 		return;
 	}
 
 	size_t allocsize = objectSize;
 	BFCAllocator::Offset memoryoffset;
-	while((memoryoffset = readSMAllocator_->Alloc(allocsize)) 
+	while((memoryoffset = readSMAllocator_->Allocate(allocsize)) 
 		== BFCAllocator::k_invalid_offset){
 		allocsize = allocsize >> 1;
 		/**
@@ -289,8 +289,9 @@ void ServerReadCallback::handleReadRequest(
 			return;
 		}
 	}
-	Task task(username_,path,Task::READ,readSM_+memoryoffset,
-				allocsize,tranID,workerID);
+	Task task(username_,path,Task::OpType::READ,
+		(uint64_t)readSM_+memoryoffset,
+		allocsize,tranID,workerID);
 	/**
 	 * TODO: If data check success, read data from ceph.
 	 */
@@ -303,14 +304,14 @@ void ServerReadCallback::handleReadRequest(
 	IPCWriteRequestMessage reply;
 	reply.setPath(path);
 
-	reply.setStartAddress(readSM_+memoryoffset);
+	reply.setStartAddress((uint64_t)readSM_+memoryoffset);
 	reply.setDataLength(allocsize);
 
 	auto send_iobuf = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
 	// Update the context
 	contextmap->second->remainSize_ -= allocsize;
-	contextmap->second->lastresponse_ = reply;
+	contextmap->second->lastResponse_ = reply;
 	/**
 	 * TODO: this `workerID` should retrive from ceph.
 	 */
@@ -342,7 +343,7 @@ void ServerReadCallback::handleWriteRequest(
 		isfinish = true;
 	} 
 
-	std::shared_ptr<writeRequestContext> writecontext;
+	auto writecontext = std::make_shared<WriteRequestContext>();
 	bool isfirstwrite = false;
 	IPCReadRequestMessage reply;
 	reply.setPath(path);
@@ -364,13 +365,13 @@ void ServerReadCallback::handleWriteRequest(
 			/**
 			 * Check whether there is pending request.
 			 */
-			if(!contextmap->second.pendingList_.empty()){
+			if(!contextmap->second->pendingList_.empty()){
 				/**
 				 * There are still other request.
 				 */
 				writecontext = contextmap->second;
-				write_msg = writecontext.pendingList_.front();
-				writecontext.pendingList_.pop();
+				write_msg = writecontext->pendingList_.front();
+				writecontext->pendingList_.pop();
 				//Goto the place of new arriving.
 				goto NEWHANDLEPOINT;
 			}
@@ -388,7 +389,7 @@ void ServerReadCallback::handleWriteRequest(
 			/**
 			 * This is the first write
 			 */
-			writecontext = std::make_shared<ReadRequestContext>();
+			writecontext = std::make_shared<WriteRequestContext>();
 			writeContextMap_.emplace(path,writecontext);
 NEWHANDLEPOINT:
 			tranID = std::rand();
@@ -399,16 +400,17 @@ NEWHANDLEPOINT:
 			 * Retrive `tranID` and `workerID`.
 			 */
 			writecontext = contextmap->second;
-			tranID = writecontext.tranID_;
-			workerID = writecontext.workerID_;
+			tranID = writecontext->tranID_;
+			workerID = writecontext->workerID_;
 		}
 	}
 
 	/**
 	 * TODO: If data check success, write data to ceph.
 	 */
-	Task task(username_,path,Task::WRITE,write_msg.getStartingAddress(),
-				write_msg.getDataLength(),tranID,workerID);
+	Task task(username_,path,Task::OpType::WRITE,
+		write_msg.getStartingAddress(),
+		write_msg.getDataLength(),tranID,workerID);
 
 	// The following process may be done in the folly::future callback.
 	if(isfirstwrite){
@@ -417,14 +419,14 @@ NEWHANDLEPOINT:
 		 */
 	}
 	auto send_iobuf2 = reply.createMsg();
-	socket_.writeChain(&wcb_,std::move(send_iobuf2));
+	socket_->writeChain(&wcb_,std::move(send_iobuf2));
 
 	/**
 	 * Update context.
 	 */
-	writecontext.tranID_ = tranID;
-	writecontext.workerID_ = workerID;
-	writecontext.lastresponse_ = reply;
+	writecontext->tranID_ = tranID;
+	writecontext->workerID_ = workerID;
+	writecontext->lastResponse_ = reply;
 }
 
 void ServerReadCallback::handleCloseRequest(){

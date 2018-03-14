@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/mman.h>
 #include <unordered_map>
 #include <queue>
 #include <ctime>
@@ -15,6 +16,7 @@
 #include "RequestContext.h"
 #include "../message/IPCReadRequestMessage.h"
 #include "../message/IPCWriteRequestMessage.h"
+#include "../utils/BFCAllocator.h"
 
 
 namespace singaistorageipc{
@@ -130,7 +132,7 @@ public:
         if(writeSM_ != nullptr){
             munmap(writeSM_,writeSMSize_);
             shm_unlink(writeSMName_);
-            writeSM_ = nullptr
+            writeSM_ = nullptr;
         }
     };
 
@@ -173,7 +175,7 @@ private:
     std::unordered_map<std::string,
         std::shared_ptr<ReadRequestContext>> readContextMap_;
     std::unordered_map<std::string,
-        std::shared_ptr<writeRequestContext>> writeContextMap_;
+        std::shared_ptr<WriteRequestContext>> writeContextMap_;
 /*
     std::unordered_map<std::string,
         std::queue<IPCReadRequestMessage>> readRequest_;

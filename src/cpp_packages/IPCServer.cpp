@@ -27,7 +27,8 @@ void IPCServer::start(){
     socket->bind(context_.addr_);
 
     ServerAcceptCallback scb(
-    	context_.bufferSize_,context_.minAllocBuf_,context_.newAllocSize_);
+    	context_.bufferSize_,context_.minAllocBuf_,
+	context_.newAllocSize_,context_.readSMSize_,context_.writeSMSize_);
     socket->addAcceptCallback(&scb,std::move(evb));
 
     ClientConnectionCallback ccb;
