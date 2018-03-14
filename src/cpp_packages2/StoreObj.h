@@ -130,7 +130,7 @@ class StoreObj
     }
 
 
-    inline const char* getGlobalObjectId() const
+    inline const std::string& getGlobalObjectId() const
     /**
      * Get global object id
      *
@@ -155,7 +155,8 @@ class StoreObj
     uint64_t containData_;            // bytes of data that are available
                                       // for reading
 
-    char globalId_ [GLOBAL_ID_LENGTH];// global storage object id
+    std::string globalId_;            // global storage object id
+
  
     std::list<StoreObj::ObjShred> radosObjs_;    
                                       // Rados objects that make up
