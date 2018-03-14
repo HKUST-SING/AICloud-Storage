@@ -255,6 +255,12 @@ void ServerReadCallback::handleReadRequest(
 			workerID = contextmap->second->workerID_;
 			tranID = contextmap->second->tranID_;
 			objectSize = contextmap->second->remainSize_;
+
+			/**
+			 * Release memory.
+			 */
+			readSMAllocator_->Dellocate(
+				lastresponse.getStartingAddress());
 		}
 
 		if(!keepsending){
