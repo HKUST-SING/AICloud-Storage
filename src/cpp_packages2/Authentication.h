@@ -3,7 +3,7 @@
 // C++ std lib
 #include <string>
 #include <utility>
-#include <cstdlib>
+#include <cstdint>
 
 
 
@@ -174,7 +174,7 @@ typedef struct OpPermissionResponse
       USER_ERR     =  1, // user cannot perform operation
                          // on the data (ACL problem)
       PATH_ERR     =  2, // no such path exists 
-      QUOTA_ERR    =  3  // user has axceeded data quota
+      QUOTA_ERR    =  3  // user has exceeded data quota
       
     };
     
@@ -182,14 +182,17 @@ typedef struct OpPermissionResponse
   PermCode      permCode_; // stores the permission result
   Task::OpType  ioOp_;     // operation type
   uint32_t      tranID_;   // message id
+  uint64_t      canWrite_; // (only for writes) how many bytes can write
 
   OpPermissionResponse(const UserAuth& user, const PermCode code,
                        const Task::OpType ioType,
-                       const uint32_t opID)
+                       const uint32_t opID,
+                       const uint64_t writeGrant=0)
   : user_(user),
     permCode_(code),
     ioOp_(ioType),
-    tranID_(opID)
+    tranID_(opID),
+    canWrite_(writeGrant)
   {}
 
 
@@ -198,7 +201,8 @@ typedef struct OpPermissionResponse
   : user_("", ""),
     permCode_(PermCode::INTERNAL_ERR),
     ioOp_(Task::OpType::CLOSE),
-    tranID_(0)
+    tranID_(0),
+    canWrite_(0)
   {}
 
   OpPermissionResponse(
@@ -206,7 +210,8 @@ typedef struct OpPermissionResponse
   : user_(other.user_),
     permCode_(other.permCode_),
     ioOp_(other.ioOp_),
-    tranID_(other.tranID_)
+    tranID_(other.tranID_),
+    canWrite_(other.canWrite_)
   {}
 
 
@@ -215,7 +220,8 @@ typedef struct OpPermissionResponse
   : user_(std::move(other.user_)),
     permCode_(other.permCode_),
     ioOp_(other.ioOp_),
-    tranID_(other.tranID_)
+    tranID_(other.tranID_),
+    canWrite_(other.canWrite_)
   {}
 
 
@@ -227,6 +233,7 @@ typedef struct OpPermissionResponse
     permCode_ = other.permCode_;
     ioOp_     = other.ioOp_;
     tranID_   = other.tranID_;
+    canWrite_ = other.canWrite_;
 
     return *this;
   }
@@ -239,6 +246,7 @@ typedef struct OpPermissionResponse
     permCode_ = other.permCode_;
     ioOp_     = other.ioOp_;
     tranID_   = other.tranID_;
+    canWrite_ = other.canWrite_;
 
     return *this;
   }
@@ -246,6 +254,46 @@ typedef struct OpPermissionResponse
 
 } OpPermissionResponse; // struct
 
+
+
+typedef struct IOResult
+{
+ 
+  public:
+    enum class Status: uint8_t
+    {
+      INTERNAL_ERR = 255, // some internal cluster error 
+                          // (undo the previous operation)
+      SUCCESS      =   0, // successful IO op
+      PARTIAL_ERR  =   1, // operation partially completed
+      AUTH_ERR     =   2, // machine does not have auth to perform
+                          // IO
+      
+    };
+
+
+  public:
+    IOResult(const UserAuth& user, 
+             const IOResult::Status stat, Task::OpType ioType,
+             const uint32_t id, const uint32_t remID=0)
+    : user_(user),
+      ioStat_(stat),
+      ioOp_(ioType),
+      tranID_(id),
+      token_(remID)
+    {}
+  
+ 
+
+  public:
+    UserAuth     user_; // user which has issues the opearation
+    Status     ioStat_; // status of the Io operation
+    Task::OpType ioOp_; // IO operation type
+    uint32_t   tranID_; // transaction ID for async IO
+    uint32_t    token_; // unique identifier for this user of the IO
+      
+
+} IOResult; // struct IOResult
 
 
 } // namesapce singaistorageipc
