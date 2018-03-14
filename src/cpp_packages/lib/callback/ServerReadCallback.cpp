@@ -259,7 +259,7 @@ void ServerReadCallback::handleReadRequest(
 			/**
 			 * Release memory.
 			 */
-			readSMAllocator_->Dellocate(
+			readSMAllocator_->Deallocate(
 				lastresponse.getStartingAddress());
 		}
 
