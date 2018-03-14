@@ -84,7 +84,7 @@ T ConcurrentQueue<T>::pop()
     cond_.wait(tmp);
   }
 
-  auto item = queue_.front();
+  auto item = std::move(queue_.front());
   queue_.pop();
 
   return std::move(item);

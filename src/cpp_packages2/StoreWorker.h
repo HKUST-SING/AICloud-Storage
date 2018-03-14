@@ -128,8 +128,42 @@ class StoreWorker: public Worker
     }
 
 
-    virtual void processTasks() override
-    {}
+    virtual void processTasks() override;
+
+
+
+  private: 
+  
+    /**
+     * Process a READ operation. The method informs the caller
+     * about the result through the passed promise object.
+     *
+     * @param: task: IO to perform and promise to fulfill
+     */
+     void processReadOp(
+          std::pair<folly::Promise<Task>, const Task&>& task);
+
+
+    /**
+     * Process a WRITE operation. The method informs the caller
+     * about the result through the passed promise object.
+     *
+     * @param: task: IO to perform and promise to fulfill
+     */
+     void processWriteOp(
+          std::pair<folly::Promise<Task>, const Task&>& task);
+
+    /**
+     * Process a DELTE operation. The method informs the caller
+     * about the result through the passed promise object.
+     *
+     * @param: task: IO to perform and promise to fulfill
+     */
+     void processDeleteOp(
+          std::pair<folly::Promise<Task>, const Task&>& task);
+
+
+
 
   private:
     ConcurrentQueue<std::pair<folly::Promise<Task>, const Task&> > tasks_; 

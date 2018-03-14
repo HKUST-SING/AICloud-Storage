@@ -30,6 +30,18 @@ StoreWorker::~StoreWorker()
   // close the ceph context
   cephCtx_.closeCephContext();
 
+  // release all the retrieved objects 
+  // and enqueued tasks
+
+  pendTasks_.clear();
+
+
+  while(!tasks_.empty()) // since the worker is being destroyed,
+  {                      // check for emptyness without a lock
+
+    tasks_.pop();
+  }
+
 }
 
 
@@ -50,8 +62,8 @@ StoreWorker::initialize()
 void
 StoreWorker::stop()
 {
-  // reset the run flag
-  work_.clear();
+  // signal to finish
+  Worker::done_.store(true);
 }
 
 
@@ -150,4 +162,83 @@ StoreWorker::completeReadStoreObj(const Task& task)
   return std::move(res);
 
 }
+
+
+void
+StoreWorker::processTasks()
+{
+
+  // process tasks from the concurretn queue
+  while(!Worker::done_.load())
+  {
+    // wait for a task 
+    auto tmpTask = std::move(tasks_.pop());
+
+    // check the type of the task
+    switch(tmpTask.second.opType_)
+    {
+      case Task::OpType::READ: 
+      {  // process read
+         
+         processReadOp(tmpTask);
+         break; // one task has been completed
+      }
+      
+      case Task::OpType::WRITE:
+      { // process write
+        
+        processWriteOp(tmpTask);
+
+        break; // one task has been completed
+
+      }
+      
+      case Task::OpType::DELETE:
+      { // process delete
+
+        processDeleteOp(tmpTask);
+
+        break; // one task has been completed
+      }      
+
+     case Task::OpType::CLOSE:
+     default:
+     {
+       done_.store(true); // completed processing
+     }
+   } // switch
+
+
+  } // while
+
+  /* closing procedures come here */
+
+
+}
+
+
+void
+StoreWorker::processReadOp(
+        std::pair<folly::Promise<Task>, const Task&>& task)
+{
+}
+
+
+void
+StoreWorker::processWriteOp(
+        std::pair<folly::Promise<Task>, const Task&>& task)
+{
+}
+
+
+void
+StoreWorker::processDeleteOp(
+        std::pair<folly::Promise<Task>, const Task&>& task)
+{
+}
+
+
+
+
+
 } // namesapce singaistorageaipc

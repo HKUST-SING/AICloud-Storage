@@ -44,7 +44,7 @@ class Worker
 
     
     Worker(const uint32_t id, std::shared_ptr<Security> sec)
-    : work_(true),
+    : done_(false),
       id_(id),
       secure_(sec)
     {}
@@ -155,7 +155,7 @@ class Worker
     virtual void processTasks() = 0;   
 
 
-    std::atomic_flag work_; // if the worker has completed its work
+    std::atomic<bool> done_; // if the worker has completed its work
 
   protected:
     mutable std::mutex initLock_;

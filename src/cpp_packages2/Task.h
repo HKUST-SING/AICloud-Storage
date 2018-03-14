@@ -135,7 +135,7 @@ public:
 	OpType opType_;
 	uint64_t dataAddr_;
 	uint32_t dataSize_;
-	uint32_t tranID_;
+	const uint32_t tranID_;
 	uint32_t workerID_;
 	OpCode opCode_;
 
