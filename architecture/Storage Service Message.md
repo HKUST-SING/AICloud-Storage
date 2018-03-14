@@ -30,7 +30,6 @@
 | Data type  | Status      |
 | ---------- | ----------- |
 | `uint16_t` | status_type |
-| `uint16_t` |   op_code   |
 
 | Data type  | CON_REPLY            |
 | ---------- | -------------------- |
