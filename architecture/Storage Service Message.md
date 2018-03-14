@@ -1,10 +1,10 @@
 ## Inter-Processing Message Structure
 
-| Data type  | Generic                                                        |
-| ---------- | ---------------------------------------------------------------|
-| `uint8_t`  | msg_type (STATUS=0,AUTH=1,READ=2,WRITE=3,CON_REPLY=4, CLOSE=5) |
-| `uint32_t` | msg_length (in bytes)                                          |
-|            | specific content (describe in below)                           |
+| Data type  | Generic                                                                |
+| ---------- | -----------------------------------------------------------------------|
+| `uint8_t`  | msg_type (STATUS=0,AUTH=1,READ=2,WRITE=3,CON_REPLY=4,CLOSE=5,DELETE=6) |
+| `uint32_t` | msg_length (in bytes)                                                  |
+|            | specific content (describe in below)                                   |
 
 | Data type  | Authentication                              |
 | ---------- | ------------------------------------------- |
@@ -30,7 +30,6 @@
 | ---------- | ----------- |
 | `uint16_t` | status_type |
 | `uint16_t` |   op_code   |
-| `char*`    |  data_path  |
 
 | Data type  | CON_REPLY            |
 | ---------- | -------------------- |
@@ -41,9 +40,15 @@
 | `char[32]` | write_buffer_name    |
 | `char[32]` | read_buffer_name     |
 
-| Data type  | Close                                                 |
-| ---------- | ------------------------------------------------------|
-|  EMPTY     | EMPTY                                                 |
+| Data type  | Close      |
+| ---------- | -----------|
+|  EMPTY     | EMPTY      |
+
+| Data type  | Delete                  |
+| ---------- | ------------------------|
+| `uint16_t` | path_length (in bytes)  |
+| `char*`    | path_value              |
+
 
 
 ## Inter-Connecting Message
