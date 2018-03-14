@@ -163,6 +163,13 @@ class StoreWorker: public Worker
           std::pair<folly::Promise<Task>, const Task&>& task);
 
 
+     /** 
+      * Return data from a local buffer 
+      * (write into the shared memory) from local memory
+      */
+     void handlePendingRead(
+          std::map<uint32_t, StoreObj>::iterator&,
+          std::pair<folly::Promise<Task>, const Task&>&);
 
 
   private:
@@ -173,11 +180,17 @@ class StoreWorker: public Worker
                             // the consumer servs them.
 
 
-    std::map<uint32_t, StoreObj> pendTasks_; // completed remotely 
+    std::map<uint32_t, StoreObj> pendReads_; // completed remotely 
                                              // tasks, pending for 
                                              // further processing
                                              // locally
 
+    //std::map<const std::string, > pendOps_; // active ops for seq
+
+    uint32_t                     tranID_;    // unique key that 
+                                             // allows to identify
+                                             // worker ops with
+                                             // security module
 
     CephContext cephCtx_;                   // for ceph communication  
                                             // (accesing the Cluster)

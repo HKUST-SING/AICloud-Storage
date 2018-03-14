@@ -20,8 +20,12 @@ public:
 	};
 
 	// result infomation
-	enum class OpCode : uint8_t{
-
+	enum class OpCode : uint8_t
+    {
+        ERROR        = 255, // error occured
+        SUCCESS      =   0, // succesful operation
+        PARTIAL_READ =   1  // successfyl parital READ 
+                            // (more need to read)
 	};
 
 	/**

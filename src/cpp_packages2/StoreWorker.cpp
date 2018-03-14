@@ -1,6 +1,6 @@
 // C++ std
-
-
+#include <cassert>
+#include <cstring>
 // Facebook folly
 
 
@@ -221,6 +221,26 @@ void
 StoreWorker::processReadOp(
         std::pair<folly::Promise<Task>, const Task&>& task)
 {
+  // first test if the operation is a pending one
+  auto checkRead = pendReads_.find(task.second.tranID_)
+  
+  if(checkRead == pend_reads_.end())
+  { 
+    // new READ operation
+  }
+  else
+  { // pending READ operation
+    if(checkRead->second.availableData())
+    { // means no need to issue another read
+      // since data is locally available
+      handlePendingRead(checkRead, task);
+    }
+    else 
+    { // need to bring data from the remote machine
+      
+    }
+   
+  }
 }
 
 
@@ -240,5 +260,44 @@ StoreWorker::processDeleteOp(
 
 
 
+
+void 
+StoreWorker::handlePendingRead(
+       std::map<uint32_t, StoreObj>::iterator& itr, 
+       std::pair<folly::Promise<Task>, const Task&>& task)
+{
+ 
+  // check if the Task path mathes the unique ID
+  std::assert(itr->second.globalId.compare(task.second.path_));
+  
+  uint64_t dataRead = static_cast<uint64_t>(task->second.dataSize_);
+  char* rawData = itr->second.getRawBytes(dataRead);
+  std::assert(rawData); // ensure that there is data
+
+  // write to the data to the shared memory
+  char* ptr = static_cast<char*>(task.second.dataAddr_);
+  std::memcpy(ptr, rawData, dataRead); // write data to the memory
+  
+  // notify the user about it
+  Task tmp(task.second); // copy constructor
+  tmp.dataSize_ = static_cast<uint32_t>(dataRead);
+  
+  // check if I can still read more data
+  if(itr->second.storeObjComplete())
+  { // done reading the entire object
+    tmp.opCode_ = Task::OpCode::SUCCESS;
+    // remove the iterator from the map
+    pendReads_.erase(itr);
+  }
+  else
+  { // need to read more data
+    tmp.opCode = Tasl::OpCode::PARTIAL_READ;
+  } 
+  
+  // a READ operation completed
+  // notify the future
+  task->first.setValue(std::move(tmp));
+
+}
 
 } // namesapce singaistorageaipc
