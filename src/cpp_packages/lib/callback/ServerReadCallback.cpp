@@ -446,7 +446,6 @@ void ServerReadCallback::handleDeleteRequest(
 	}
 
 	std::string path = delete_msg.getPath();
-	std::string username = delete_msg.getUsername();
 	/**
 	 * TODO: check whether this operation is vaild.
 	 *
@@ -458,7 +457,7 @@ void ServerReadCallback::handleDeleteRequest(
 	 *       and save the `tranID`.
 	 */
 	uint32_t tranID = rand();
-	Task task(username,path,Task::OpType::DELETE,0,0,tranID);
+	Task task(username_,path,Task::OpType::DELETE,0,0,tranID);
 
 	/**
 	 * Reply the result.
@@ -529,7 +528,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	
 };
 
-void readEOF() noexcept{
+void ServerReadCallback::readEOF() noexcept{
 	readBuffer_.clear();
     readContextMap_.clear();
     writeContextMap_.clear();

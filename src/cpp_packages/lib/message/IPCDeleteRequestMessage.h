@@ -84,7 +84,7 @@ private:
 		msgLength_ = sizeof(IPCMessage::MessageType)
 					+ sizeof(uint32_t)
 					+ sizeof(uint16_t)
-					+ (pathLength_ * sizeof(char))
+					+ (pathLength_ * sizeof(char));
 
 		return msgLength_;
 	};
