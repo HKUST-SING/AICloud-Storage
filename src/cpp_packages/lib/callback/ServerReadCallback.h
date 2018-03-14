@@ -16,21 +16,35 @@
 
 namespace singaistorageipc{
 
+/**
+ * This class is contain the infomation
+ * of current workerID, tranID, remain size,
+ * and pending requests of a processing object.
+ */
+class RequestContext{
+
+};
+
 /*
  * This callback will be invoked when a socket can be read by server.
  */
 class ServerReadCallback : public folly::AsyncReader::ReadCallback{
 public:
-    // TODO: User need set buffer size when create this callback
     ServerReadCallback(size_t buf,
-        const std::shared_ptr<folly::AsyncSocket>& socket)
+        const std::shared_ptr<folly::AsyncSocket>& socket,
+        uint64_t minAllocBuf,
+        uint64_t newAllocSize,
+        uint32_t readSMSize,
+        uint32_t writeSMSize)
     : bufferSize_(buf),
       socket_(socket),
-      wcb_(socket.get()->getFd()){};
-
-    ~ServerReadCallback(){
-        readBuffer_.clear();
-    };
+      wcb_(socket.get()->getFd()),
+      minAllocBuf_(minAllocBuf),
+      newAllocSize_(newAllocSize),
+      readSMSize_(readSMSize),
+      writeSMSize_(writeSMSize),
+      readSM_(nullptr),
+      writeSM_(nullptr){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -69,6 +83,11 @@ public:
         return false;
     };
 
+    /**
+     * Suggested buffer size, allocated for read operations,
+     * if callback is movable and supports folly::IOBuf
+     */
+
     size_t maxBufferSize() const override{
         return bufferSize_;
     };
@@ -102,7 +121,7 @@ public:
         lastWriteResponse_.clear();
     };
 
-     /**
+    /**
      * readError() will be invoked if an error occurs reading from the
      * transport.
      *
@@ -116,8 +135,23 @@ public:
     void readDataAvailable(size_t len) noexcept override;
 
 private:
+    std::string username_;
+
     size_t bufferSize_;
+    uint64_t minAllocBuf_;
+    uint64_t newAllocSize_;
+    uint32_t readSMSize_;
+    uint32_t writeSMSize_;
+    char readSMName_[32];
+    char writeSMName_[32];
+
+    void *readSM_;
+    void *writeSM_;
+
     std::shared_ptr<folly::AsyncSocket> socket_;
+    std::shared_ptr<BFCAllocator> readSMAllocator_;
+    std::shared_ptr<BFCAllocator> writeSMAllocator_;
+
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
 
@@ -133,6 +167,7 @@ private:
     void handleAuthticationRequest(std::unique_ptr<folly::IOBuf> data);
     void handleReadRequest(std::unique_ptr<folly::IOBuf> data);
     void handleWriteRequest(std::unique_ptr<folly::IOBuf> data);
+    void handleCloseRequest();
 
     // Return whether this is the first request of this object.
     bool insertReadRequest(IPCReadRequestMessage msg);

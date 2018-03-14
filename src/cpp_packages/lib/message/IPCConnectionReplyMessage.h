@@ -108,11 +108,11 @@ public:
 		rBufferSize_ = size;
 	};
 
-	void setWriteBufferName(char *val){
+	void setWriteBufferName(const char *val){
 		memcpy(wBufferName_,val,32*sizeof(char));
 	};
 
-	void setReadBufferName(char *val){
+	void setReadBufferName(const char *val){
 		memcpy(rBufferName_,val,32*sizeof(char));
 	};
 

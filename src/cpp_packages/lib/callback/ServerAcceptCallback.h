@@ -13,6 +13,14 @@ namespace singaistorageipc{
  */
 class ServerAcceptCallback : public folly::AsyncServerSocket::AcceptCallback{
 public:
+     ServerAcceptCallback(size_t bufferSize, uint64_t minAllocBuf,
+        uint64_t newAllocSize,uint32_t readsm,uint32_t writesm){
+          bufferSize_ = bufferSize;
+          minAllocBuf_ = minAllocBuf;
+          newAllocSize_ = newAllocSize;
+          readsm_ = readsm;
+          writesm_ = writesm;          
+     }
 	/**
      * connectionAccepted() is called whenever a new client connection is
      * received.
@@ -84,6 +92,12 @@ public:
 	};
 
 private:
+     size_t bufferSize_;
+     uint64_t minAllocBuf_;
+     uint64_t newAllocSize_;
+     uint32_t readsm_;
+     uint32_t writesm_;
+
      std::vector<std::shared_ptr<folly::AsyncSocket>> socketsPool_;
      std::vector<std::shared_ptr<ServerReadCallback>> readcallbacksPool_;
 };
