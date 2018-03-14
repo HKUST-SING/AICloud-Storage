@@ -1,0 +1,73 @@
+/**
+ * This file define the message structure
+ * used in the inter-server communication
+ * followed by Google Protocol Buffers.
+ */
+
+syntax = "proto2";
+
+package singaistorageipc;
+
+message AuthenticationRequest{
+	optional string username_ = 1;
+	optional string password_ = 2;	
+}
+
+message AuthenticationResponse{
+	optional AuthenticationRequest user_ = 1;
+
+	enum AuthCode{
+		INTERNAL_ERR = 0; // some system internal error
+    	SUCCESS      = 1; // successful authentication
+    	USER_ERR     = 2; // no such user found
+    	PASSWD_ERR   = 3; // wrong user password
+	}
+
+	optional AuthCode authCode_ = 2;
+}
+
+message OpPermissionRequest{
+	optional AuthenticationRequest user_ = 1;
+
+	enum OpType{
+		READ = 0;
+		WRITE = 1;
+		DELETE = 2;
+        CLOSE  = 3;
+	}
+	optional OpType opType_ = 2;
+	optional uint32 tranID_ = 3;
+}
+
+message OpPermissionResponse{
+	optional AuthenticationRequest user_ = 1;
+	enum PermCode{
+		INTERNAL_ERR = 0; // some system internal error
+    	SUCCESS      = 1; // operation has been approved
+    	USER_ERR     = 2; // user cannot perform operation
+                   	   	  // on the data (ACL problem)
+    	PATH_ERR     = 3; // no such path exists 
+    	QUOTA_ERR    = 4; // user has exceeded data quota
+	}
+
+	optional PermCode permCode_ = 2;
+	optional uint32	tranID_ = 3;
+	optional uint64 canWrite_ = 4;
+}
+
+message IOResult{
+	optional AuthenticationRequest user_ = 1;
+
+	enum Status{
+      	SUCCESS      = 0; // successful IO op
+      	PARTIAL_ERR  = 1; // operation partially completed
+      	AUTH_ERR     = 2; // machine does not have auth to perform
+                          // IO
+        INTERNAL_ERR = 3; // some internal cluster error 
+           	              // (undo the previous operation)
+	}
+
+	optional Status ioStat_ = 2;
+	optional uint32 tranID_ = 3;
+	optional uint32 token_  = 4;
+}

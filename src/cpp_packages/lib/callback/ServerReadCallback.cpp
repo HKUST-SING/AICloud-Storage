@@ -442,23 +442,13 @@ NEWHANDLEPOINT:
 }
 
 void ServerReadCallback::handleCloseRequest(){
+	IPCStatusMessage reply;
 	/**
-	 * Release share memory.
+	 * TODO: set the status as success.
 	 */
-	munmap(readSM_,readSMSize_);
-	munmap(writeSM_,writeSMSize_);
-	shm_unlink(readSMName_);
-	shm_unlink(writeSMName_);
-	readSM_ = nullptr;
-	writeSM_ = nullptr;
-
-	/**
-	 * Unregister the allocator.
-	 */
-	readSMAllocator_ = nullptr;
-	//writeSMAllocator_ = nullptr;
-
-	username_.clear();
+	reply.setStatusType(0);
+	auto send_iobuf = reply.createMsg();
+	socket_->writeChain(&wcb_,std::move(send_iobuf));
 }
 
 void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
@@ -506,5 +496,32 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	}
 	
 };
+
+void readEOF() noexcept{
+	readBuffer_.clear();
+    readContextMap_.clear();
+    writeContextMap_.clear();
+
+    /**
+	 * TODO: wait uutil all the pengding operation finish.
+	 */
+	/**
+	 * Release share memory.
+	 */
+	munmap(readSM_,readSMSize_);
+	munmap(writeSM_,writeSMSize_);
+	shm_unlink(readSMName_);
+	shm_unlink(writeSMName_);
+	readSM_ = nullptr;
+	writeSM_ = nullptr;
+
+	/**
+	 * Unregister the allocator.
+	 */
+	readSMAllocator_ = nullptr;
+	//writeSMAllocator_ = nullptr;
+
+	username_.clear();
+}
 
 }

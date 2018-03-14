@@ -110,32 +110,7 @@ public:
      * The read callback will be automatically uninstalled immediately before
      * readEOF() is invoked.
      */
-    void readEOF() noexcept override{
-        readBuffer_.clear();
-        /*
-        readRequest_.clear();
-        writeRequest_.clear();
-        lastReadResponse_.clear();
-        lastWriteResponse_.clear();
-        */
-        readContextMap_.clear();
-        writeContextMap_.clear();
-
-        readSMAllocator_ = nullptr;
-        /**
-         * Close share memory.
-         */
-        if(readSM_ != nullptr){
-            munmap(readSM_,readSMSize_);
-            shm_unlink(readSMName_);
-            readSM_ = nullptr;
-        }
-        if(writeSM_ != nullptr){
-            munmap(writeSM_,writeSMSize_);
-            shm_unlink(writeSMName_);
-            writeSM_ = nullptr;
-        }
-    };
+    void readEOF() noexcept override;
 
     /**
      * readError() will be invoked if an error occurs reading from the
