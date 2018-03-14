@@ -187,7 +187,7 @@ private:
     std::unordered_map<std::string,IPCReadRequestMessage> lastWriteResponse_;
 */
 
-    void handleAuthticationRequest(std::unique_ptr<folly::IOBuf> data);
+    void handleAuthenticationRequest(std::unique_ptr<folly::IOBuf> data);
     void handleReadRequest(std::unique_ptr<folly::IOBuf> data);
     void handleWriteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleCloseRequest();

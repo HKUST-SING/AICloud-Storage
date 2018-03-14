@@ -26,7 +26,7 @@
 
 namespace singaistorageipc{
 
-void ServerReadCallback::handleAuthticationRequest(
+void ServerReadCallback::handleAuthenticationRequest(
 	std::unique_ptr<folly::IOBuf> data){
 	if(readSM_ != nullptr || writeSM_ != nullptr){
 		/**
@@ -279,7 +279,6 @@ void ServerReadCallback::handleReadRequest(
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
 		// Update the last response.
 		contextmap->second->lastResponse_ = reply;
-		// TODO: Make sure that the client will comfirm this message, too.
 		return;
 	}
 
@@ -317,6 +316,9 @@ void ServerReadCallback::handleReadRequest(
 	auto send_iobuf = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
 	// Update the context
+	/**
+	 * TODO: the ``allocasize` should retrive from ceph.
+	 */
 	contextmap->second->remainSize_ -= allocsize;
 	contextmap->second->lastResponse_ = reply;
 	/**
@@ -383,8 +385,10 @@ void ServerReadCallback::handleWriteRequest(
 				/**
 				 * There are no other request.
 				 */
+				writecontext = contextmap->second;
+				tranID = writecontext->tranID_;
+				workerID = writecontext->workerID_;
 				writeContextMap_.erase(path);
-				return;
 			}
 		}
 	}
@@ -478,7 +482,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	IPCMessage::MessageType *type = (IPCMessage::MessageType *)data;
 	switch(*type){
 		case IPCMessage::MessageType::AUTH : 
-			handleAuthticationRequest(std::move(rec_iobuf));
+			handleAuthenticationRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::READ :
