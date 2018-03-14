@@ -7,6 +7,8 @@
 #include <cstring>
 #include <unordered_map>
 #include <queue>
+#include <cstdlib>
+#include <memory>
 
 #include <stdio.h>
 #include <ctime>
@@ -20,12 +22,32 @@
 */
 //using namespace singaistorageipc;
 
+class Example{
+
+public:
+	Example(const Example& e)
+	: queue(e.queue){std::srand(time(NULL));};
+
+	Example(){};
+
+	std::queue<int> queue;
+
+};
+
 
 int main(int argc, char** argv){
-	uint32_t readBufferSize_ = 1000*1000*1000;
-	std::cout << readBufferSize_ << std::endl;
+	Example tmp;
+	tmp.queue.emplace(1); 
+	std::cout << tmp.queue.size() << std::endl;
 
-	int a = 2;
-	std::cout << (a << 1) << std::endl;
+	Example tmp1(tmp);
+	tmp1.queue.emplace(2);
+	std::cout << tmp.queue.size() << std::endl;
+	std::srand(time(NULL));
+	std::cout << std::rand() << std::endl;
+	auto a = std::make_shared<Example>(tmp);
+	std::cout << a->queue.size() << std::endl;
+	a->queue.emplace(1);
+	std::cout << a->queue.size() << std::endl;
 	return 0;
 }

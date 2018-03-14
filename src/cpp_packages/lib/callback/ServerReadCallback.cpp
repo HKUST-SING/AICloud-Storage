@@ -1,8 +1,10 @@
 
 #include <ctime>
 #include <cstring>
+#include <cstdlib>
 #include <fcntl.h>
 #include <errno.h>
+#include <memory>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
@@ -23,36 +25,6 @@
 #include "../utils/BFCAllocator.h"
 
 namespace singaistorageipc{
-
-bool ServerReadCallback::insertReadRequest(
-	IPCReadRequestMessage msg){
-	auto search = readRequest_.find(msg.getPath());
-	if(search == readRequest_.end()){
-		std::queue<IPCReadRequestMessage> queue;
-		queue.emplace(msg);
-		readRequest_.emplace(msg.getPath(),queue);
-		return true;
-	}
-	else{
-		search->second.emplace(msg);
-		return false;
-	}
-}
-
-bool ServerReadCallback::insertWriteRequest(
-	IPCWriteRequestMessage msg){
-	auto search = writeRequest_.find(msg.getPath());
-	if(search == writeRequest_.end()){
-		std::queue<IPCWriteRequestMessage> queue;
-		queue.emplace(msg);
-		writeRequest_.emplace(msg.getPath(),queue);
-		return true;
-	}
-	else{
-		search->second.emplace(msg);
-		return false;
-	}
-}
 
 void ServerReadCallback::handleAuthticationRequest(
 	std::unique_ptr<folly::IOBuf> data){
@@ -144,7 +116,7 @@ void ServerReadCallback::handleAuthticationRequest(
 	 * Register allocater for share memory.
 	 */
 	readSMAllocator_ = BFCAllocator::create(0,readSMSize_);
-	writeSMAllocator_ = BFCAllocator::create(1,writeSMSize_);
+	///writeSMAllocator_ = BFCAllocator::create(1,writeSMSize_);
 
 	/**
 	 * Send the reply.
@@ -178,39 +150,55 @@ void ServerReadCallback::handleReadRequest(
 
 
 	std::string path = read_msg.getPath();
-	/**
-	 * TODO: store this info.
-	 */
-	uint32_t workID = 0;
-	uint32_t tranID = 0;
-	uint32_t objectSize = 1024;
+	uint32_t workerID = 0;
+	uint32_t tranID;
+	uint32_t objectSize;
 
+	auto contextmap = readContextMap_.find(path);
 	if(isnewcoming){
-		/**
-	 	 * TODO: check user credentials and correctness of operation.
-	 	 *
-	 	 * Here we only grant each operation.
-	 	 */
-
-		if(!insertReadRequest(read_msg)){
-			// There is other read request processing
-			// of the same object.
+	 	/**
+	 	 * Find if there are other read request processing
+	 	 * on the same object.
+	 	 */ 
+		if(contextmap != readContextMap_.end()){
+			/**
+			 * There is other read request processing
+			 * on the same object.
+			 */
+			contextmap->second->pendingList.emplace(read_msg);
 			return ;
+		}
+		else{
+			/**
+			 * It is the first request.
+			 */
+			/**
+	 	 	 * TODO: check user credentials and correctness of operation.
+	 	 	 * 		 update `objectSize`
+	 	 	 *
+	 	 	 * Here we only grant each operation.
+	 	 	 */
+	 		objectSize = std::rand();
+
+			tranID = std::rand();
+			auto newcontext = std::make_shared<ReadRequestContext>();
+			newcontext->workerID_ = workerID;
+			newcontext->tranID_ = tranID;
+			newcontext->remainSize_ = objectSize;
+			readContextMap_.emplace(path,newcontext);
 		}
 	}
-	else{
+	else{ // if(isnewcoming)
 		// It is a comfirm.
-		auto kv_pair = lastReadResponse_.find(path);
-
-		if(kv_pair == lastReadResponse_.end()){
+		if(contextmap == readContextMap_.end()){
 			/**
-			 * Server havn't send any response before.
-			 * Just return the result.
+			 * There is no context. It must be an error.
 			 */
-			return ;
+			return;
 		}
 
-		IPCWriteRequestMessage lastresponse = kv_pair->second;
+		IPCWriteRequestMessage lastresponse 
+			= contextmap->second->lastresponse_;
 
 		/**
 		 * Check whether last response represent
@@ -224,30 +212,49 @@ void ServerReadCallback::handleReadRequest(
 
 		bool keepsending = true;
 		if(isfinish){
-			// Remove the request from the queue.
-			auto readrequests = readRequest_[path];
-			readrequests.pop();
+			// check the request queue size.
+			auto readrequests = contextmap->second->pendingList_;
 
 			if(readrequests.empty()){
 				// No other more requests need to process.
 				keepsending = false;
-				readRequest_.erase(path);
-				lastReadResponse_.erase(path)
+				readContextMap_.erase(path);
 			}
 			else{
 				// Get the next request.
 				IPCReadRequestMessage nextrequest = readrequests.front();
+				contextmap->second->pendingList_.pop();
+
+				/**
+	 	 	 	 * TODO: check user credentials and correctness of operation.
+	 	 	 	 * 		 update `objectSize`
+	 	 	 	 *
+	 	 	 	 * Here we only grant each operation.
+	 	 	 	 */
+	 			objectSize = std::rand();
+
 				/**
 			 	 * Get some info use for ceph.
 			 	 */
-			 	pro = nextrequest.getProperties();			 	
+			 	pro = nextrequest.getProperties();	
+			 	/**
+			 	 * Update context.
+			 	 */		 	
+			 	tranID = std::rand();
+			 	contextmap->second->workerID_ = workerID;
+			 	contextmap->second->tranID_ = tranID;
+			 	contextmap->second->remainSize_ = objectSize;
+
 			}
 
 		}
-		else{
+		else{ //if(isfinish)
 			/**
-			 * TODO: Retrive the `workID` and `tranID`
+			 * Retrive the `workerID`,`tranID` and `objectSize`
 			 */
+			workerID = contextmap->second->workerID_;
+			tranID = contextmap->second->tranID_;
+			objectSize = contextmap->second->remainSize_;
 		}
 
 		if(!keepsending){
@@ -263,14 +270,15 @@ void ServerReadCallback::handleReadRequest(
 		reply.setDataLength(0);
 		auto send_iobuf = reply.createMsg();
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
-		// TODO: Update the last response.
+		// Update the last response.
+		contextmap->second->lastresponse_ = reply;
 		// TODO: Make sure that the client will comfirm this message, too.
 		return;
 	}
 
 	size_t allocsize = objectSize;
 	BFCAllocator::Offset memoryoffset;
-	while((memoryoffset = readSMAllocator_.get()->Alloc(allocsize)) 
+	while((memoryoffset = readSMAllocator_->Alloc(allocsize)) 
 		== BFCAllocator::k_invalid_offset){
 		allocsize = allocsize >> 1;
 		/**
@@ -300,7 +308,13 @@ void ServerReadCallback::handleReadRequest(
 
 	auto send_iobuf = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
-	// TODO: Update the last response
+	// Update the context
+	contextmap->second->remainSize_ -= allocsize;
+	contextmap->second->lastresponse_ = reply;
+	/**
+	 * TODO: this `workerID` should retrive from ceph.
+	 */
+	contextmap->second->workerID_ = workerID;
 }
 
 void ServerReadCallback::handleWriteRequest(
@@ -314,83 +328,103 @@ void ServerReadCallback::handleWriteRequest(
 	/**
 	 * TODO: check the bitmap.
 	 */
-	// Whether this write request is an new request.
-	bool isnewcoming;
-	
-	if(isnewcoming){
+	uint32_t pro = write_msg.getProperties();
+
+	std::string path = write_msg.getPath();
+	uint32_t workerID = 0;
+	uint32_t tranID;
+
+	auto contextmap = writeContextMap_.find(path);
+
+	bool isfinish = false;
+	if(write_msg.getStartingAddress() == 0
+		&& write_msg.getDataLength() == 0){
+		isfinish = true;
+	} 
+
+	std::shared_ptr<writeRequestContext> writecontext;
+	bool isfirstwrite = false;
+	IPCReadRequestMessage reply;
+	reply.setPath(path);
+
+	/**
+	 * TODO: need discuss.
+	 */
+	if(isfinish){
 		/**
-	 	 * TODO: check user credentials and correctness of operation.
-	 	 *
-	 	 * Here we only grant each operation.
-	 	 */
-
-		if(!insertWriteRequest(write_msg)){
-			// There is other write request processing
-			// of the same object.
-			return ;
-		}
-		else{
-			/**
-			 * TODO: get some info use for ceph.
-			 */
-		}
-	}
-	else{
-		// It is a comfirm.
-		auto kv_pair = lastWriteResponse_.find(write_msg.getPath());
-
-		if(kv_pair == lastWriteResponse_.end()){
-			/**
-			 * Server havn't send any response before.
-			 * Just return the result.
-			 */
-			return ;
-		}
-
-		IPCReadRequestMessage lastresponse = kv_pair->second;
-
-		/**
-		 * TODO: check whether this request represent
-		 * 		 the operation has finished.
+		 * TODO: Set properties with flag is unset.
 		 */
-		bool isfinish;
+		/**
+		 * Reply to the client.
+		 */
+		auto send_iobuf = reply.createMsg();
+		socket_->writeChain(&wcb_,std::move(send_iobuf));
 
-		if(isfinish){
-			// Remove the request from the queue.
-			auto writerequests = writeRequest_[write_msg.getPath()];
-			writerequests.pop();
-
-			if(writerequests.empty()){
-				// No other more requests need to process.
-				writeRequest_.erase(write_msg.getPath());
+		if(contextmap != writeContextMap_.end()){
+			/**
+			 * Check whether there is pending request.
+			 */
+			if(!contextmap->second.pendingList_.empty()){
+				/**
+				 * There are still other request.
+				 */
+				writecontext = contextmap->second;
+				write_msg = writecontext.pendingList_.front();
+				writecontext.pendingList_.pop();
+				//Goto the place of new arriving.
+				goto NEWHANDLEPOINT;
 			}
 			else{
-				// Get the next request.
-				IPCWriteRequestMessage nextrequest = writerequests.front();
 				/**
-			 	 * TODO: get some info use for ceph.
-			 	 */
+				 * There are no other request.
+				 */
+				writeContextMap_.erase(path);
+				return;
 			}
-
+		}
+	}
+	else{ //if(isfinish)
+		if(contextmap == writeContextMap_.end()){
+			/**
+			 * This is the first write
+			 */
+			writecontext = std::make_shared<ReadRequestContext>();
+			writeContextMap_.emplace(path,writecontext);
+NEWHANDLEPOINT:
+			tranID = std::rand();
+			isfirstwrite = true;
 		}
 		else{
 			/**
-			 * TODO: get some info use for ceph.
+			 * Retrive `tranID` and `workerID`.
 			 */
+			writecontext = contextmap->second;
+			tranID = writecontext.tranID_;
+			workerID = writecontext.workerID_;
 		}
-
 	}
 
 	/**
 	 * TODO: If data check success, write data to ceph.
 	 */
-
+	Task task(username_,path,Task::WRITE,write_msg.getStartingAddress(),
+				write_msg.getDataLength(),tranID,workerID);
 
 	// The following process may be done in the folly::future callback.
+	if(isfirstwrite){
+		/**
+		 * TODO: set the flag.
+		 */
+	}
+	auto send_iobuf2 = reply.createMsg();
+	socket_.writeChain(&wcb_,std::move(send_iobuf2));
 
 	/**
-	 * Need to set last response.
+	 * Update context.
 	 */
+	writecontext.tranID_ = tranID;
+	writecontext.workerID_ = workerID;
+	writecontext.lastresponse_ = reply;
 }
 
 void ServerReadCallback::handleCloseRequest(){
@@ -408,7 +442,7 @@ void ServerReadCallback::handleCloseRequest(){
 	 * Unregister the allocator.
 	 */
 	readSMAllocator_ = nullptr;
-	writeSMAllocator_ = nullptr;
+	//writeSMAllocator_ = nullptr;
 
 	username_.clear();
 }

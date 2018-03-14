@@ -129,7 +129,7 @@ public:
 	}
 
 
-public:
+private:
 	std::string username_;
 	std::string path_;
 	OpType opType_;

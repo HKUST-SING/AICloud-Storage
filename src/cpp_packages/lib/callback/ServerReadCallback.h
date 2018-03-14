@@ -2,6 +2,8 @@
 
 #include <unordered_map>
 #include <queue>
+#include <ctime>
+#include <cstdlib>
 
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocket.h>
@@ -10,20 +12,12 @@
 #include <folly/io/async/AsyncSocketException.h>
 
 #include "ServerWriteCallback.h"
+#include "RequestContext.h"
 #include "../message/IPCReadRequestMessage.h"
 #include "../message/IPCWriteRequestMessage.h"
 
 
 namespace singaistorageipc{
-
-/**
- * This class is contain the infomation
- * of current workerID, tranID, remain size,
- * and pending requests of a processing object.
- */
-class RequestContext{
-
-};
 
 /*
  * This callback will be invoked when a socket can be read by server.
@@ -44,7 +38,7 @@ public:
       readSMSize_(readSMSize),
       writeSMSize_(writeSMSize),
       readSM_(nullptr),
-      writeSM_(nullptr){};
+      writeSM_(nullptr){std::srand(time(NULL));};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -113,12 +107,31 @@ public:
      * The read callback will be automatically uninstalled immediately before
      * readEOF() is invoked.
      */
-    virtual void readEOF() noexcept override{
+    void readEOF() noexcept override{
         readBuffer_.clear();
+        /*
         readRequest_.clear();
         writeRequest_.clear();
         lastReadResponse_.clear();
         lastWriteResponse_.clear();
+        */
+        readContextMap_.clear();
+        writeContextMap_.clear();
+
+        readSMAllocator_ = nullptr;
+        /**
+         * Close share memory.
+         */
+        if(readSM_ != nullptr){
+            munmap(readSM_,readSMSize_);
+            shm_unlink(readSMName_);
+            readSM_ = nullptr;
+        }
+        if(writeSM_ != nullptr){
+            munmap(writeSM_,writeSMSize_);
+            shm_unlink(writeSMName_);
+            writeSM_ = nullptr
+        }
     };
 
     /**
@@ -130,7 +143,9 @@ public:
      *
      * @param ex        An exception describing the error that occurred.
      */
-    void readErr(const folly::AsyncSocketException& ex) noexcept override{};
+    void readErr(const folly::AsyncSocketException& ex) noexcept override{
+        readEOF();
+    };
 
     void readDataAvailable(size_t len) noexcept override;
 
@@ -150,11 +165,16 @@ private:
 
     std::shared_ptr<folly::AsyncSocket> socket_;
     std::shared_ptr<BFCAllocator> readSMAllocator_;
-    std::shared_ptr<BFCAllocator> writeSMAllocator_;
+//    std::shared_ptr<BFCAllocator> writeSMAllocator_;
 
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
 
+    std::unordered_map<std::string,
+        std::shared_ptr<ReadRequestContext>> readContextMap_;
+    std::unordered_map<std::string,
+        std::shared_ptr<writeRequestContext>> writeContextMap_;
+/*
     std::unordered_map<std::string,
         std::queue<IPCReadRequestMessage>> readRequest_;
     std::unordered_map<std::string,
@@ -162,16 +182,12 @@ private:
 
     std::unordered_map<std::string,IPCWriteRequestMessage> lastReadResponse_;
     std::unordered_map<std::string,IPCReadRequestMessage> lastWriteResponse_;
-
+*/
 
     void handleAuthticationRequest(std::unique_ptr<folly::IOBuf> data);
     void handleReadRequest(std::unique_ptr<folly::IOBuf> data);
     void handleWriteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleCloseRequest();
-
-    // Return whether this is the first request of this object.
-    bool insertReadRequest(IPCReadRequestMessage msg);
-    bool insertWriteRequest(IPCWriteRequestMessage msg);
 
 };
 
