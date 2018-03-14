@@ -1,4 +1,4 @@
-
+#include <iostream>
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -28,7 +28,6 @@ namespace singaistorageipc{
 
 void ServerReadCallback::handleAuthticationRequest(
 	std::unique_ptr<folly::IOBuf> data){
-
 	if(readSM_ != nullptr || writeSM_ != nullptr){
 		/**
 		 * The user has authenticated before.
@@ -95,7 +94,6 @@ void ServerReadCallback::handleAuthticationRequest(
 		writeSMName = memName32(ctime(&t));
 	}
 	memcpy(writeSMName_,writeSMName,32*sizeof(char));
-
 	/**
 	 * Set the size of share memory.
 	 */

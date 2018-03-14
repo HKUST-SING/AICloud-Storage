@@ -155,8 +155,8 @@ private:
 					+ sizeof(uint32_t)
 					+ sizeof(uint64_t)
 					+ sizeof(uint32_t)
-					+ sizeof(32*sizeof(char))
-					+ sizeof(32*sizeof(char));
+					+ 32*sizeof(char)
+					+ 32*sizeof(char);
 		return msgLength_;
 	};
 };
