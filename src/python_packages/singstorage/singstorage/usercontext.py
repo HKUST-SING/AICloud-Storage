@@ -318,17 +318,18 @@ class UserContext(object):
 			
 			# case 1: MSG_STATUS returned
 
-			if res_msg == sing_msgs.MSG_STATUS:
+			if res_msg.msg_type == sing_msgs.MSG_STATUS:
 				# get the return code
 				res_service = res_msg.op_status
 
-			elif res_msg == sing_msgs.MSG_CON_REPLY:
+			elif res_msg.msg_type == sing_msgs.MSG_CON_REPLY:
 				res_service = sing_errs.SUCCESS
 			
 			else: # some error
 				res_service = sing_errs.INTERNAL_ERROR
 
-		except:
+		except Exception as exp:
+			print exp
 			res_service = sing_errs.INTERNAL_ERROR
 
 		# failed to connect to the storage service

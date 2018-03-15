@@ -181,7 +181,9 @@ class SocketIPC(ControlIPC):
 				tmp_logger.error("Cannot connect to the service after a few attempts.")
 				raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 
-		# connection has successfully connected
+		# socket has successfully connected
+		self._connected = True 
+
 		# authenticate the user
 		tmp_logger.info("Socket has connected to the storage service.")
 		self.send_request(sing_msgs.MSG_AUTH, 0, username=username,
@@ -253,7 +255,10 @@ class SocketIPC(ControlIPC):
      
 		# decode the header
 		msg.decode_header(header)
-        
+       	
+		tmp_logger.info("Message type:{0}, message length: {0}".format(msg.msg_type, msg.msg_length))
+		
+		 
 		# need to check if the reuired message type
 		# match the received one
 		if req_type != msg.msg_type:
@@ -308,7 +313,7 @@ class SocketIPC(ControlIPC):
 			Close the UNIX socket.
 		"""
 
-		if not super._connected:
+		if not self._connected:
 			return # the IPC is closed
 
 
@@ -349,4 +354,4 @@ class SocketIPC(ControlIPC):
 			# ignore exceptions
 			pass
 		finally:
-			super._connected = False # mark as closed
+			self._connected = False # mark as closed
