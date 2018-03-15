@@ -136,8 +136,8 @@ private:
     uint64_t newAllocSize_;
     uint32_t readSMSize_;
     uint32_t writeSMSize_;
-    char readSMName_[32];
-    char writeSMName_[32];
+    char* readSMName_;
+    char* writeSMName_;
 
     void *readSM_;
     void *writeSM_;
