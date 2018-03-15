@@ -43,6 +43,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 	IPCAuthenticationMessage auth_msg;
 	// If parse fail, stop processing.
 	if(!auth_msg.parse(std::move(data))){
+		sendStatus(auth_msg.getID(),IPCStatusMessage::StatusType::STAT_USER);
 		return;
 	}
 
@@ -95,6 +96,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 		readSMName = memName32(ctime(&t));
 	}
 	memcpy(readSMName_,readSMName,32*sizeof(char));
+	std::cout << "read SM:" << readSMName_ << std::endl;
 
 	int writefd;
 	while((writefd = shm_open(writeSMName,
@@ -107,6 +109,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 		writeSMName = memName32(ctime(&t));
 	}
 	memcpy(writeSMName_,writeSMName,32*sizeof(char));
+	std::cout << "write SM:" << writeSMName_ << std::endl;
 	/**
 	 * Set the size of share memory.
 	 */
@@ -558,12 +561,16 @@ void ServerReadCallback::readEOF() noexcept{
 	/**
 	 * Release share memory.
 	 */
-	munmap(readSM_,readSMSize_);
-	munmap(writeSM_,writeSMSize_);
-	shm_unlink(readSMName_);
-	shm_unlink(writeSMName_);
-	readSM_ = nullptr;
-	writeSM_ = nullptr;
+	if(readSM_ != nullptr){
+		munmap(readSM_,readSMSize_);	
+		shm_unlink(readSMName_);
+		readSM_ = nullptr;
+	}
+	if(writeSM_ != nullptr){
+		munmap(writeSM_,writeSMSize_);
+		shm_unlink(writeSMName_);
+		writeSM_ = nullptr;
+	}
 
 	/**
 	 * Unregister the allocator.
