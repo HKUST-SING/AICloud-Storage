@@ -43,6 +43,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 	IPCAuthenticationMessage auth_msg;
 	// If parse fail, stop processing.
 	if(!auth_msg.parse(std::move(data))){
+		sendStatus(auth_msg.getID(),IPCStatusMessage::StatusType::STAT_AUTH_USER);
 		return;
 	}
 
@@ -95,8 +96,13 @@ void ServerReadCallback::handleAuthenticationRequest(
 		delete(readSMName);
 		readSMName = memName32(ctime(&t));
 	}
+<<<<<<< HEAD
 	//memcpy(readSMName_,readSMName,32*sizeof(char));
 	readSMName_ = readSMName;
+=======
+	memcpy(readSMName_,readSMName,32*sizeof(char));
+	std::cout << "read SM:" << readSMName_ << std::endl;
+>>>>>>> 8aeed324af582e718232661dc68be3152ddb7193
 
 	int writefd;
 	while((writefd = shm_open(writeSMName,
@@ -109,8 +115,13 @@ void ServerReadCallback::handleAuthenticationRequest(
 		delete(writeSMName);
 		writeSMName = memName32(ctime(&t));
 	}
+<<<<<<< HEAD
 	writeSMName_ = writeSMName;
 	//memcpy(writeSMName_,writeSMName,32*sizeof(char));
+=======
+	memcpy(writeSMName_,writeSMName,32*sizeof(char));
+	std::cout << "write SM:" << writeSMName_ << std::endl;
+>>>>>>> 8aeed324af582e718232661dc68be3152ddb7193
 	/**
 	 * Set the size of share memory.
 	 */
@@ -147,7 +158,10 @@ void ServerReadCallback::handleAuthenticationRequest(
 	reply.setID(auth_msg.getID());
 
 	auto send_iobuf = reply.createMsg();
+	std::cout << "io buf:" << send_iobuf->length() << std::endl;
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
+	std::cout << "connection reply:" << reply.getLength()
+		  << std::endl;
 };
 
 void ServerReadCallback::handleReadRequest(
@@ -162,6 +176,7 @@ void ServerReadCallback::handleReadRequest(
 	 * TODO: check the bitmap.
 	 */
 	// Whether this read request is an new request.
+	std::cout << "check bitmap" << std::endl;
 	uint32_t pro = read_msg.getProperties();
 	bool isnewcoming;
 	if(pro == 1){
@@ -173,6 +188,7 @@ void ServerReadCallback::handleReadRequest(
 	uint32_t workerID = 0;
 	uint32_t objectSize;
 
+	std::cout << "start processing" << std::endl;
 	auto contextmap = readContextMap_.find(path);
 	if(isnewcoming){
 	 	/**
@@ -197,7 +213,9 @@ void ServerReadCallback::handleReadRequest(
 	 	 	 *
 	 	 	 * Here we only grant each operation.
 	 	 	 */
+			std::cout << "create new context" << std::endl;
 	 		objectSize = std::rand();
+			std::cout << "object size:"<<objectSize << std::endl;
 
 			auto newcontext = std::make_shared<ReadRequestContext>();
 			newcontext->workerID_ = workerID;
@@ -323,6 +341,7 @@ void ServerReadCallback::handleReadRequest(
 	/**
 	 * Then reply write message to client.
 	 */
+	std::cout << "configuring reply message" << std::endl;
 	IPCWriteRequestMessage reply;
 	reply.setPath(path);
 
@@ -331,7 +350,9 @@ void ServerReadCallback::handleReadRequest(
 
 	reply.setID(read_msg.getID());
 
+	std::cout << "create iobuf" << std::endl;
 	auto send_iobuf = reply.createMsg();
+	std::cout << "send" << std::endl;
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
 	// Update the context
 	/**
@@ -553,6 +574,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 };
 
 void ServerReadCallback::readEOF() noexcept{
+	std::cout << "read EOF" << std::endl;
 	readBuffer_.clear();
     readContextMap_.clear();
     writeContextMap_.clear();
@@ -567,16 +589,23 @@ void ServerReadCallback::readEOF() noexcept{
 		munmap(readSM_,readSMSize_);	
 		shm_unlink(readSMName_);
 		readSM_ = nullptr;
+<<<<<<< HEAD
 		delete(readSMName_);
 		readSMName_ = nullptr;
 	}
 	
+=======
+	}
+>>>>>>> 8aeed324af582e718232661dc68be3152ddb7193
 	if(writeSM_ != nullptr){
 		munmap(writeSM_,writeSMSize_);
 		shm_unlink(writeSMName_);
 		writeSM_ = nullptr;
+<<<<<<< HEAD
 		delete(writeSMName_);
 		writeSMName_ = nullptr;
+=======
+>>>>>>> 8aeed324af582e718232661dc68be3152ddb7193
 	}
 
 	/**
