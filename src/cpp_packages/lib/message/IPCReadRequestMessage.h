@@ -53,6 +53,9 @@ public:
 
 		tmp = createMsgHead(tmp);
 
+		memcpy(tmp,&pathLength_,sizeof(uint16_t));
+		tmp += sizeof(uint16_t);
+
 		memcpy(tmp,pathVal_.c_str(),pathLength_ * sizeof(char));
 		tmp += pathLength_ * sizeof(char);
 
