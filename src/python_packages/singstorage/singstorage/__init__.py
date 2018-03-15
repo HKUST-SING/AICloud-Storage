@@ -42,6 +42,11 @@ def read_data(dpath):
 	return ops.read_data_sync(cloud_user, dpath)
 
 
+def delete_data(dpath):
+	global cloud_user
+	ops.delete_data_sync(cloud_user, dpath)
+
+
 def close():
 	global cloud_user
 

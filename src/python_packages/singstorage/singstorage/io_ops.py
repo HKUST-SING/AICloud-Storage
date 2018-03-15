@@ -26,10 +26,16 @@ ch.setFormatter(formatter)
 
 # add handler to logger
 logger.addHandler(ch)
-
+logger.propagate=False
 
 ####### LOGGING ENDS HERE #############
 
+
+####### Define some module exceptions #######
+from singstorage.singexcept import StoreOpError as StorageError 
+
+
+######### Exceptions end here  ################
 
 
 def connect_to_cluster(user):
@@ -61,6 +67,13 @@ def read_data_sync(user, path):
 
 	return rados_obj.get_raw_data() # return an instance of the 
 									# Python bytearray
+
+
+def delete_data_sync(user, path):
+	rados_obj = sing_rados.RadosObject(user, path)
+
+	# this may throw an exception
+	user.delete_data(rados_obj)
 
 
 def close_conn(user):

@@ -31,7 +31,7 @@ ch.setFormatter(formatter)
 
 # add handler to logger
 logger.addHandler(ch)
-
+logger.propagate=False
 
 ####### LOGGING ENDS HERE #############
 

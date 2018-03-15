@@ -37,7 +37,7 @@ ch.setFormatter(formatter)
 
 # add handler to logger
 logger.addHandler(ch)
-
+logger.propagate=False
 
 ####### LOGGING ENDS HERE #############
 
@@ -688,8 +688,53 @@ class UserContext(object):
 			rados_obj.extend_data(read_data)
 			
 
+	def delete_data(self, rados_obj):
+		"""
+			Delete a storage object at the given path.
+		"""
+		tmp_logger = logging.getLogger(__name__)
+		tmp_logger.info("delete_data: {0}".format(rados_obj.get_data_path()))		
 
-	def  close(self):
+		mark_id = self._get_unique_id() # message id
+		self._ctrl.send_request(sing_msgs.MSG_DELETE, mark_id,
+								data_path=rados_obj.get_data_path())
+
+
+		# wait for permission from the service
+		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS) 
+		
+		# STATUS message must be received
+		assert res.msg_type == sing_msgs>MSG_STATUS, "Delete receives some different message"
+		assert res.msg_id == mark_id, "STATUS id != message id"
+
+
+		# if status is success, return
+		if res.op_status == sing_msg.STAT_SUCCESS:
+			return	
+
+
+		# other possible cases
+		if res.op_status == sing_msgs.STAT_PATH:
+			raise sing_errs.PathError(rados_obj.get_data_path(),
+									  False)
+
+		elif res.op_status == sing_msgs.STAT_DENY:
+			raise sing_errs.PathError(rados_obj.get_data_path(),
+									  True)
+
+		elif res.op_status == sing_msgs.STAT_QUOTA:
+			raise sing_errs.QuotaError(obj_len, 0)
+
+		elif res.op_status == sing_msgs.STAT_PROT:
+			protocol = rados_obj.get_data_path().split(":")
+			raise sing_errs.ProtError(protocol[0])
+
+		else: # some internal error
+			raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
+
+
+
+	def close(self):
 		"""
 			Try to close the user.
 		"""
