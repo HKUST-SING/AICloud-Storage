@@ -17,6 +17,7 @@
 #include "RequestContext.h"
 #include "../message/IPCReadRequestMessage.h"
 #include "../message/IPCWriteRequestMessage.h"
+#include "../message/IPCStatusMessage.h"
 #include "../utils/BFCAllocator.h"
 
 
@@ -168,7 +169,7 @@ private:
     void handleDeleteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleCloseRequest(std::unique_ptr<folly::IOBuf> data);
 
-    void ServerReadCallback::sendStatus(
+    void sendStatus(
         uint32_t id,IPCStatusMessage::StatusType type);
 
 };

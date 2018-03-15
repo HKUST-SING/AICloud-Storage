@@ -13,7 +13,7 @@ namespace singaistorageipc{
 class IPCDeleteRequestMessage : public IPCMessage{
 
 public:
-	IPCReadRequestMessage(){
+	IPCDeleteRequestMessage(){
 		msgType_ = IPCMessage::MessageType::DELETE;
 		pathLength_ = 0;
 	};

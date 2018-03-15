@@ -16,7 +16,7 @@ public:
 		msgType_ = IPCMessage::MessageType::CLOSE;
 	}
 
-	bool parse(std::unique_ptr<folly::IOBuf>) override{
+	bool parse(std::unique_ptr<folly::IOBuf> msg) override{
 		auto data = msg.get()->data();
 		auto length = msg.get()->length();
 

@@ -32,7 +32,7 @@ public:
 	 */
 	virtual bool parse(std::unique_ptr<folly::IOBuf>) = 0;
 
-	void* parseHead(void *data){
+	const uint8_t* parseHead(const uint8_t *data){
 		data += sizeof(IPCMessage::MessageType);
 		memcpy(&msgID_,data,sizeof(uint32_t));
 
@@ -80,17 +80,17 @@ public:
 protected:
 	MessageType msgType_;
 
-	uint32_t msgID_
+	uint32_t msgID_;
 
 	uint32_t msgLength_;
-private:
-	virtual uint32_t computeLength() = 0;
 
 	uint32_t computeHeadLength(){
 		return sizeof(IPCMessage::MessageType)
 					+ sizeof(uint32_t)
 					+ sizeof(uint32_t);
 	}
+private:
+	virtual uint32_t computeLength() = 0;
 };
 
 }

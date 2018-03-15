@@ -22,6 +22,7 @@
 #include "../message/IPCWriteRequestMessage.h"
 #include "../message/IPCDeleteRequestMessage.h"
 #include "../message/IPCStatusMessage.h"
+#include "../message/IPCCloseMessage.h"
 #include "../utils/Hash.h"
 #include "../utils/BFCAllocator.h"
 
@@ -254,7 +255,6 @@ void ServerReadCallback::handleReadRequest(
 			 	/**
 			 	 * Update context.
 			 	 */		 	
-			 	tranID = std::rand();
 			 	contextmap->second->workerID_ = workerID;
 			 	contextmap->second->remainSize_ = objectSize;
 
@@ -454,7 +454,6 @@ void ServerReadCallback::handleWriteRequest(
 	/**
 	 * Update context.
 	 */
-	writecontext->tranID_ = tranID;
 	writecontext->workerID_ = workerID;
 	writecontext->lastResponse_ = reply;
 }
