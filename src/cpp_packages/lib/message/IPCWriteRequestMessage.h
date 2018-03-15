@@ -128,8 +128,8 @@ private:
 		msgLength_ = computeHeadLength()
 					+ sizeof(uint16_t)
 					+ (pathLength_ * sizeof(char))
-					+ sizeof(uint32_t);
-					+ sizeof(uint64_t);
+					+ sizeof(uint32_t)
+					+ sizeof(uint64_t)
 					+ sizeof(uint64_t);
 		return msgLength_;
 	};
