@@ -5,10 +5,11 @@
 
 # Dependency modules
 from future.utils import viewitems as future_viewitems
-
+import posix_ipc
 
 
 # Python std lib
+import mmap
 import logging
 
 
@@ -228,7 +229,7 @@ class UserContext(object):
 					  (self._mem_tail + buf_size) % self._end_addr
 
 
-		return SharedMemeStruct(mem_addr, mem_size)
+		return SharedMemStruct(mem_addr, mem_size)
 
 
 
@@ -280,7 +281,7 @@ class UserContext(object):
 				return (len(d_read), d_read)
 
               
-		return SharedMemeStruct(mem_addr, mem_size)
+		return SharedMemStruct(mem_addr, mem_size)
 
 
 
@@ -293,7 +294,6 @@ class UserContext(object):
 			Initialize the user and try to connect to the 
 			sing storage service for data storage processing.
 		"""
-		#return
 
 		tmp_logger = logging.getLogger(__name__)
 		tmp_logger.info("connect_to_service")
@@ -303,7 +303,6 @@ class UserContext(object):
 
 
 		if not self._ctrl:
-			tmp_logger.error("Cannot create an IPC Socket")
 			raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
 
 
@@ -328,8 +327,8 @@ class UserContext(object):
 			else: # some error
 				res_service = sing_errs.INTERNAL_ERROR
 
-		except Exception as exp:
-			print exp
+		except:
+			self._ctrl.close_conn()
 			res_service = sing_errs.INTERNAL_ERROR
 
 		# failed to connect to the storage service
@@ -350,11 +349,14 @@ class UserContext(object):
 									 res_msg.read_buf_name)
 
 		except Exception as exp:
-			return sing_errs._INTERNAL_ERROR # add logging here
+			print exp
+			self.close()
+			return sing_errs.INTERNAL_ERROR # add logging here
 			
 
 		# all initialization steps have successfully completed
 		# Notify the user about a successful process
+		tmp_logger.info("Returning sing_errs.SUCCESS")
 		return sing_errs.SUCCESS
 
 
@@ -581,7 +583,7 @@ class UserContext(object):
 		tmp_logger = logging.getLogger(__name__)
 		tmp_logger.info("read_raw_data")
 		
-		return	
+
 		ref_data = rados_obj.get_raw_data() # reference to
 											# raw data of the object
 		
@@ -739,8 +741,6 @@ class UserContext(object):
 		"""
 			Try to close the user.
 		"""
-		return
-
 
 		tmp_logger = logging.getLogger(__name__)
 		tmp_logger.info("close")
