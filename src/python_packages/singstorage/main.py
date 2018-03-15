@@ -1,15 +1,23 @@
-from __future__ import print_function
-
 import singstorage
 
+
+user = None
+
 try:
-	singstorage.connect("John", "password")
+	user = singstorage.context.UserContext("username", "password")
+	if not user:
+		raise IOError("Out of Memory")
 
-	singstorage.read_data("S3:path_to_data")
-	singstorage.write_data("S3:path_to_data", bytearray(b"ONE MESSAGE TO WRITE"))
+	user.connect_to_service()
 
-	singstorage.close()
+	rados_obj = singstorage.rados.RadosObject(user, "some_bla")
 
+	user.read_raw_data(rados_obj)
 
 except Exception as exp:
-	print(exp)
+	print exp
+
+finally:
+	if user:
+		user.close()
+
