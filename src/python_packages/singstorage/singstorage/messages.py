@@ -308,7 +308,7 @@ class WriteMessage(InterMessage):
 		
 		# decode the rest of the message
 		self.prop_bitmap, self.mem_addr, self.data_length =\
-			struct.unpack("=IQQ", message[2+path_length:24+path_length:1])
+			struct.unpack("=IQQ", message[2+path_length:22+path_length:1])
 		
 		
 	
