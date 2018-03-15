@@ -341,6 +341,23 @@ void ServerReadCallback::handleWriteRequest(
 	 */
 	uint32_t pro = write_msg.getProperties();
 
+	if(pro == 1){
+		/**
+		 * TODO: The flag set. It means this is the first 
+		 * 		 message of a new request. We need authenticate 
+		 * 		 at the authentication server.
+		 * 		 The total size of written object is set in 
+		 *		 `dataLength_`, while the `startAddress_` is 0.
+		 *		 Here, we just grant every request.
+		 */
+		IPCStatusMessage reply;
+		reply.setStatusType(0);
+		auto send_iobuf = reply.createMsg();
+		socket_->writeChain(&wcb_,std::move(send_iobuf));
+		return;
+	}
+
+
 	std::string path = write_msg.getPath();
 	uint32_t workerID = 0;
 	uint32_t tranID;
