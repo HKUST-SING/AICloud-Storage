@@ -1,7 +1,17 @@
 # Python std lib
 import sys
+
+# check if valid Python versions
 PYTHON_MAJOR_VERSION = sys.version_info[0]
 PYTHON_MINOR_VERSION = sys.version_info[1]
+
+if PYTHON_MAJOR_VERSION == 2 and PYTHON_MINOR_VERSION != 7:
+	sys.exit("Only Python2 with minor 7 is supported")
+
+if PYTHON_MAJOR_VERSION != 2 and PYTHON_MAJOR_VERSION != 3:
+	sys.exit("Unsupported Python version: {0}".format(PYTHON_MAJOR_VERSION))
+	
+
 
 
 

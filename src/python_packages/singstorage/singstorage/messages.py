@@ -48,7 +48,7 @@ class InterMessage(object):
 	subcls = {} # list of subclasses : key is class 
 
 	def __init__(self, msg_type=MSG_DEFAULT, 
-					   msg_id=0, msg_length=0):
+					   msg_length=0, msg_id=0):
 		self.msg_type   = msg_type
 		self.msg_id     = msg_id
 		self.msg_length = msg_length + 9
@@ -62,12 +62,13 @@ class InterMessage(object):
 
 
 	def decode_msg(self, message):
-		self.msg_type, self.msg_id, self.msg_length =\
-		  struct.unpack("=BII", message[0:9:1])
+		self.decode_header()
 
 
 	def decode_header(self, header_msg):
-		self.decode_msg(header_msg)
+		self.msg_type, self.msg_id, self.msg_length =\
+		  struct.unpack("=BII", header_msg[0:9:1])
+
 
 
 	def get_header_size(self):
@@ -113,6 +114,7 @@ class InterMessage(object):
 		# create a message with the passed values
 		msg = MessageClass(**kwargs)
 		# modify the id 
+	
 		msg.msg_id = msg_id
 
 		return msg
@@ -127,7 +129,8 @@ class AuthMessage(InterMessage):
 		super(AuthMessage, self).__init__(MSG_AUTH, 
 										  len(username)+HASH_LENGTH + 2)
 		self.user_name    = username
-		self.passwd_hash  = passwd      
+		self.passwd_hash  = passwd 
+
 
 
 	def encode_msg(self):
@@ -166,8 +169,9 @@ class AuthMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		user_lenght = struct.unapck("=H", message[0:2:1])
-		chars = "B"*(user_lenght+HASH_LENGTH)
+		user_length = struct.unpack("=H", message[0:2:1])
+		user_length = user_length[0] # from tuple to int
+		chars = "B"*(user_length+HASH_LENGTH)
 		# now unpack the rest of the chars
 		name_pass = struct.unpack("="+chars, message[2::1])
 		
@@ -181,14 +185,11 @@ class AuthMessage(InterMessage):
 		if PYTHON_MAJOR_VERSION == 3:
 			self.passwd_hash = bytes(name_pass[user_length::1])
 		
-		elif PYTHON_MAJOR_VERSION == 2:
+		else: # must be Python2.7
 			self.passwd_hash =\
 			"".join([chr(ch_item) for ch_item
 								  in name_pass[user_length::1]])
-
-		else:
-			pass # add logging here		
-		
+			
 		
 		
 
@@ -231,7 +232,8 @@ class ReadMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		path_length = struct.unapck("=H", message[0:2:1])
+		path_length = struct.unpack("=H", message[0:2:1])
+		path_length = path_length[0] # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
@@ -241,9 +243,9 @@ class ReadMessage(InterMessage):
 		"".join([str(chr(ch_item)) for ch_item in vals[0::1]])
 
 		# decode the property bitmap
-		self.prop_bitmap = struct.unpack("=I", 
-								  message[2+path_length:6+path_length:1])
-		
+		tmp_bit  = struct.unpack("=I", 
+						message[2+path_length:6+path_length:1])
+		self.prop_bitmap = tmp_bit[0] # tuple to int
 		
 	
 @InterMessage.register_subclass(MSG_WRITE)
@@ -291,7 +293,8 @@ class WriteMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		path_length = struct.unapck("=H", message[0:2:1])
+		path_length = struct.unpack("=H", message[0:2:1])
+		path_length = path_length[0] # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		path_data = struct.unpack("="+chars, message[2:path_length+2:1])
@@ -340,9 +343,10 @@ class StatusMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		self.op_status = struct.unpack("=H", message[0:2:1])
-		
-		
+		tmp_status     =  struct.unpack("=H", message[0:2:1])
+		self.op_status =  tmp_status[0] # tuple to int
+	
+	
 @InterMessage.register_subclass(MSG_CON_REPLY)
 class ConReplyMessage(InterMessage):
 	"""
@@ -352,7 +356,7 @@ class ConReplyMessage(InterMessage):
 				       r_buf_addr=0,  r_buf_size=0,
                        w_buf_name="", r_buf_name=""):
 		super(ConReplyMessage, self).__init__(MSG_CON_REPLY, 
-										      152)
+										      88)
 		self.write_buf_addr  =  w_buf_addr
 		self.write_buf_size  =  w_buf_size
 		self.read_buf_addr   =  r_buf_addr  
@@ -396,7 +400,7 @@ class ConReplyMessage(InterMessage):
 		"""
 		self.write_buf_addr, self.write_buf_size,\
 		self.read_buf_addr, self.read_buf_size =\
-				struct.unapck('=QIQI', message[0:24:1])
+				struct.unpack('=QIQI', message[0:24:1])
 
 		# now unpack the rest of the chars
 		mem_names = struct.unpack('='+HASH_CODE+HASH_CODE, message[24::1])
@@ -417,14 +421,14 @@ class CloseMessage(InterMessage):
 		Session close message.
 	"""
 	def __init__(self):
-		super(StatusMessage, self).__init__(MSG_CLOSE,0)
+		super(CloseMessage, self).__init__(MSG_CLOSE,0)
 		    
 
 	def encode_msg(self):
 		"""
 			Encode the content of the message into binary form.
 		"""
-		msg_beg, vals = super(StatusMessage, self).encode_msg()
+		msg_beg, vals = super(CloseMessage, self).encode_msg()
 
 		# done
 		return struct.pack(msg_beg, *vals)
@@ -478,7 +482,8 @@ class DeleteMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		path_length = struct.unapck("=H", message[0:2:1])
+		path_length = struct.unpack("=H", message[0:2:1])
+		path_length = path_length[0] # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		vals  = struct.unpack("="+chars, message[2:2+path_length:1])

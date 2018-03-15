@@ -181,9 +181,13 @@ class SocketIPC(ControlIPC):
 				tmp_logger.error("Cannot connect to the service after a few attempts.")
 				raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 
-		# connection has successfully connected
+		# socket has successfully connected
+		self._connected = True 
+
 		# authenticate the user
 		tmp_logger.info("Socket has connected to the storage service.")
+
+
 		self.send_request(sing_msgs.MSG_AUTH, 0, username=username,
 						  passwd=password)
 
@@ -253,7 +257,8 @@ class SocketIPC(ControlIPC):
      
 		# decode the header
 		msg.decode_header(header)
-        
+       	
+		 
 		# need to check if the reuired message type
 		# match the received one
 		if req_type != msg.msg_type:
@@ -294,7 +299,7 @@ class SocketIPC(ControlIPC):
 
 
 		# message has successfully been read
-		
+		tmp_logger.info("read_request: decoding the received message")	
 		msg.decode_msg(b"".join(raw_data)) # decode the raw data
 										   # to a message
 
@@ -308,7 +313,7 @@ class SocketIPC(ControlIPC):
 			Close the UNIX socket.
 		"""
 
-		if not super._connected:
+		if not self._connected:
 			return # the IPC is closed
 
 
@@ -317,36 +322,39 @@ class SocketIPC(ControlIPC):
 
 		# send a notification to release 
 		# the resources
+		
+		try:
+			self.send_request(sing_msgs.MSG_CLOSE)
 
-		self.send_request(sing_msgs.MSG_CLOSE)
+			# wait for response
+			res = self.recv_request(sing_msgs.MSG_STATUS)
 
-
-
-		# wait for response
-		res = self.recv_request(sing_msgs.MSG_STATUS)
-
-		if res.op_status != sing_msgs.STAT_SUCCESS:
-			# log the response
-			tmp_logger.warn("Received status to close is not SUCCESS. status: {0}".format(res.op_status))
-
-			# check for ambiguous status
-			if res.op_status == sing_msgs.STAT_AMBG:
-				
-				# send one more time
-				tmp_logger.warn("received STAT_AMG")
-
-				self.send_request(sing_msgs.MSG_CLOSE)
-
-				res = self.recv_request(sing_msgs.MSG_STATUS)
-
+			if res.op_status != sing_msgs.STAT_SUCCESS:
 				# log the response
+				tmp_logger.warn("Received status to close is not SUCCESS. status: {0}".format(res.op_status))
+
+				# check for ambiguous status
+				if res.op_status == sing_msgs.STAT_AMBG:
+				
+					# send one more time
+					tmp_logger.warn("received STAT_AMG")
+
+					self.send_request(sing_msgs.MSG_CLOSE)
+
+					res = self.recv_request(sing_msgs.MSG_STATUS)
+
+					# log the response
 			
 
-		# close the socket and set the IPC as inactive
-		try:
-			self._sock.close()
 		except:
-			# ignore exceptions
 			pass
+
 		finally:
-			super._connected = False # mark as closed
+			# close the socket and set the IPC as inactive
+			try:
+				self._sock.close()
+			except:
+				# ignore exceptions
+				pass
+			finally:
+				self._connected = False # mark as closed
