@@ -42,7 +42,9 @@ public:
       readSMSize_(readSMSize),
       writeSMSize_(writeSMSize),
       readSM_(nullptr),
-      writeSM_(nullptr){std::srand(time(NULL));};
+      writeSM_(nullptr),
+      readSMName_(nullptr),
+      writeSMName_(nullptr){std::srand(time(NULL));};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -136,8 +138,8 @@ private:
     uint64_t newAllocSize_;
     uint32_t readSMSize_;
     uint32_t writeSMSize_;
-    char readSMName_[32];
-    char writeSMName_[32];
+    char* readSMName_;
+    char* writeSMName_;
 
     void *readSM_;
     void *writeSM_;

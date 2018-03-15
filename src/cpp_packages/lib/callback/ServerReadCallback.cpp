@@ -92,9 +92,11 @@ void ServerReadCallback::handleAuthenticationRequest(
 		 * The object already exists. Change another name.
 		 */
 		t = time(NULL);
+		delete(readSMName);
 		readSMName = memName32(ctime(&t));
 	}
-	memcpy(readSMName_,readSMName,32*sizeof(char));
+	//memcpy(readSMName_,readSMName,32*sizeof(char));
+	readSMName_ = readSMName;
 
 	int writefd;
 	while((writefd = shm_open(writeSMName,
@@ -104,9 +106,11 @@ void ServerReadCallback::handleAuthenticationRequest(
 		 * The object already exists. Change another name.
 		 */
 		t = time(NULL);
+		delete(writeSMName);
 		writeSMName = memName32(ctime(&t));
 	}
-	memcpy(writeSMName_,writeSMName,32*sizeof(char));
+	writeSMName_ = writeSMName;
+	//memcpy(writeSMName_,writeSMName,32*sizeof(char));
 	/**
 	 * Set the size of share memory.
 	 */
@@ -199,6 +203,7 @@ void ServerReadCallback::handleReadRequest(
 			newcontext->workerID_ = workerID;
 			newcontext->remainSize_ = objectSize;
 			readContextMap_.emplace(path,newcontext);
+			contextmap = readContextMap_.find(path);
 		}
 	}
 	else{ // if(isnewcoming)
@@ -558,12 +563,21 @@ void ServerReadCallback::readEOF() noexcept{
 	/**
 	 * Release share memory.
 	 */
-	munmap(readSM_,readSMSize_);
-	munmap(writeSM_,writeSMSize_);
-	shm_unlink(readSMName_);
-	shm_unlink(writeSMName_);
-	readSM_ = nullptr;
-	writeSM_ = nullptr;
+	if(readSM_ != nullptr){
+		munmap(readSM_,readSMSize_);	
+		shm_unlink(readSMName_);
+		readSM_ = nullptr;
+		delete(readSMName_);
+		readSMName_ = nullptr;
+	}
+	
+	if(writeSM_ != nullptr){
+		munmap(writeSM_,writeSMSize_);
+		shm_unlink(writeSMName_);
+		writeSM_ = nullptr;
+		delete(writeSMName_);
+		writeSMName_ = nullptr;
+	}
 
 	/**
 	 * Unregister the allocator.
