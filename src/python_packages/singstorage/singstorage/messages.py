@@ -258,7 +258,7 @@ class WriteMessage(InterMessage):
 		super(WriteMessage, self).__init__(MSG_WRITE, 
 										  len(data_path) + 22)
 		self.data_path    =  data_path
-		self.prop_bitmap  =  0
+		self.prop_bitmap  =  properties
 		self.mem_addr     =  start_addr
 		self.data_length  =  data_length    
 

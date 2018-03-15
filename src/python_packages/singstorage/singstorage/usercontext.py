@@ -9,6 +9,7 @@ import posix_ipc
 
 
 # Python std lib
+import os
 import mmap
 import logging
 
@@ -187,7 +188,7 @@ class UserContext(object):
               
                 
 				# move the file descriptor to the correct position
-				self._mmap.seek(self._mem_head - self._mem_beg, 
+				self._mmap.seek(self._mem_head - self._beg_addr, 
 								os.SEEK_SET)
 
 				# check how many bytes it can be written 
@@ -200,7 +201,11 @@ class UserContext(object):
 
 				# check how many bytes can be written in one call
 				will_write = min(avail, need_to_write)
-				bytes_written = self._mmap.write(data[0:will_write:1])
+
+				# compute # written bytes
+				bytes_written = self._mmap.tell()
+				self._mmap.write(bytes(data[0:will_write:1]))
+				bytes_written = (self._mmap.tell() - bytes_written)
 
 				# update the head pointer to the new position
 				self._mem_head = (self._mem_head + bytes_written) % self._end_addr
@@ -273,7 +278,7 @@ class UserContext(object):
 				# read the given number of bytes and 
 				# return a tuple: (read_bytes, data_string)
                 # move to the correct place of the file
-				self._mmap((read_addr - self._beg_addr), os.SEEK_SET)
+				self._mmap.seek((read_addr - self._beg_addr), os.SEEK_SET)
                 
 				can_read = min(read_len, self._end_addr - read_addr)
 				d_read = self._mmap.read(can_read)
@@ -479,7 +484,7 @@ class UserContext(object):
 		mem_addr = self._write_mem.get_write_addr() # where data 
 												    # will be written	
 
-		written_bytes = self._write_mem(ref_data)
+		written_bytes = self._write_mem.write_data(ref_data)
 
 
 		if written_bytes <= 0: # something wrong
@@ -491,7 +496,7 @@ class UserContext(object):
 		obj_len -= written_bytes # update the number of written bytes
 		
 		# send a notification to the service about the data
-		mark_id = self._get_uniqueue_id()
+		mark_id = self._get_unique_id()
 		self._ctrl.send_request(sing_msgs.MSG_WRITE, mark_id,
 								data_path=rados_obj.get_data_path(),
 								properties=0, start_addr=mem_addr,
@@ -521,7 +526,7 @@ class UserContext(object):
 		while obj_len > 0: # write all the data
 			mem_addr = self._write_mem.get_write_addr()
 			send_buf = self._avail_buffer()
-			written_bytes = self._write_mem(
+			written_bytes = self._write_mem.write_data(
 					ref_data[std_index:std_index+send_buf:1])
 
 
@@ -623,7 +628,7 @@ class UserContext(object):
 
 
 		assert res.msg_id == mark_id, "Not the same ID"
-		assert res.prop_bitmap == 1,  "Write flag is unset"
+		#assert res.prop_bitmap == 1,  "Write flag is unset"
 
 
 		# read data from the shared memory
@@ -653,10 +658,10 @@ class UserContext(object):
 			# next chunk of data
 			res = self._ctrl.recv_request(sing_msgs.MSG_WRITE)	
 
-			assert res.msg_type == sign_msgs.MSG_WRITE, "Not a WRITE msg"
+			assert res.msg_type == sing_msgs.MSG_WRITE, "Not a WRITE msg"
 
 			# check if writing is complete
-			if res.data_path == "" and res.data_length == 0:
+			if res.mem_addr == 0 and res.data_length == 0:
 				# notify a success
 				self._ctrl.send_request(sing_msgs.MSG_READ, 
 									    mark_id,
@@ -665,7 +670,7 @@ class UserContext(object):
 				return # done reading the rados object
 
  
-			assert res.msg_id == msrk_id, "Not the same ID as read's one"
+			assert res.msg_id == mark_id, "Not the same ID as read's one"
 
 
 			# read data from the shared memory
