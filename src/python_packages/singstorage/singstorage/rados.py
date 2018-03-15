@@ -44,8 +44,8 @@ class RadosObject(object):
 		read/write operation creates a new instance of this class and
 		the context of the user's data is stored by the instance.
 	"""
-	def __init__(self, user, data_path, data=bytearray(b""),
-										props=None):
+	def __init__(self, user, data_path, 
+				 data=bytearray(b""), props=None):
 		self._user  =  user
 		self._props =  props
 		self._path  =  data_path

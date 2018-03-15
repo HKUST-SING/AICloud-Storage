@@ -53,13 +53,14 @@ class StoreOpError(Exception):
 	"""Base class for exceptions in this module."""
 
 	def __init__(self, message):
-		super(IOError, self).__init__(message)
+		super(StoreOpError, self).__init__(message)
 		self.message  = message
 		
 
 
 	def __str__(self):
-		par_val = super.__str__() # get super classes info
+		par_val = super(StoreOpError, self).__str__() # get super 
+											          # class info
 		
 		return "".join([par_val, "\n\n", self.message, "\n\n"])
 			

@@ -186,6 +186,8 @@ class SocketIPC(ControlIPC):
 
 		# authenticate the user
 		tmp_logger.info("Socket has connected to the storage service.")
+
+
 		self.send_request(sing_msgs.MSG_AUTH, 0, username=username,
 						  passwd=password)
 
@@ -256,8 +258,6 @@ class SocketIPC(ControlIPC):
 		# decode the header
 		msg.decode_header(header)
        	
-		tmp_logger.info("Message type:{0}, message length: {0}".format(msg.msg_type, msg.msg_length))
-		
 		 
 		# need to check if the reuired message type
 		# match the received one
@@ -299,7 +299,7 @@ class SocketIPC(ControlIPC):
 
 
 		# message has successfully been read
-		
+		tmp_logger.info("read_request: decoding the received message")	
 		msg.decode_msg(b"".join(raw_data)) # decode the raw data
 										   # to a message
 
@@ -322,36 +322,39 @@ class SocketIPC(ControlIPC):
 
 		# send a notification to release 
 		# the resources
+		
+		try:
+			self.send_request(sing_msgs.MSG_CLOSE)
 
-		self.send_request(sing_msgs.MSG_CLOSE)
+			# wait for response
+			res = self.recv_request(sing_msgs.MSG_STATUS)
 
-
-
-		# wait for response
-		res = self.recv_request(sing_msgs.MSG_STATUS)
-
-		if res.op_status != sing_msgs.STAT_SUCCESS:
-			# log the response
-			tmp_logger.warn("Received status to close is not SUCCESS. status: {0}".format(res.op_status))
-
-			# check for ambiguous status
-			if res.op_status == sing_msgs.STAT_AMBG:
-				
-				# send one more time
-				tmp_logger.warn("received STAT_AMG")
-
-				self.send_request(sing_msgs.MSG_CLOSE)
-
-				res = self.recv_request(sing_msgs.MSG_STATUS)
-
+			if res.op_status != sing_msgs.STAT_SUCCESS:
 				# log the response
+				tmp_logger.warn("Received status to close is not SUCCESS. status: {0}".format(res.op_status))
+
+				# check for ambiguous status
+				if res.op_status == sing_msgs.STAT_AMBG:
+				
+					# send one more time
+					tmp_logger.warn("received STAT_AMG")
+
+					self.send_request(sing_msgs.MSG_CLOSE)
+
+					res = self.recv_request(sing_msgs.MSG_STATUS)
+
+					# log the response
 			
 
-		# close the socket and set the IPC as inactive
-		try:
-			self._sock.close()
 		except:
-			# ignore exceptions
 			pass
+
 		finally:
-			self._connected = False # mark as closed
+			# close the socket and set the IPC as inactive
+			try:
+				self._sock.close()
+			except:
+				# ignore exceptions
+				pass
+			finally:
+				self._connected = False # mark as closed

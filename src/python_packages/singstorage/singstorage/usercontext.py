@@ -303,7 +303,7 @@ class UserContext(object):
 
 
 		if not self._ctrl:
-			raise sing_errs.InternalError(sing_errs.INT_ERR_MEMORY)
+			return sing_errs.INTERNAL_ERROR
 
 
 		# try to connect to the sing service
@@ -314,7 +314,7 @@ class UserContext(object):
 					            					self._passwd)
 
 			# two cases possible
-			
+	
 			# case 1: MSG_STATUS returned
 
 			if res_msg.msg_type == sing_msgs.MSG_STATUS:
@@ -341,6 +341,7 @@ class UserContext(object):
 		# Allocate the communication structures
 		try:
 			# initialize the internal memory buffers
+
 			self._init_shared_memory(res_msg.write_buf_addr, 
 									 res_msg.write_buf_size,
 									 res_msg.write_buf_name, 
@@ -349,7 +350,7 @@ class UserContext(object):
 									 res_msg.read_buf_name)
 
 		except Exception as exp:
-			print exp
+			print (exp)
 			self.close()
 			return sing_errs.INTERNAL_ERROR # add logging here
 			
