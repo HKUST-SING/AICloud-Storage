@@ -15,11 +15,13 @@ from singstorage       import PYTHON_MAJOR_VERSION
 
 # MESSAGE TYPE VALUES
 MSG_DEFAULT    =  255
-MSG_STATUS     =  0
-MSG_AUTH       =  1
-MSG_READ       =  2
-MSG_WRITE      =  3
-MSG_CON_REPLY  =  4
+MSG_STATUS     =    0
+MSG_AUTH       =    1
+MSG_READ       =    2
+MSG_WRITE      =    3
+MSG_CON_REPLY  =    4
+MSG_CLOSE      =    5
+MSG_DELETE     =    6
 
 
 # 'status_type' for MSG_STATUS messages
@@ -30,11 +32,13 @@ STAT_AUTH_PASS   = 3   # authentication problem (password)
 STAT_PATH	     = 3   # data path problem ('no such path')
 STAT_DENY	     = 4   # denied access to the data at 'path'
 STAT_QUOTA       = 5   # user has exceeded his/her data quota
+STAT_PROT        = 6   # the used protocol is not supported
 STAT_AMBG        = 254 # cannot understand previously sent request
 STAT_INTER       = 255 # internal system error (release resources)
 
 
 
+MAX_SEQ_ID  = 2**32 - 1 # uint32_t max value
 HASH_LENGTH = 32
 HASH_CODE = "B"*HASH_LENGTH # hash string value
 class InterMessage(object):
@@ -43,21 +47,23 @@ class InterMessage(object):
 	"""
 	subcls = {} # list of subclasses : key is class 
 
-	def __init__(self, msg_type=MSG_DEFAULT, msg_length=0):
+	def __init__(self, msg_type=MSG_DEFAULT, 
+					   msg_id=0, msg_length=0):
 		self.msg_type   = msg_type
-		self.msg_length = msg_length + 5
+		self.msg_id     = msg_id
+		self.msg_length = msg_length + 9
 
 
 	def encode_msg(self):
 		"""
 			Write the style, the type, and length.
 		"""
-		return ("=BI", [self.msg_type, self.msg_length])
+		return ("=BII", [self.msg_type, self.msg_id, self.msg_length])
 
 
 	def decode_msg(self, message):
-		self.msg_type, self.msg_length =\
-						struct.unpack("=BI", message[0:5:1])
+		self.msg_type, self.msg_id, self.msg_length =\
+		  struct.unpack("=BII", message[0:9:1])
 
 
 	def decode_header(self, header_msg):
@@ -65,7 +71,7 @@ class InterMessage(object):
 
 
 	def get_header_size(self):
-		return 5
+		return 9
 
 
 	def get_msg_length(self):
@@ -74,6 +80,9 @@ class InterMessage(object):
 
 	def get_msg_type(self):
 		return self.msg_type
+
+	def get_msg_id(self):
+		return self.msg_id
 
 
 	@classmethod
@@ -92,7 +101,7 @@ class InterMessage(object):
 
 
 	@classmethod
-	def create_message(cls, msg_type, **kwargs):
+	def create_message(cls, msg_type, msg_id, **kwargs):
 		"""
 			Create and initialize a new message of type 'msg_type'
 		"""
@@ -102,8 +111,11 @@ class InterMessage(object):
 			return None
 
 		# create a message with the passed values
-		return MessageClass(**kwargs)
+		msg = MessageClass(**kwargs)
+		# modify the id 
+		msg.msg_id = msg_id
 
+		return msg
 
 
 @InterMessage.register_subclass(MSG_AUTH)
@@ -187,9 +199,9 @@ class ReadMessage(InterMessage):
 	"""
 	def __init__(self, data_path="", properties=0):
 		super(ReadMessage, self).__init__(MSG_READ, 
-										  len(data_path) + 4)
+										  len(data_path) + 6)
 		self.data_path    = data_path
-		self.prop_bitmap  = 0
+		self.prop_bitmap  = properties
 
 
 	def encode_msg(self):
@@ -397,5 +409,81 @@ class ConReplyMessage(InterMessage):
 		"".join([str(chr(ch_item)) for ch_item\
 								   in mem_names[HASH_LENGTH::1]])
 		
+	
+
+@InterMessage.register_subclass(MSG_CLOSE)
+class CloseMessage(InterMessage):
+	"""
+		Session close message.
+	"""
+	def __init__(self):
+		super(StatusMessage, self).__init__(MSG_CLOSE,0)
+		    
+
+	def encode_msg(self):
+		"""
+			Encode the content of the message into binary form.
+		"""
+		msg_beg, vals = super(StatusMessage, self).encode_msg()
+
+		# done
+		return struct.pack(msg_beg, *vals)
+
+
+
+	
+	def decode_msg(self, message):
+		"""
+			Decode the passsed binary message into the fields
+			of the message.
+		"""
+		pass
+
+
+@InterMessage.register_subclass(MSG_DELETE)
+class DeleteMessage(InterMessage):
+	"""
+		Delete object request message.
+	"""
+	def __init__(self, data_path=""):
+		super(DeleteMessage, self).__init__(MSG_DELETE, 
+				      						len(data_path) + 2)
+		self.data_path = data_path
+
+
+	def encode_msg(self):
+		"""
+			Encode the content of the message into binary form.
+		"""
+		msg_beg, vals = super(DeleteMessage, self).encode_msg()
+		string_val = "B"*len(self.data_path)
+		code_val = "".join([msg_beg, "H", string_val])
+		vals.append(len(self.data_path)) # append length value
 		
+		# encode chars
+		for char_name in self.data_path:
+			vals.append(ord(char_name))
+		
+		# append property bitmap
+		vals.append(self.prop_bitmap)
+
+		# done
+		return struct.pack(code_val, *vals)
+
+
+
+	
+	def decode_msg(self, message):
+		"""
+			Decode the passsed binary message into the fields
+			of the message.
+		"""
+		path_length = struct.unapck("=H", message[0:2:1])
+		chars = "B"*path_length
+		# now unpack the rest of the chars
+		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
+		
+		# decode a binary string to a Python string
+		self.data_path =\
+		"".join([str(chr(ch_item)) for ch_item in vals[0::1]])
 	

@@ -130,6 +130,7 @@ class UserContext(object):
 		self._props       =    StorageProperties()
 		self._ctrl        =    None  # IPC Control Channel
 
+		self._id          =    0 # unique operation ID
                                # tuple: (path, left_to_read)
 		self._pend_reads  =    [] # pending reads
                                # tupel: (path, left_to_write)
@@ -310,16 +311,21 @@ class UserContext(object):
 
 		try:
 			self._ctrl.init_ipc()
-			res_code = self._ctrl.connect_to_service(self._user,
-					           					  self._passwd)
+			res_msg = self._ctrl.connect_to_service(self._user,
+					            					self._passwd)
 
-			if res_code == sing_msgs.STAT_SUCCESS:
+			# two cases possible
+			
+			# case 1: MSG_STATUS returned
+
+			if res_msg == sing_msgs.MSG_STATUS:
+				# get the return code
+				res_service = res_msg.op_status
+
+			elif res_msg == sing_msgs.MSG_CON_REPLY:
 				res_service = sing_errs.SUCCESS
-			elif res_code == sing_msgs.STAT_AUTH_USER:
-				res_service = sing_errs.AUTH_USER
-			elif res_code == sing_msgs.STAT_AUTH_PASS:
-				res_service = sing_msgs.AUTH_PASSWORD
-			else:
+			
+			else: # some error
 				res_service = sing_errs.INTERNAL_ERROR
 
 		except:
@@ -331,31 +337,24 @@ class UserContext(object):
 
 
 
-		# succesfully connected to the service
-		# wait for the response from the service
-		# and initialize internal data buffers.
+		# Succesfully connected to the service
+		# Allocate the communication structures
 		try:
-			req = self._ctrl.recv_request(sing_msgs.MSG_CON_REPLY)
-
 			# initialize the internal memory buffers
-			self._init_shared_memory(req.write_buf_addr, 
-									 req.write_buf_size,
-									 req.write_buf_name, 
-									 req.read_buf_addr,
-									 req.read_buf_size,	
-									 req.read_buf_name)
+			self._init_shared_memory(res_msg.write_buf_addr, 
+									 res_msg.write_buf_size,
+									 res_msg.write_buf_name, 
+									 res_msg.read_buf_addr,
+									 res_msg.read_buf_size,	
+									 res_msg.read_buf_name)
 
 		except Exception as exp:
 			return sing_errs._INTERNAL_ERROR # add logging here
 			
 
-
 		# all initialization steps have successfully completed
-		# receive success
+		# Notify the user about a successful process
 		return sing_errs.SUCCESS
-
-
-
 
 
 	def _init_shared_memory(self, write_addr, write_size, write_name,
@@ -401,6 +400,15 @@ class UserContext(object):
 		self._props = prop_obj
 
 
+	def _get_unique_id(self):
+		"""
+			A way of assigning the id to a unique value
+		"""
+		
+		# first, only a simple increment
+		uq_id = (self._id +1) % sing_msgs.MAX_SEQ_ID
+
+		return uq_id
 
 
 
@@ -416,8 +424,52 @@ class UserContext(object):
 		# keep writing until fully written
 		ref_data = rados_obj.get_raw_data() # reference to data
 		obj_len  = rados_obj.get_len()      # length in bytes
-		
-		return
+	
+
+		# request for a permission from the service
+		# to write the new data
+		mark_id = self._get_unique_id() # message id
+		self._ctrl.send_request(sing_msgs.MSG_WRITE, mark_id,
+								data_path=rados_obj.get_data_path(),
+								properties=1, start_addr=0,
+								data_length=obj_len)
+
+
+		# wait for permission from the service
+		res = self._ctrl.recv_request(sing_msgs.MSG_READ)
+		# check if the message is either a READ or a STATUS 
+		# message
+		# some error occured
+		if res.msg_type == sing_msgs.MSG_STATUS:
+			# throw an exception
+			if res.op_status == sing_msgs.STAT_PATH:
+				raise sing_errs.PathError(rados_obj.get_data_path(),
+										  False)
+
+			elif res.op_status == sing_msgs.STAT_DENY:
+				raise sing_errs.PathError(rados_obj.get_data_path(),
+										  True)
+
+			elif res.op_status == sing_msgs.STAT_QUOTA:
+				raise sing_errs.QuotaError(obj_len, 0)
+
+			elif res.op_status == sing_msgs.STAT_PROT:
+				protocol = rados_obj.get_data_path().split(":")
+				raise sing_errs.ProtError(protocol[0])
+
+			else: # some internal error
+				raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
+
+
+		# make sure a READ response
+		assert res.msg_type == sing_msgs.MSG_READ, "Not READ msg"
+	
+		# since it is the first write message, expect to
+		# receive a read with the bitmap flag set
+		assert res.prop_bitmap == 1, "READ bitmap unset"
+
+
+	
 		# keep writing until an exception occurs or
 		# the entire object has been written
 		mem_addr = self._write_mem.get_write_addr() # where data 
@@ -435,21 +487,30 @@ class UserContext(object):
 		obj_len -= written_bytes # update the number of written bytes
 		
 		# send a notification to the service about the data
-		self._ctrl.send_request(sing_msgs.MSG_WRITE,
+		mark_id = self._get_uniqueue_id()
+		self._ctrl.send_request(sing_msgs.MSG_WRITE, mark_id,
 								data_path=rados_obj.get_data_path(),
 								properties=0, start_addr=mem_addr,
 								data_length=written_bytes)
 
 
 		# wait for response 
-		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
-		# check the status of the previous message
-		if res.op_status != sing_msgs.STAT_SUCCESS:
-			tmp_logger.error("write_raw_data: != STAT_SUCCESS")
-			self.close()
-			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
+		res = self._ctrl.recv_request(sing_msgs.MSG_READ)
+		# check if the message is either a READ or a STATUS 
+		# message
+		# some error occured
+		if res.msg_type == sing_msgs.MSG_STATUS:
+			# throw an exception
+			# some internal error
+			raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
 
-		
+
+		# make sure a READ response
+		assert res.msg_type == sing_msgs.MSG_READ, "Not READ msg"
+		# the flag must be unset
+		assert res.prop_bitmap == 0, "READ bitmap set"
+
+
 		# write the rest of the data
 		std_index = written_bytes
 
@@ -466,8 +527,10 @@ class UserContext(object):
 				raise sing_errs.InternalError(sing_errs.INT_ERR_WRITE)
 
 			# send a requst to the service
-			self._ctrl.send_request(sing_msgs.MSG_WRITE,
-									data_path="", properties=0,
+			mark_id = self._get_unique_id()
+			self._ctrl.send_request(sing_msgs.MSG_WRITE, mark_id,
+									data_path=rados_obj.get_data_path(), 
+									properties=0,
                                     start_addr=mem_addr, 
 									data_length=written_bytes)
 
@@ -476,17 +539,36 @@ class UserContext(object):
 			std_index += written_bytes
 
 			# wait for a response from the service
-			res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
-			# check the status of the previous message
-			if res.op_status != sing_msgs.STAT_SUCCESS:
-				logger.error("write_raw_data: != STAT_SUCCESS")
-				self.close()
-				raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
+			res = self._ctrl.recv_request(sing_msgs.MSG_READ)
+			# check the status of the previous write
+
+			if res.msg_type == sing_msgs.MSG_STATUS:
+				# some internal error
+				raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
+
+
+			assert res.msg_type == sing_msgs.MSG_READ, "Not READ msg"
+
+			# ensure that the bit flag is reset
+			assert res.prop_bitmap == 0, "READ bitmap is set"
 	
 	
 
-		# done with the rados object	
+		# done with the rados object
+		mark_id = self._get_unique_id()	
+		self._ctrl.send_request(sing_msgs.MSG_WRITE, mark_id,
+								data_path=rados_obj.get_data_path(), 
+								properties=0,
+                                start_addr=0, 
+							    data_length=0)
 
+
+		res = self._ctrl.recv_request(sing_msgs.MSG_READ)
+		# check the status of the previous write
+		assert res.msg_type == sing_msgs.MSG_READ, "Not READ msg"
+
+		# ensure that the bit flag is reset
+		assert res.prop_bitmap == 0, "READ bitmap is set"
 
 
 
@@ -503,21 +585,31 @@ class UserContext(object):
 											# raw data of the object
 		
 		# ask for request from the service
-		self._ctrl.send_request(sing_msgs.MSG_READ, 
-							    data_path=rados_obj.get_data_path())
+		mark_id = self._get_unique_id()
+		self._ctrl.send_request(sing_msgs.MSG_READ, mark_id,
+							    data_path=rados_obj.get_data_path(),
+								properties=1)
 	
 
 		# wait for response 
-		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS)
-		# check the status of the previous message
-		if res.op_status != sing_msgs.STAT_SUCCESS:
-			tmp_logger.error("read_raw_data: != STAT_SUCCESS")
-			self.close()
-			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT)
-
-		
-		# wait for the first chunk of data
 		res = self._ctrl.recv_request(sing_msgs.MSG_WRITE)
+
+		# check the status of the previous message
+		if res.msg_type == sing_msgs.MSG_STATUS:
+			tmp_logger.error("read_raw_data: == MSG_STATUS")
+			
+			if res.op_status == STAT_PATH:
+				raise sing_errs.PathError(rado_obj.get_data_path(),
+                                          False)
+		
+			elif res.op_status == STAT_DENY:
+				raise sing_errs.PathError(rados_obj.get_data_path(),
+										  True)
+
+			else:
+				tmp_logger.warn("MSG_STATUS: non path related read")
+				raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
+
 
 		if res.data_path != rados_obj.get_data_path(): # some internal
 													   # error
@@ -526,13 +618,17 @@ class UserContext(object):
 			raise sing_errs.InternalError(sing_errs.INT_ERR_PROT) 
 
 
+		assert res.msg_id == mark_id, "Not the same ID"
+		assert res.prop_bitmap == 1,  "Write flag is unset"
+
+
 		# read data from the shared memory
 		read_bytes, read_data = self._read_mem.read_data(res.mem_addr,
 														 res.data_length)
 
 		if read_bytes != res.data_length:
 			# an error, notify the service
-			self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+			self._ctrl.send_request(sing_msgs.MSG_STATUS, mark_id,
 									status_type=sing_msgs.STAT_INTER)
 
 			tmp_logger.error("read_raw_data: read_bytes != res.data_length")
@@ -540,10 +636,10 @@ class UserContext(object):
 
 			raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
 		else:
-			# notify a success
-			self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_msgs.STAT_SUCCESS)
-
+			# notify that the data has been read
+			self._ctrl.send_request(sing_msgs.MSG_READ, mark_id,
+							    	data_path=rados_obj.get_data_path(),
+									properties=0)
 
 		# append data
 		rados_obj.extend_data(read_data)
@@ -551,25 +647,21 @@ class UserContext(object):
 		while True:
 		
 			# next chunk of data
-			res = self._ctrl.recv_request(sing_msgs.MSG_WRITE)
+			res = self._ctrl.recv_request(sing_msgs.MSG_WRITE)	
+
+			assert res.msg_type == sign_msgs.MSG_WRITE, "Not a WRITE msg"
 
 			# check if writing is complete
 			if res.data_path == "" and res.data_length == 0:
 				# notify a success
-				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=
-									sing_msgs.STAT_SUCCESS)
+				self._ctrl.send_request(sing_msgs.MSG_READ, 
+									    mark_id,
+									    data_path=rados_obj.get_data_path())
 				
 				return # done reading the rados object
 
  
-
-			if res.data_path != rados_obj.get_data_path(): # some internal
-										      			   # error
-
-				tmp_logger.error("read_raw_data: res.data_path != rados_obj.get_data_path()")
-				self.close()
-				raise sing_errs.InternalError(sing_errs.INT_ERR_PROT) 
+			assert res.msg_id == msrk_id, "Not the same ID as read's one"
 
 
 			# read data from the shared memory
@@ -579,7 +671,7 @@ class UserContext(object):
 			if read_bytes != res.data_length:
 
 				# an error, notify the service
-				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
+				self._ctrl.send_request(sing_msgs.MSG_STATUS, mark_id, 
 									status_type=sing_msgs.STAT_INTER)
 
 				tmp_logger.error("read_raw_data: read_bytes != res.data_length")
@@ -588,8 +680,8 @@ class UserContext(object):
 
 			else:
 				# notify a success
-				self._ctrl.send_request(sing_msgs.MSG_STATUS, 
-									status_type=sing_msgs.STAT_SUCCESS)
+				self._ctrl.send_request(sing_msgs.MSG_READ, mark_id, 
+									data_path=rados_obj.get_data_path())
 
 
 			# append data and loop back
