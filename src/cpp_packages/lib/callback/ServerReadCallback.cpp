@@ -43,7 +43,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 	IPCAuthenticationMessage auth_msg;
 	// If parse fail, stop processing.
 	if(!auth_msg.parse(std::move(data))){
-		sendStatus(auth_msg.getID(),IPCStatusMessage::StatusType::STAT_USER);
+		sendStatus(auth_msg.getID(),IPCStatusMessage::StatusType::STAT_AUTH_USER);
 		return;
 	}
 
