@@ -32,14 +32,46 @@ public:
 	 */
 	virtual bool parse(std::unique_ptr<folly::IOBuf>) = 0;
 
+	void* parseHead(void *data){
+		data += sizeof(IPCMessage::MessageType);
+		memcpy(&msgID_,data,sizeof(uint32_t));
+
+		data += sizeof(uint32_t);
+		memcpy(&msgLength_,data,sizeof(uint32_t));
+
+		data += sizeof(uint32_t);
+		return data;
+	}
+
 	/**
 	 * createMsg() should call computeLength().
 	 */
 	virtual std::unique_ptr<folly::IOBuf> createMsg() = 0;
 
+	void* createMsgHead(void *tmp){
+		memcpy(tmp,&msgType_,sizeof(IPCMessage::MessageType));
+		tmp += sizeof(IPCMessage::MessageType);
+
+		memcpy(tmp,&msgID_,sizeof(uint32_t));
+		tmp += sizeof(uint32_t);
+
+		memcpy(tmp,&msgLength_,sizeof(uint32_t));
+		tmp += sizeof(uint32_t);
+
+		return tmp;
+	}
+
 	MessageType getType(){
 		return msgType_;
 	};
+
+	uint32_t getID(){
+		return msgID_;
+	}
+
+	void setID(uint32_t id){
+		msgID_ = id;
+	}
 
 	uint32_t getLength(){
 		return msgLength_;
@@ -48,9 +80,17 @@ public:
 protected:
 	MessageType msgType_;
 
+	uint32_t msgID_
+
 	uint32_t msgLength_;
 private:
 	virtual uint32_t computeLength() = 0;
+
+	uint32_t computeHeadLength(){
+		return sizeof(IPCMessage::MessageType)
+					+ sizeof(uint32_t)
+					+ sizeof(uint32_t);
+	}
 };
 
 }

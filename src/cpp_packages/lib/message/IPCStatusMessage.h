@@ -15,6 +15,20 @@ namespace singaistorageipc{
 
 class IPCStatusMessage : public IPCMessage{
 public:
+
+	enum class StatusType : uint16_t{
+		STAT_SUCCESS     = 0   // notifies success
+		STAT_CLOSE       = 1   // require to close IPC and release resources
+		STAT_AUTH_USER   = 2   // authentication problem (username)
+		STAT_AUTH_PASS   = 3   // authentication problem (password)
+		STAT_PATH	     = 3   // data path problem ('no such path')
+		STAT_DENY	     = 4   // denied access to the data at 'path'
+		STAT_QUOTA       = 5   // user has exceeded his/her data quota
+		STAT_PROT        = 6   // the used protocol is not supported
+		STAT_AMBG        = 254 // cannot understand previously sent request
+		STAT_INTER       = 255 // internal system error (release resources)
+	};
+
 	IPCStatusMessage(){
 		msgType_ = IPCMessage::MessageType::STATUS;
 	};
@@ -28,22 +42,13 @@ public:
 			return false;
 		}
 
-		data += sizeof(IPCMessage::MessageType);
-		memcpy(&msgLength_,data,sizeof(uint32_t));
+		data = parseHead(data);
 
 		if(length != msgLength_){
 			return false;
 		}
 
-		data += sizeof(uint32_t);
-		memcpy(&statusType_,data,sizeof(uint16_t));
-
-		data += sizeof(uint16_t);
-		memcpy(&opCode_,data,sizeof(uint16_t));
-
-		data += sizeof(uint16_t);
-		auto tail = msg.get()->tail();
-		pathVal_ = std::string((char*)data,tail-data);
+		memcpy(&statusType_,data,sizeof(StatusType));
 
 		return true;
 	};
@@ -52,60 +57,29 @@ public:
 		void *buffer = (void*)malloc(computeLength());
 		void *tmp = buffer;
 
-		memcpy(tmp,&msgType_,sizeof(IPCMessage::MessageType));
-		tmp += sizeof(IPCMessage::MessageType);
+		tmp = createMsgHead(tmp);
 
-		memcpy(tmp,&msgLength_,sizeof(uint32_t));
-		tmp += sizeof(uint32_t);
-
-		memcpy(tmp,&statusType_,sizeof(uint16_t));
-		tmp += sizeof(uint16_t);
-
-		memcpy(tmp,&opCode_,sizeof(uint16_t));
-		tmp += sizeof(uint16_t);
-
-		memcpy(tmp,pathVal_.c_str(),pathVal_.length() * sizeof(char));
+		memcpy(tmp,&statusType_,sizeof(StatusType));
 
 		auto iobuf = folly::IOBuf::copyBuffer(buffer,msgLength_);
 
 		return std::move(iobuf);
 	};
 
-	void setStatusType(uint16_t type){
+	void setStatusType(StatusType type){
 		statusType_ = type;
 	};
 
-	void setOpCode(uint16_t op){
-		opCode_ = op;
-	};
-
-	void setPath(const std::string& path){
-		pathVal_ = path;
-	};
-
-	uint16_t getStatusType(){
+	StatusType getStatusType(){
 		return statusType_;
 	};
 
-	uint16_t getOpCode(){
-		return opCode_;
-	};
-
-	std::string getPath(){
-		return pathVal_;
-	};
-
 private:
-	uint16_t statusType_;
-	uint16_t opCode_;
-	std::string pathVal_;
+	StatusType statusType_;
 
 	uint32_t computeLength() override{
-		msgLength_ = sizeof(IPCMessage::MessageType)
-					+ sizeof(uint32_t)
-					+ sizeof(uint16_t)
-					+ sizeof(uint16_t)
-					+ (pathVal_.length() * sizeof(char));
+		msgLength_ = computeHeadLength()
+					+ sizeof(StatusType);
 
 		return msgLength_;
 	};

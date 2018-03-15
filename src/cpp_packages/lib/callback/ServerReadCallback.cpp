@@ -27,21 +27,32 @@
 
 namespace singaistorageipc{
 
+void ServerReadCallback::sendStatus(
+	uint32_t id,IPCStatusMessage::StatusType type){
+	IPCStatusMessage reply;
+	reply.setID(id);
+	reply.setStatusType(type);
+	auto send_iobuf = reply.createMsg();
+	socket_->writeChain(&wcb_,std::move(send_iobuf));
+}
+
 void ServerReadCallback::handleAuthenticationRequest(
 	std::unique_ptr<folly::IOBuf> data){
+
+	IPCAuthenticationMessage auth_msg;
+	// If parse fail, stop processing.
+	if(!auth_msg.parse(std::move(data))){
+		return;
+	}
+
 	if(readSM_ != nullptr || writeSM_ != nullptr){
 		/**
 		 * The user has authenticated before.
 		 */
 
 		// Or we can send a STATUS message here.
+		sendStatus(auth_msg.getID(),IPCStatusMessage::StatusType::STAT_PROT);
 		return ;
-	}
-
-	IPCAuthenticationMessage auth_msg;
-	// If parse fail, stop processing.
-	if(!auth_msg.parse(std::move(data))){
-		return;
 	}
 
 	/**
@@ -128,6 +139,8 @@ void ServerReadCallback::handleAuthenticationRequest(
 	reply.setWriteBufferName(writeSMName_);
 	reply.setReadBufferName(readSMName_);
 
+	reply.setID(auth_msg.getID());
+
 	auto send_iobuf = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
 };
@@ -153,7 +166,6 @@ void ServerReadCallback::handleReadRequest(
 
 	std::string path = read_msg.getPath();
 	uint32_t workerID = 0;
-	uint32_t tranID;
 	uint32_t objectSize;
 
 	auto contextmap = readContextMap_.find(path);
@@ -182,10 +194,8 @@ void ServerReadCallback::handleReadRequest(
 	 	 	 */
 	 		objectSize = std::rand();
 
-			tranID = std::rand();
 			auto newcontext = std::make_shared<ReadRequestContext>();
 			newcontext->workerID_ = workerID;
-			newcontext->tranID_ = tranID;
 			newcontext->remainSize_ = objectSize;
 			readContextMap_.emplace(path,newcontext);
 		}
@@ -196,6 +206,8 @@ void ServerReadCallback::handleReadRequest(
 			/**
 			 * There is no context. It must be an error.
 			 */
+			sendStatus(read_msg.getID(),
+				IPCStatusMessage::StatusType::STAT_AMBG);
 			return;
 		}
 
@@ -244,7 +256,6 @@ void ServerReadCallback::handleReadRequest(
 			 	 */		 	
 			 	tranID = std::rand();
 			 	contextmap->second->workerID_ = workerID;
-			 	contextmap->second->tranID_ = tranID;
 			 	contextmap->second->remainSize_ = objectSize;
 
 			}
@@ -255,7 +266,6 @@ void ServerReadCallback::handleReadRequest(
 			 * Retrive the `workerID`,`tranID` and `objectSize`
 			 */
 			workerID = contextmap->second->workerID_;
-			tranID = contextmap->second->tranID_;
 			objectSize = contextmap->second->remainSize_;
 
 			/**
@@ -291,14 +301,14 @@ void ServerReadCallback::handleReadRequest(
 		/**
 	 	 * TODO: handle situation that the share memory is total full.
 	  	 */
-		if(allocsize < 100){
+		if(allocsize < 10){
 			// TODO: we should not return here.
 			return;
 		}
 	}
 	Task task(username_,path,Task::OpType::READ,
 		(uint64_t)readSM_+memoryoffset,
-		allocsize,tranID,workerID);
+		allocsize,read_msg.getID(),workerID);
 	/**
 	 * TODO: If data check success, read data from ceph.
 	 */
@@ -313,6 +323,8 @@ void ServerReadCallback::handleReadRequest(
 
 	reply.setStartAddress((uint64_t)readSM_+memoryoffset);
 	reply.setDataLength(allocsize);
+
+	reply.setID(read_msg.getID());
 
 	auto send_iobuf = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
@@ -341,6 +353,12 @@ void ServerReadCallback::handleWriteRequest(
 	 */
 	uint32_t pro = write_msg.getProperties();
 
+	IPCReadRequestMessage reply;	
+	std::string path = write_msg.getPath();
+	reply.setPath(path);
+	reply.setID(write_msg.getID());
+	reply.setProperties(0);
+
 	if(pro == 1){
 		/**
 		 * TODO: The flag set. It means this is the first 
@@ -350,17 +368,14 @@ void ServerReadCallback::handleWriteRequest(
 		 *		 `dataLength_`, while the `startAddress_` is 0.
 		 *		 Here, we just grant every request.
 		 */
-		IPCStatusMessage reply;
-		reply.setStatusType(0);
+		reply.setProperties(1);
+
 		auto send_iobuf = reply.createMsg();
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
 		return;
 	}
 
-
-	std::string path = write_msg.getPath();
 	uint32_t workerID = 0;
-	uint32_t tranID;
 
 	auto contextmap = writeContextMap_.find(path);
 
@@ -371,9 +386,6 @@ void ServerReadCallback::handleWriteRequest(
 	} 
 
 	auto writecontext = std::make_shared<WriteRequestContext>();
-	bool isfirstwrite = false;
-	IPCReadRequestMessage reply;
-	reply.setPath(path);
 
 	if(isfinish){
 		/**
@@ -401,9 +413,13 @@ void ServerReadCallback::handleWriteRequest(
 				 * There are no other request.
 				 */
 			writecontext = contextmap->second;
-			tranID = writecontext->tranID_;
 			workerID = writecontext->workerID_;
 			writeContextMap_.erase(path);
+		}
+		else{
+			sendStatus(write_msg.getID(),
+				IPCStatusMessage::StatusType::STAT_AMBG);
+			return;
 		}
 	}
 	else{ //if(isfinish)
@@ -413,15 +429,12 @@ void ServerReadCallback::handleWriteRequest(
 			 */
 			writecontext = std::make_shared<WriteRequestContext>();
 			writeContextMap_.emplace(path,writecontext);
-			tranID = std::rand();
-			isfirstwrite = true;
 		}
 		else{
 			/**
 			 * Retrive `tranID` and `workerID`.
 			 */
 			writecontext = contextmap->second;
-			tranID = writecontext->tranID_;
 			workerID = writecontext->workerID_;
 		}
 	}
@@ -431,18 +444,10 @@ void ServerReadCallback::handleWriteRequest(
 	 */
 	Task task(username_,path,Task::OpType::WRITE,
 		write_msg.getStartingAddress(),
-		write_msg.getDataLength(),tranID,workerID);
+		write_msg.getDataLength(),write_msg.getID(),workerID);
 
 	// The following process may be done in the folly::future callback.
-	if(isfirstwrite){
-		/**
-		 * TODO: set the flag.
-		 */
-		reply.setProperties(1);
-	}
-	else{
-		reply.setProperties(0);
-	}
+
 	auto send_iobuf2 = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf2));
 
@@ -473,26 +478,24 @@ void ServerReadCallback::handleDeleteRequest(
 	 * TODO: send the delete operation to the ceph
 	 *       and save the `tranID`.
 	 */
-	uint32_t tranID = rand();
-	Task task(username_,path,Task::OpType::DELETE,0,0,tranID);
+	Task task(username_,path,Task::OpType::DELETE,0,0,delete_msg.getID());
 
 	/**
 	 * Reply the result.
 	 */
-	IPCStatusMessage reply;
-	reply.setStatusType(0);
-	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb_,std::move(send_iobuf));
+	sendStatus(delete_msg.getID(),
+		IPCStatusMessage::StatusType::STAT_SUCCESS);
 }
 
-void ServerReadCallback::handleCloseRequest(){
-	IPCStatusMessage reply;
-	/**
-	 * TODO: set the status as success.
-	 */
-	reply.setStatusType(0);
-	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb_,std::move(send_iobuf));
+void ServerReadCallback::handleCloseRequest(
+	std::unique_ptr<folly::IOBuf> data){
+	IPCCloseMessage close_msg;
+	// If parse fail, stop processing.
+	if(!close_msg.parse(std::move(data))){
+		return;
+	}
+	sendStatus(close_msg.getID(),
+		IPCStatusMessage::StatusType::STAT_SUCCESS);
 }
 
 void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
@@ -532,7 +535,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 			break;
 
 		case IPCMessage::MessageType::CLOSE :
-			handleCloseRequest();
+			handleCloseRequest(std::move(rec_iobuf));
 			break;
 
 		default:

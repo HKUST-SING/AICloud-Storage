@@ -166,7 +166,10 @@ private:
     void handleReadRequest(std::unique_ptr<folly::IOBuf> data);
     void handleWriteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleDeleteRequest(std::unique_ptr<folly::IOBuf> data);
-    void handleCloseRequest();
+    void handleCloseRequest(std::unique_ptr<folly::IOBuf> data);
+
+    void ServerReadCallback::sendStatus(
+        uint32_t id,IPCStatusMessage::StatusType type);
 
 };
 

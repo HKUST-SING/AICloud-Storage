@@ -27,14 +27,12 @@ public:
 			return false;
 		}
 
-		data += sizeof(IPCMessage::MessageType);
-		memcpy(&msgLength_,data,sizeof(uint32_t));
+		data = parseHead(data);
 
 		if(length != msgLength_){
 			return false;
 		}
 
-		data += sizeof(uint32_t);
 		memcpy(&usernameLength_,data,sizeof(uint16_t));
 
 		data += sizeof(uint16_t);
@@ -50,11 +48,7 @@ public:
 		void *buffer = (void*)malloc(computeLength());
 		void *tmp = buffer;
 
-		memcpy(tmp,&msgType_,sizeof(IPCMessage::MessageType));
-		tmp += sizeof(IPCMessage::MessageType);
-
-		memcpy(tmp,&msgLength_,sizeof(uint32_t));
-		tmp += sizeof(uint32_t);
+		tmp = createMsgHead(tmp);
 
 		memcpy(tmp,&usernameLength_,sizeof(uint16_t));
 		tmp += sizeof(uint16_t);
@@ -96,8 +90,7 @@ private:
 	char password_[32];
 
 	uint32_t computeLength() override{
-		msgLength_ = sizeof(IPCMessage::MessageType)
-					+ sizeof(uint32_t)
+		msgLength_ = computeHeadLength()
 					+ sizeof(uint16_t)
 					+ (usernameLength_ * sizeof(char))
 					+ (32 * sizeof(char));

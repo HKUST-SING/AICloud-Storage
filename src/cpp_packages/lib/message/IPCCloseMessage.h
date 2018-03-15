@@ -12,7 +12,7 @@ namespace singaistorageipc{
 
 class IPCCloseMessage : public IPCMessage{
 public:
-	IPCMessage(){
+	IPCCloseMessage(){
 		msgType_ = IPCMessage::MessageType::CLOSE;
 	}
 
@@ -25,8 +25,7 @@ public:
 			return false;
 		}
 
-		data += sizeof(IPCMessage::MessageType);
-		memcpy(&msgLength_,data,sizeof(uint32_t));
+		parseHead(data);
 
 		if(length != msgLength_){
 			return false;
@@ -39,10 +38,7 @@ public:
 		void *buffer = (void*)malloc(computeLength());
 		void *tmp = buffer;
 
-		memcpy(tmp,&msgType_,sizeof(IPCMessage::MessageType));
-		tmp += sizeof(IPCMessage::MessageType);
-
-		memcpy(tmp,&msgLength_,sizeof(uint32_t));
+		createMsgHead(tmp);
 
 		auto iobuf = folly::IOBuf::copyBuffer(buffer,msgLength_);
 
@@ -50,8 +46,7 @@ public:
 	}
 private:
 	uint32_t computeLength() override{
-		msgLength_ = sizeof(IPCMessage::MessageType)
-					+ sizeof(uint32_t);
+		msgLength_ = computeHeadLength();
 
 		return msgLength_;
 	}

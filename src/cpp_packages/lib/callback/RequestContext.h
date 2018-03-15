@@ -14,9 +14,6 @@ class RequestContext{
 
 public:
     uint32_t workerID_;
-
-    uint32_t tranID_;   
-
 };
 
 class ReadRequestContext : public RequestContext{
