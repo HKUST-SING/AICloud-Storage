@@ -45,6 +45,12 @@ message OpPermissionRequest{
 	optional OpType opType_ = 3;
 }
 
+message MetaData{
+	optional uint64 globalObjectID_ = 1;
+	optional uint64 totalObjectSize_ = 2;
+	optional uint32 numberOfShreds_ = 3;
+}
+
 message OpPermissionResponse{
 	optional Head head_ = 1;
 	enum PermCode{
@@ -57,9 +63,17 @@ message OpPermissionResponse{
 	LOCK_ERR     = 5; // cannot lock the object, maybe 
 			  // some one is using this object
 	}
-
 	optional PermCode permCode_ = 2;
-	optional uint64 canWrite_ = 3;
+	optional MetaData metaData_ = 3;
+	
+	message RadosObject{
+	optional string cephObjectID_ = 1;
+	optional uint32 index_ = 2;
+	optional uint64 size_ = 3;
+	}
+	
+	repeated radosObject RadosObjects_ = 4;
+	optional uint64 canWrite_ = 5;
 }
 
 message IOResult{
