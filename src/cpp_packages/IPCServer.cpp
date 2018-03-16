@@ -41,8 +41,9 @@ void IPCServer::start(){
     socket->listen(context_.backlog_);
     socket->startAccepting();
 
-    SysSignalHandler sighandler(evb,socket);
-    sighandler.registerSignalHandler(std::SIGINT);
+    SysSignalHandler sighandler{evb};
+    sighandler.addSocket(socket);
+    sighandler.registerSignalHandler(SIGINT);
     
     std::cout << "server starting......" << std::endl;
     evb->loopForever();

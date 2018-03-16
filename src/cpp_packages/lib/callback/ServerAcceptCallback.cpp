@@ -24,8 +24,8 @@ void ServerAcceptCallback::connectionAccepted(int fd,
 void ServerAcceptCallback::acceptStopped() noexcept{
     //socketsPool_.clear();
     //readcallbacksPool_.clear();
-    for(auto socket : socketsMap_){
-    	socket->second->closeNow();
+    for(auto socket : (*socketsMap_)){
+    	socket.second.socket_->closeNow();
     }
     socketsMap_->clear();
     std::remove(unixPath_.c_str());
