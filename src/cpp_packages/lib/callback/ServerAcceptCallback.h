@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cstdio>
+#include <unordered_map>
 
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/SocketAddress.h>
 
 #include "ServerReadCallback.h"
+#include "../../IPCContext.h"
 
 namespace singaistorageipc{
 
@@ -13,13 +16,20 @@ namespace singaistorageipc{
  */
 class ServerAcceptCallback : public folly::AsyncServerSocket::AcceptCallback{
 public:
+     ServerAcceptCallback() = delete;
      ServerAcceptCallback(size_t bufferSize, uint64_t minAllocBuf,
-        uint64_t newAllocSize,uint32_t readsm,uint32_t writesm){
+        uint64_t newAllocSize,uint32_t readsm,uint32_t writesm,
+        const std::string& path,
+        std::shared_ptr<std::unordered_map<
+        int,IPCContext::PersistentConnection>> map){
+
           bufferSize_ = bufferSize;
           minAllocBuf_ = minAllocBuf;
           newAllocSize_ = newAllocSize;
           readsm_ = readsm;
-          writesm_ = writesm;          
+          writesm_ = writesm;    
+          unixPath_ = path;   
+          socketsMap_ = map;   
      }
 	/**
      * connectionAccepted() is called whenever a new client connection is
@@ -87,8 +97,11 @@ public:
      * after acceptStopped() is invoked.
      */
 	void acceptStopped() noexcept override{
-        socketsPool_.clear();
-        readcallbacksPool_.clear();
+        //socketsPool_.clear();
+        //readcallbacksPool_.clear();
+        socketsMap_.clear();
+        std::remove(unixPath_.c_str());
+        socketsMap_ = nullptr;
 	};
 
 private:
@@ -98,8 +111,14 @@ private:
      uint32_t readsm_;
      uint32_t writesm_;
 
+     std::string unixPath_;
+
+     std::shared_ptr<
+          std::unordered_map<int,IPCContext::PersistentConnection>> socketsMap_;
+/*
      std::vector<std::shared_ptr<folly::AsyncSocket>> socketsPool_;
      std::vector<std::shared_ptr<ServerReadCallback>> readcallbacksPool_;
+*/
 };
 
 

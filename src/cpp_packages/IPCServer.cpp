@@ -28,10 +28,12 @@ void IPCServer::start(){
 
     ServerAcceptCallback scb(
     	context_.bufferSize_,context_.minAllocBuf_,
-	context_.newAllocSize_,context_.readSMSize_,context_.writeSMSize_);
+	   context_.newAllocSize_,context_.readSMSize_,
+        context_.writeSMSize_,context_.addr_.getPath(),
+        context_.socketsMap_);
     socket->addAcceptCallback(&scb,std::move(evb));
 
-    ClientConnectionCallback ccb;
+    ClientConnectionCallback ccb(context_.socketsMap_);
     socket->setConnectionEventCallback(&ccb);
     
     socket->listen(context_.backlog_);

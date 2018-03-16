@@ -3,10 +3,16 @@
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/SocketAddress.h>
 
+#include "../../IPCContext.h"
+
 namespace singaistorageipc{
 
 class ClientConnectionCallback : public folly::AsyncServerSocket::ConnectionEventCallback{
 public:
+    ClientConnectionCallback() = delete;
+    ClientConnectionCallback(std::shared_ptr<
+          std::unordered_map<int,IPCContext::PersistentConnection>> socketsMap)
+    :socketsMap_(socketsMap){};
 	/**
     * onConnectionAccepted() is called right after a client connection
     * is accepted using the system accept()/accept4() APIs.
@@ -23,7 +29,13 @@ public:
      * probably because of some error encountered.
      */
     void onConnectionDropped(const int socket,
-            const folly::SocketAddress& addr) noexcept override{}; 
+            const folly::SocketAddress& addr) noexcept override{
+        
+        auto search = socketsMap_->find(socket);
+        if(search != socketsMap_->end()){
+            socketsMap_->erase(socket);
+        }
+    }; 
     /**
      * onConnectionEnqueuedForAcceptorCallback() is called when the
      * connection is successfully enqueued for an AcceptCallback to pick up.
@@ -37,7 +49,13 @@ public:
      */
     void onConnectionDequeuedByAcceptorCallback(
         const int socket,
-        const folly::SocketAddress& addr) noexcept override{};
+        const folly::SocketAddress& addr) noexcept override{
+        
+        auto search = socketsMap_->find(socket);
+        if(search != socketsMap_->end()){
+            socketsMap_->erase(socket);
+        }
+    };
     /**
      * onBackoffStarted is called when the socket has successfully started
      * backing off accepting new client sockets.
@@ -53,6 +71,10 @@ public:
      * onBackoffError is called when there is an error entering backoff
      */
     void onBackoffError() noexcept override{};
+
+private:
+    std::shared_ptr<
+          std::unordered_map<int,IPCContext::PersistentConnection>> socketsMap_;
 };
 
 }

@@ -4,7 +4,8 @@
 #include <sys/mman.h>
 #include <unordered_map>
 #include <queue>
-#include <ctime>
+#include <ctime> // ctime used in std::srand for testing
+                 // can be removed in future
 #include <cstdlib>
 
 #include <folly/io/async/AsyncTransport.h>
@@ -171,8 +172,7 @@ private:
     void handleDeleteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleCloseRequest(std::unique_ptr<folly::IOBuf> data);
 
-    void sendStatus(
-        uint32_t id,IPCStatusMessage::StatusType type);
+    void sendStatus(uint32_t id, IPCStatusMessage::StatusType type);
 
 };
 

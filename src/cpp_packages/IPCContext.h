@@ -12,6 +12,8 @@ public:
 	IPCContext(std::string s, int backlog){
 		addr_ = folly::SocketAddress::makeFromPath(s);
 		backlog_ = backlog;
+		socketsMap_ = std::make_shared<
+						std::unordered_map<int,PersistentConnection>>();
 	};
 
 	folly::SocketAddress addr_;
@@ -35,8 +37,25 @@ public:
 	 */
 	uint64_t newAllocSize_{1024};
 
-	uint32_t readSMSize_{1000*1000*1000}; // 1G
-	uint32_t writeSMSize_{1000*1000*1000};
+	uint32_t readSMSize_{1000*1000}; // 1M
+	uint32_t writeSMSize_{1000*1000};
+
+	class PersistentConnection{
+    public:
+        PersistentConnection(
+            std::shared_ptr<folly::AsyncSocket> socket,
+            std::shared_ptr<ServerReadCallback> readcallback):
+            socket_(socket),readcallback_(readcallback){};
+        ~PersistentConnection(){
+            socket_ = nullptr;
+            readcallback_ = nullptr;
+        }
+        std::shared_ptr<folly::AsyncSocket> socket_;
+        std::shared_ptr<ServerReadCallback> readcallback_;
+    };
+
+    std::shared_ptr<
+    	std::unordered_map<int,PersistentConnection>> socketsMap_;
 };
 
 }

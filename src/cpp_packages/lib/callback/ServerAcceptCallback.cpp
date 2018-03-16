@@ -15,8 +15,9 @@ void ServerAcceptCallback::connectionAccepted(int fd,const folly::SocketAddress&
 		new ServerReadCallback(bufferSize_,s,minAllocBuf_,newAllocSize_,
 			readsm_,writesm_));
     s->setReadCB(cb.get());
-    socketsPool_.emplace_back(s);
-    readcallbacksPool_.emplace_back(cb);
+    socketsMap_->insert({fd,{s,cb}});
+//    socketsPool_.emplace_back(s);
+//    readcallbacksPool_.emplace_back(cb);
 };
 
 }
