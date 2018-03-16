@@ -3,6 +3,7 @@
  */
 
 #include <iostream>
+#include <csignal>
 
 /**
  * External dependence
@@ -18,12 +19,13 @@
 #include "lib/callback/ServerAcceptCallback.h"
 #include "lib/callback/ClientConnectionCallback.h"
 #include "IPCServer.h"
+#include "SysSignalHandler.h"
 
 namespace singaistorageipc{
 
 void IPCServer::start(){
     auto evb = folly::EventBaseManager::get()->getEventBase();
-    auto socket = folly::AsyncServerSocket::newSocket(std::move(evb));
+    auto socket = folly::AsyncServerSocket::newSocket(evb);
     socket->bind(context_.addr_);
 
     ServerAcceptCallback scb(
@@ -31,13 +33,17 @@ void IPCServer::start(){
 	   context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
         context_.socketsMap_);
-    socket->addAcceptCallback(&scb,std::move(evb));
+    socket->addAcceptCallback(&scb,evb);
 
     ClientConnectionCallback ccb(context_.socketsMap_);
     socket->setConnectionEventCallback(&ccb);
     
     socket->listen(context_.backlog_);
     socket->startAccepting();
+
+    SysSignalHandler sighandler(evb,socket);
+    sighandler.registerSignalHandler(std::SIGINT);
+    
     std::cout << "server starting......" << std::endl;
     evb->loopForever();
 };

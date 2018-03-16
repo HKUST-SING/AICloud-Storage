@@ -96,13 +96,7 @@ public:
      * No more calls to connectionAccepted() or acceptError() will be made
      * after acceptStopped() is invoked.
      */
-	void acceptStopped() noexcept override{
-        //socketsPool_.clear();
-        //readcallbacksPool_.clear();
-        socketsMap_->clear();
-        std::remove(unixPath_.c_str());
-        socketsMap_ = nullptr;
-	};
+	void acceptStopped() noexcept override;
 
 private:
      size_t bufferSize_;
