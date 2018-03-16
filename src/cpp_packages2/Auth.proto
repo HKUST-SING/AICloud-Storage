@@ -15,12 +15,13 @@ message AuthenticationRequest{
 }
 
 message Head{
-	optional string username_ = 1;
-	optional uint32 userID_ = 2;
+	optional uint32 userID_ = 1;
+	optional string secretKey_ = 2;
 }
 
 message AuthenticationResponse{
 	optional Head head_ = 1;
+	optional string username_ = 2;
 	enum AuthCode{
 		INTERNAL_ERR = 0; // some system internal error
     	SUCCESS      = 1; // successful authentication
@@ -28,8 +29,7 @@ message AuthenticationResponse{
     	PASSWD_ERR   = 3; // wrong user password
 	}
 
-	optional AuthCode authCode_ = 2;
-	optional string secretKey_ = 3;
+	optional AuthCode authCode_ = 3;
 }
 
 message OpPermissionRequest{
@@ -42,7 +42,6 @@ message OpPermissionRequest{
 	}
 	optional OpType opType_ = 2;
 	optional uint32 tranID_ = 3;
-	optional string secretKey_ = 4;
 }
 
 message OpPermissionResponse{
