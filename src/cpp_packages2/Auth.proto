@@ -36,9 +36,9 @@ message AuthenticationResponse{
 message OpPermissionRequest{
 	optional Head head_ = 1;
 	enum OpType{
-		READ = 0;
-		WRITE = 1;
-		DELETE = 2;
+	READ = 0;
+	WRITE = 1;
+	DELETE = 2;
         CLOSE  = 3;
 	}
 	optional OpType opType_ = 2;
