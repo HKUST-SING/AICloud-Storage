@@ -35,13 +35,14 @@ message AuthenticationResponse{
 
 message OpPermissionRequest{
 	optional Head head_ = 1;
+	optional string path_ = 2;
 	enum OpType{
 	READ = 0;
 	WRITE = 1;
 	DELETE = 2;
         CLOSE  = 3;
 	}
-	optional OpType opType_ = 2;
+	optional OpType opType_ = 3;
 }
 
 message OpPermissionResponse{
