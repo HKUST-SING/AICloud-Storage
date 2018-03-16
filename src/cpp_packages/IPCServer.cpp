@@ -47,6 +47,10 @@ void IPCServer::start(){
     
     std::cout << "server starting......" << std::endl;
     evb->loopForever();
+    /**
+     * TODO: seagmentation fault will be threw if we use return here.
+     */
+    exit(0);
 };
 
 }

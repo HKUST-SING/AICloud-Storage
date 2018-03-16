@@ -20,7 +20,7 @@ public:
 	};
 
 	~SysSignalHandler() override{
-		runSocket_ = nullptr;
+		//runSocket_ = nullptr;
 	};
 	
 	void signalReceived(int signum) noexcept override{
