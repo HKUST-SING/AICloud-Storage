@@ -4,9 +4,9 @@
 
 # check if a file is passed
 
-if [ $# -eq 0 ]; then
-  echo "No arguments supplied"
-fi
+#if [ $# -eq 0 ]; then
+#  echo "No arguments supplied"
+#fi
 
 #output=$(echo $1|cut -d "." -f 1)
 

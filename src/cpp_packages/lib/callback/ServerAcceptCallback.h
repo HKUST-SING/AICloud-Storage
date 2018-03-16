@@ -99,7 +99,7 @@ public:
 	void acceptStopped() noexcept override{
         //socketsPool_.clear();
         //readcallbacksPool_.clear();
-        socketsMap_.clear();
+        socketsMap_->clear();
         std::remove(unixPath_.c_str());
         socketsMap_ = nullptr;
 	};
