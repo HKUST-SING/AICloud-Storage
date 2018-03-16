@@ -17,6 +17,7 @@ message AuthenticationRequest{
 message Head{
 	optional uint32 userID_ = 1;
 	optional string secretKey_ = 2;
+	optional uint32 tranID_ = 3;
 }
 
 message AuthenticationResponse{
@@ -41,7 +42,6 @@ message OpPermissionRequest{
         CLOSE  = 3;
 	}
 	optional OpType opType_ = 2;
-	optional uint32 tranID_ = 3;
 }
 
 message OpPermissionResponse{
@@ -56,8 +56,7 @@ message OpPermissionResponse{
 	}
 
 	optional PermCode permCode_ = 2;
-	optional uint32	tranID_ = 3;
-	optional uint64 canWrite_ = 4;
+	optional uint64 canWrite_ = 3;
 }
 
 message IOResult{
@@ -72,6 +71,5 @@ message IOResult{
 	}
 
 	optional Status ioStat_ = 2;
-	optional uint32 tranID_ = 3;
-	optional uint32 token_  = 4;
+	optional uint32 token_  = 3;
 }
