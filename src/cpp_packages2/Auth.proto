@@ -8,16 +8,15 @@ syntax = "proto2";
 
 package singaistorageipc;
 
-message AuthenticationRequest{
-	optional string username_ = 1;
-	optional string password_ = 2;
-	optional string secretKey_ = 3;
-}
-
 message Head{
 	optional uint32 userID_ = 1;
 	optional string secretKey_ = 2;
 	optional uint32 tranID_ = 3;
+}
+
+message AuthenticationRequest{
+	optional Head head_ = 1;
+	optional string password_ = 2;
 }
 
 message AuthenticationResponse{
