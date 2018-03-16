@@ -37,6 +37,7 @@ public:
 		  dataAddr_(dataAddr),
           dataSize_(dataSize),
           tranID_(tranID),
+		  objSize_(0),
 		  workerID_(workerID)
 
     {}
@@ -45,12 +46,13 @@ public:
 	 * Used for create a response.
 	 */
 	Task(const std::string& username, const std::string& path, 
-         const uint32_t tranID, const uint32_t workerID, 
-         const OpCode opCode)
+         const uint32_t tranID, const uint32_t workerID,
+		 const uint64_t remSize, const OpCode opCode)
 		: username_(username),
           path_(path),
           tranID_(tranID),
 		  workerID_(workerID),
+		  objSize_(remSize,
           opCode_(opCode)
      {}
 
@@ -62,6 +64,7 @@ public:
       path_(other.path_),
       tranID_(other.tranID_),
       workerID_(other.workerID_),
+	  objSize_(other.objSize_),
       opCode_(other.opCode_)
     {}
 
@@ -73,6 +76,7 @@ public:
        path_(std::move(other.path_)),
        tranID_(other.tranID_),
        workerID_(other.workerID_),
+	   objSize_(other.objSize_)
        opCode_(other.opCode_)
      {}
 
@@ -137,6 +141,9 @@ public:
 	uint32_t dataSize_;
 	uint32_t tranID_;
 	uint32_t workerID_;
+
+	/*set by worker*/
+	uint64_t objSize_;
 	OpCode opCode_;
 
 }; // class Task
