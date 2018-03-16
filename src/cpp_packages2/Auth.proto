@@ -10,12 +10,17 @@ package singaistorageipc;
 
 message AuthenticationRequest{
 	optional string username_ = 1;
-	optional string password_ = 2;	
+	optional string password_ = 2;
+	optional string secretKey_ = 3;
+}
+
+message Head{
+	optional string username_ = 1;
+	optional uint32 userID_ = 2;
 }
 
 message AuthenticationResponse{
-	optional AuthenticationRequest user_ = 1;
-
+	optional Head head_ = 1;
 	enum AuthCode{
 		INTERNAL_ERR = 0; // some system internal error
     	SUCCESS      = 1; // successful authentication
@@ -24,11 +29,11 @@ message AuthenticationResponse{
 	}
 
 	optional AuthCode authCode_ = 2;
+	optional string secretKey_ = 3;
 }
 
 message OpPermissionRequest{
-	optional AuthenticationRequest user_ = 1;
-
+	optional Head head_ = 1;
 	enum OpType{
 		READ = 0;
 		WRITE = 1;
@@ -37,10 +42,11 @@ message OpPermissionRequest{
 	}
 	optional OpType opType_ = 2;
 	optional uint32 tranID_ = 3;
+	optional string secretKey_ = 4;
 }
 
 message OpPermissionResponse{
-	optional AuthenticationRequest user_ = 1;
+	optional Head head_ = 1;
 	enum PermCode{
 		INTERNAL_ERR = 0; // some system internal error
     	SUCCESS      = 1; // operation has been approved
@@ -56,8 +62,7 @@ message OpPermissionResponse{
 }
 
 message IOResult{
-	optional AuthenticationRequest user_ = 1;
-
+	optional Head head_ = 1;
 	enum Status{
       	SUCCESS      = 0; // successful IO op
       	PARTIAL_ERR  = 1; // operation partially completed
