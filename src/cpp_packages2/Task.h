@@ -59,7 +59,7 @@ public:
           path_(path),
           tranID_(tranID),
 		  workerID_(workerID),
-		  objSize_(remSize,
+		  objSize_(remSize),
           opCode_(opCode)
      {}
 
@@ -83,7 +83,7 @@ public:
        path_(std::move(other.path_)),
        tranID_(other.tranID_),
        workerID_(other.workerID_),
-	   objSize_(other.objSize_)
+	   objSize_(other.objSize_),
        opCode_(other.opCode_)
      {}
 
