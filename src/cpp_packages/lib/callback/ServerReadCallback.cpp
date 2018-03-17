@@ -335,7 +335,7 @@ void ServerReadCallback::handleReadRequest(
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
 	// Update the context
 	/**
-	 * TODO: the ``allocasize` should retrive from ceph.
+	 * TODO: the `remainSize` should retrive from ceph.
 	 */
 	contextmap->second->remainSize_ -= allocsize;
 	contextmap->second->lastResponse_ = reply;
