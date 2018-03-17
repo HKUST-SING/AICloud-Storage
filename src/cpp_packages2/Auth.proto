@@ -46,9 +46,9 @@ message OpPermissionRequest{
 }
 
 message MetaData{
-	optional uint64 globalObjectID_ = 1;
+	optional uint64 globalObjectID_  = 1;
 	optional uint64 totalObjectSize_ = 2;
-	optional uint32 numberOfShreds_ = 3;
+	optional uint32 numberOfShards_  = 3;
 }
 
 message OpPermissionResponse{
