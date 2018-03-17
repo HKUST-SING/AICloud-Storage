@@ -14,8 +14,8 @@ class Task{
 public:
 	enum class OpType : uint8_t
 	{
-		READ = 1,
-		WRITE = 2,
+		READ   = 1,
+		WRITE  = 2,
 		DELETE = 3,
         	CLOSE  = 4
 	};
@@ -27,8 +27,8 @@ public:
 		OP_ERR_USER      =   1, // user is not authorized to access path
 		OP_ERR_PATH      =   2, // no path exists (for READ operations)
 		OP_ERR_QUOTA     =   3, // not enough available storage (not implemented yet)
-		OP_ERR_LOCK      =   4, // cannot acquire lock for data (retry later)
-		OP_ERR_INTERNAL  = 255 // internal error (generic error)
+		OP_ERR_LOCK      =   4, // tried to acquire lock of data and failed multiple times 
+		OP_ERR_INTERNAL  = 255  // internal error (generic error)
 	};
 
 	/**
@@ -149,8 +149,7 @@ public:
 	uint32_t tranID_;
 	uint32_t workerID_;
 
-	/*set by worker*/
-	uint64_t objSize_; // remaining bytes to read
+	uint64_t objSize_; // used by Unix service and worker to determine object size
 	OpCode opCode_;
 
 }; // class Task
