@@ -12,16 +12,23 @@ namespace singaistorageipc{
 class Task{
 
 public:
-	enum class OpType : uint8_t{
+	enum class OpType : uint8_t
+	{
 		READ = 1,
 		WRITE = 2,
 		DELETE = 3,
-        CLOSE  = 4
+        	CLOSE  = 4
 	};
 
 	// result infomation
-	enum class OpCode : uint8_t{
-
+	enum class OpCode : uint8_t
+	{
+		OP_SUCCESS       =   0, // operation successful
+		OP_ERR_USER      =   1, // user is not authorized to access path
+		OP_ERR_PATH      =   2, // no path exists (for READ operations)
+		OP_ERR_QUOTA     =   3, // not enough available storage (not implemented yet)
+		OP_ERR_LOCK      =   4, // cannot acquire lock for data (retry later)
+		OP_ERR_INTERNAL  = 255 // internal error (generic error)
 	};
 
 	/**
@@ -86,9 +93,9 @@ public:
    
 
 
-	inline const std::string& getUsername() const
+	inline uint64_t getUserID() const
     {
-		return username_;
+		return userID_;
 	}
 
 
@@ -134,7 +141,7 @@ public:
 
 
 public:
-	std::string username_;
+	uint64_t userID_;  // global user id used internally within the storage system
 	std::string path_;
 	OpType opType_;
 	uint64_t dataAddr_;
@@ -143,7 +150,7 @@ public:
 	uint32_t workerID_;
 
 	/*set by worker*/
-	uint64_t objSize_;
+	uint64_t objSize_; // remaining bytes to read
 	OpCode opCode_;
 
 }; // class Task
