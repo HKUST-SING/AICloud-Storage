@@ -28,7 +28,7 @@ void IPCServer::start(){
 	   context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
         context_.socketsMap_);
-    socket_->addAcceptCallback(&scb,evb);
+    socket_->addAcceptCallback(&scb,evb_);
 
     ClientConnectionCallback ccb(context_.socketsMap_);
     socket_->setConnectionEventCallback(&ccb);
@@ -40,7 +40,7 @@ void IPCServer::start(){
     socket_->startAccepting();
     
     std::cout << "server starting......" << std::endl;
-    evb->loopForever();
+    evb_->loopForever();
     /**
      * TODO: seagmentation fault will be threw if we use return here.
      */
