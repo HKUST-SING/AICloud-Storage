@@ -93,6 +93,22 @@ class Security
                        const uint64_t dataSize=0) = 0;  
 
 
+	/** 
+	 * Interface for sending a request to retrieve the information
+	 * about the storage system object identified by the path.
+     * The method should return information which could help
+     * read/write data and also after returning, on success, 
+     * the caller has right to read/write the data to path.
+     *
+     * @param path: identifier of a data object to access
+	 * @param op  : IO operation to be performed on data
+	 */
+
+	virtual folly:Future<ObjectInfo> 
+		lockAndRetrieveInfo(const std::string& path,
+							const Task::OpType op) = 0;
+
+
      /**
       * For sending an IO operation result.
       * 
