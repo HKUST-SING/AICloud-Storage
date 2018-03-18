@@ -45,6 +45,7 @@ void IPCServer::start(){
 
 void IPCServer::stop(){
     std::cout << "server stopping......" << std::endl;
+    socket_->stopAccepting();
     socket_ = nullptr;
     evb_->loopOnce();
     std::cout << "server stop" << std::endl;
