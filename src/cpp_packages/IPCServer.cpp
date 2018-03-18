@@ -3,7 +3,6 @@
  */
 
 #include <iostream>
-#include <csignal>
 
 /**
  * External dependence
@@ -13,28 +12,25 @@
 /**
  * Internal dependence
  */
-#include "lib/callback/ServerAcceptCallback.h"
-#include "lib/callback/ClientConnectionCallback.h"
 #include "IPCServer.h"
-#include "SysSignalHandler.h"
 
 namespace singaistorageipc{
 
 void IPCServer::start(){
     socket_->bind(context_.addr_);
 
-    ServerAcceptCallback scb(
+/*    ServerAcceptCallback scb(
     	context_.bufferSize_,context_.minAllocBuf_,
 	   context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
         context_.socketsMap_);
-    socket_->addAcceptCallback(&scb,evb_);
+*/    socket_->addAcceptCallback(&scb_,evb_);
 
-    ClientConnectionCallback ccb(context_.socketsMap_);
-    socket_->setConnectionEventCallback(&ccb);
+//    ClientConnectionCallback ccb(context_.socketsMap_);
+    socket_->setConnectionEventCallback(&ccb_);
     
-    SysSignalHandler sighandler{evb_};
-    sighandler.registerSignalHandler(SIGINT);
+//    SysSignalHandler sighandler{evb_};
+    
 
     socket_->listen(context_.backlog_);
     socket_->startAccepting();
