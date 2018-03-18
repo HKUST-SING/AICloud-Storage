@@ -184,7 +184,7 @@ void ServerReadCallback::handleReadRequest(
 			 * There is other read request processing
 			 * on the same object.
 			 */
-			contextmap->second->pendingList_.emplace(read_msg);
+			contextmap->second.pendingList_.emplace(read_msg);
 			return ;
 		}
 		else{
@@ -199,9 +199,9 @@ void ServerReadCallback::handleReadRequest(
 	 	 	 */
 	 		objectSize = std::rand();
 
-			auto newcontext = std::make_shared<ReadRequestContext>();
-			newcontext->workerID_ = workerID;
-			newcontext->remainSize_ = objectSize;
+			ReadRequestContext newcontext;
+			newcontext.workerID_ = workerID;
+			newcontext.remainSize_ = objectSize;
 			readContextMap_.emplace(path,newcontext);
 			contextmap = readContextMap_.find(path);
 		}
@@ -218,7 +218,7 @@ void ServerReadCallback::handleReadRequest(
 		}
 
 		IPCWriteRequestMessage lastresponse 
-			= contextmap->second->lastResponse_;
+			= contextmap->second.lastResponse_;
 
 		/**
 		 * Check whether last response represent
@@ -233,7 +233,7 @@ void ServerReadCallback::handleReadRequest(
 		bool keepsending = true;
 		if(isfinish){
 			// check the request queue size.
-			auto readrequests = contextmap->second->pendingList_;
+			auto readrequests = contextmap->second.pendingList_;
 
 			if(readrequests.empty()){
 				// No other more requests need to process.
@@ -243,7 +243,7 @@ void ServerReadCallback::handleReadRequest(
 			else{
 				// Get the next request.
 				IPCReadRequestMessage nextrequest = readrequests.front();
-				contextmap->second->pendingList_.pop();
+				contextmap->second.pendingList_.pop();
 
 				/**
 	 	 	 	 * TODO: check user credentials and correctness of operation.
@@ -260,8 +260,8 @@ void ServerReadCallback::handleReadRequest(
 			 	/**
 			 	 * Update context.
 			 	 */		 	
-			 	contextmap->second->workerID_ = workerID;
-			 	contextmap->second->remainSize_ = objectSize;
+			 	contextmap->second.workerID_ = workerID;
+			 	contextmap->second.remainSize_ = objectSize;
 
 			}
 
@@ -270,8 +270,8 @@ void ServerReadCallback::handleReadRequest(
 			/**
 			 * Retrive the `workerID`,`tranID` and `objectSize`
 			 */
-			workerID = contextmap->second->workerID_;
-			objectSize = contextmap->second->remainSize_;
+			workerID = contextmap->second.workerID_;
+			objectSize = contextmap->second.remainSize_;
 
 			/**
 			 * Release memory.
@@ -294,7 +294,7 @@ void ServerReadCallback::handleReadRequest(
 		auto send_iobuf = reply.createMsg();
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
 		// Update the last response.
-		contextmap->second->lastResponse_ = reply;
+		contextmap->second.lastResponse_ = reply;
 		return;
 	}
 
@@ -337,12 +337,12 @@ void ServerReadCallback::handleReadRequest(
 	/**
 	 * TODO: the `remainSize` should retrive from ceph.
 	 */
-	contextmap->second->remainSize_ -= allocsize;
-	contextmap->second->lastResponse_ = reply;
+	contextmap->second.remainSize_ -= allocsize;
+	contextmap->second.lastResponse_ = reply;
 	/**
 	 * TODO: this `workerID` should retrive from ceph.
 	 */
-	contextmap->second->workerID_ = workerID;
+	contextmap->second.workerID_ = workerID;
 }
 
 void ServerReadCallback::handleWriteRequest(
@@ -390,7 +390,7 @@ void ServerReadCallback::handleWriteRequest(
 		isfinish = true;
 	} 
 
-	auto writecontext = std::make_shared<WriteRequestContext>();
+	WriteRequestContext writecontext;
 
 	if(isfinish){
 		/**
@@ -413,34 +413,33 @@ void ServerReadCallback::handleWriteRequest(
 				write_msg = writecontext->pendingList_.front();
 				writecontext->pendingList_.pop();
 			}*/
-			
 				/**
 				 * There are no other request.
 				 */
 			writecontext = contextmap->second;
-			workerID = writecontext->workerID_;
+			workerID = writecontext.workerID_;
 			writeContextMap_.erase(path);
 		}
 		else{
 			sendStatus(write_msg.getID(),
 				IPCStatusMessage::StatusType::STAT_AMBG);
-			return;
 		}
+		return;
 	}
 	else{ //if(isfinish)
 		if(contextmap == writeContextMap_.end()){
 			/**
 			 * This is the first write
 			 */
-			writecontext = std::make_shared<WriteRequestContext>();
 			writeContextMap_.emplace(path,writecontext);
+			contextmap = writeContextMap_.find(path);
 		}
 		else{
 			/**
 			 * Retrive `tranID` and `workerID`.
 			 */
 			writecontext = contextmap->second;
-			workerID = writecontext->workerID_;
+			workerID = writecontext.workerID_;
 		}
 	}
 
@@ -459,8 +458,8 @@ void ServerReadCallback::handleWriteRequest(
 	/**
 	 * Update context.
 	 */
-	writecontext->workerID_ = workerID;
-	writecontext->lastResponse_ = reply;
+	contextmap->second.workerID_ = workerID;
+	contextmap->second.lastResponse_ = reply;
 }
 
 void ServerReadCallback::handleDeleteRequest(

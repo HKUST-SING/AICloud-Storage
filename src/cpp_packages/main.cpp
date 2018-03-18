@@ -10,6 +10,7 @@ int main(int argc,char** argv){
 	IPCContext c("/tmp/sing_ipc_socket",10);
 	IPCServer s(c);
 	s.start();
+	s.stop();
 
 	return 0;
 }

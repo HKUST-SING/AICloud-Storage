@@ -15,12 +15,8 @@ namespace singaistorageipc{
 class SysSignalHandler : public folly::AsyncSignalHandler{
 public:
 	using folly::AsyncSignalHandler::AsyncSignalHandler;
-	void addSocket(std::shared_ptr<folly::AsyncServerSocket> runSocket){
-		runSocket_ = runSocket;
-	};
 
 	~SysSignalHandler() override{
-		//runSocket_ = nullptr;
 	};
 	
 	void signalReceived(int signum) noexcept override{
@@ -30,15 +26,9 @@ public:
 			 */
 			return;
 		}
-		if(runSocket_ != nullptr){
-			runSocket_->destroy();
-		}
 		auto evb = getEventBase();
 		evb->terminateLoopSoon();
 	}
-
-private:
-	std::shared_ptr<folly::AsyncServerSocket> runSocket_;
 };
 
 }

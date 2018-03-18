@@ -8,9 +8,6 @@
 /**
  * External dependence
  */
-#include <folly/io/async/EventBaseManager.h>
-#include <folly/io/async/EventBase.h>
-#include <folly/io/async/AsyncServerSocket.h>
 #include <folly/SocketAddress.h> 
 
 /**
@@ -24,33 +21,37 @@
 namespace singaistorageipc{
 
 void IPCServer::start(){
-    auto evb = folly::EventBaseManager::get()->getEventBase();
-    auto socket = folly::AsyncServerSocket::newSocket(evb);
-    socket->bind(context_.addr_);
+    socket_->bind(context_.addr_);
 
     ServerAcceptCallback scb(
     	context_.bufferSize_,context_.minAllocBuf_,
 	   context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
         context_.socketsMap_);
-    socket->addAcceptCallback(&scb,evb);
+    socket_->addAcceptCallback(&scb,evb);
 
     ClientConnectionCallback ccb(context_.socketsMap_);
-    socket->setConnectionEventCallback(&ccb);
+    socket_->setConnectionEventCallback(&ccb);
     
-    socket->listen(context_.backlog_);
-    socket->startAccepting();
-
-    SysSignalHandler sighandler{evb};
-    sighandler.addSocket(socket);
+    SysSignalHandler sighandler{evb_};
     sighandler.registerSignalHandler(SIGINT);
+
+    socket_->listen(context_.backlog_);
+    socket_->startAccepting();
     
     std::cout << "server starting......" << std::endl;
     evb->loopForever();
     /**
      * TODO: seagmentation fault will be threw if we use return here.
      */
-    exit(0);
-};
+    //exit(0);
+}
+
+void IPCServer::stop(){
+    std::cout << "server stopping......" << std::endl;
+    socket_->destroy();
+    evb_->loopOnce();
+    std::cout << "server stop" << std::endl;
+}
 
 }

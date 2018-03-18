@@ -6,6 +6,9 @@
 /**
  * External dependence
  */
+#include <folly/io/async/EventBaseManager.h>
+#include <folly/io/async/EventBase.h>
+#include <folly/io/async/AsyncServerSocket.h>
 
 /**
  * Internal dependence
@@ -16,12 +19,19 @@ namespace singaistorageipc{
 
 class IPCServer final{
 public:
-	IPCServer(IPCContext context):context_(context){};
+	IPCServer() = delete;
+	IPCServer(IPCContext context):context_(context){
+		evb_ = folly::EventBaseManager::get()->getEventBase();
+		socket_ = folly::AsyncServerSocket::newSocket(evb_);
+	};
 
-    void start();
+	void start();
+    void stop();
 
 private:
 	IPCContext context_;
+	folly::EventBase *evb_;
+	std::shared_ptr<folly::AsyncServerSocket> socket_;
 };
 
 }

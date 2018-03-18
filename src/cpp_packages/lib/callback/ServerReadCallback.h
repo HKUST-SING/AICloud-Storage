@@ -152,10 +152,8 @@ private:
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
 
-    std::unordered_map<std::string,
-        std::shared_ptr<ReadRequestContext>> readContextMap_;
-    std::unordered_map<std::string,
-        std::shared_ptr<WriteRequestContext>> writeContextMap_;
+    std::unordered_map<std::string,ReadRequestContext> readContextMap_;
+    std::unordered_map<std::string,WriteRequestContext> writeContextMap_;
 /*
     std::unordered_map<std::string,
         std::queue<IPCReadRequestMessage>> readRequest_;
