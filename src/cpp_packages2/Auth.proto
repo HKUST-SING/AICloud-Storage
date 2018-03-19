@@ -15,14 +15,14 @@ message Head{
 }
 
 message AuthenticationRequest{
-	optional Head head_ = 1;
-	optional string username_ = 2;
-	optional string password_ = 3;
+//	optional Head head_ = 1;
+	optional string username_ = 1;
+	optional string password_ = 2;
 }
 
 message AuthenticationResponse{
-	optional Head head_ = 1;
-	optional string username_ = 2;
+//	optional Head head_ = 1;
+	optional string username_ = 1;
 	enum AuthCode{
 	INTERNAL_ERR = 0; // some system internal error
     	SUCCESS      = 1; // successful authentication
@@ -30,29 +30,23 @@ message AuthenticationResponse{
     	PASSWD_ERR   = 3; // wrong user password
 	}
 
-	optional AuthCode authCode_ = 3;
+	optional AuthCode authCode_ = 2;
 }
 
 message OpPermissionRequest{
-	optional Head head_ = 1;
-	optional string path_ = 2;
+//	optional Head head_ = 1;
+	optional string path_ = 1;
 	enum OpType{
 	READ = 0;
 	WRITE = 1;
 	DELETE = 2;
         CLOSE  = 3;
 	}
-	optional OpType opType_ = 3;
-}
-
-message MetaData{
-	optional uint64 globalObjectID_  = 1;
-	optional uint64 totalObjectSize_ = 2;
-	optional uint32 numberOfShards_  = 3;
+	optional OpType opType_ = 2;
 }
 
 message OpPermissionResponse{
-	optional Head head_ = 1;
+//	optional Head head_ = 1;
 	enum PermCode{
     	SUCCESS      = 0; // operation has been approved
     	USER_ERR     = 1; // user cannot perform operation
@@ -63,8 +57,14 @@ message OpPermissionResponse{
 			  // some one is using this object
 	INTERNAL_ERR = 5; // some system internal error
 	}
-	optional PermCode permCode_ = 2;
-	optional MetaData metaData_ = 3;
+	optional PermCode permCode_ = 1;
+	
+	message MetaData{
+	optional uint64 globalObjectID_  = 1;
+	optional uint64 totalObjectSize_ = 2;
+	optional uint32 numberOfShards_  = 3;
+	}
+	optional MetaData metaData_ = 2;
 	
 	message RadosObject{
 	optional string cephObjectID_ = 1;
@@ -72,12 +72,12 @@ message OpPermissionResponse{
 	optional uint64 size_ = 3;
 	}
 	
-	repeated radosObject RadosObjects_ = 4;
-	optional uint64 canWrite_ = 5;
+	repeated RadosObject radosObjects_ = 3;
+	optional uint64 canWrite_ = 4;
 }
 
-message IOResult{
-	optional Head head_ = 1;
+message IOResultRequest{
+//	optional Head head_ = 1;
 	enum Status{
       	SUCCESS      = 0; // successful IO op
       	PARTIAL_ERR  = 1; // operation partially completed
@@ -87,6 +87,31 @@ message IOResult{
            	              // (undo the previous operation)
 	}
 
-	optional Status ioStat_ = 2;
-	optional uint32 token_  = 3;
+	optional Status ioStat_ = 1;
+	optional uint32 token_  = 2;
+}
+
+enum Type{
+	Authentication = 0;
+	OPPermission   = 1;
+	IOResult       = 2;
+}
+/**
+ * This message use for transportation
+ */
+message Request{
+	required Head head_ = 1;
+	optional Type type_ = 2;
+	optional AuthenticationRequest authRequest_ = 3;
+	optional OpPermissionRequest opRequest_ = 4;
+	optional IOResultRequest     ioRequest_ = 5;
+}
+/**
+ * This message use for transportation
+ */
+message Response{
+	required Head head_ = 1;
+	optional Type type_ = 2;
+	optional AuthenticationResponse authResponse = 3;
+	optional OpPermissionResponse opResponse = 4;
 }
