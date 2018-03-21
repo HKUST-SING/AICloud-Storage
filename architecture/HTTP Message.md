@@ -32,7 +32,11 @@ Content-Length: {size of the body}\r\n\r\n
  "Error_Type":uint8_t}
 ```
 
+<<<<<<< HEAD
+####Object Get
+=======
 #### Object Get
+>>>>>>> 3e678284ada77b0bdedbbcc7bd7886ab76bf77f3
 
 ```http
 GET {bucket_name}/{object_name} HTTP/1.1
@@ -41,7 +45,11 @@ Content-Length: {size of the body}
 Accept: application/json;charset=utf-8
 Authorization: SING_AUTH USER_ID:secret_key\r\n\r\n
 
+<<<<<<< HEAD
+{"Transaction_ID":uint32_t(,"Commit":uint)}
+=======
 {"Transaction_ID":uint32_t}
+>>>>>>> 3e678284ada77b0bdedbbcc7bd7886ab76bf77f3
 ```
 
 ```http
@@ -50,6 +58,10 @@ Content-Type: application/json;charset=utf-8
 Content-Length: {size of body}\r\n\r\n
 
 {"Transaction_ID":uint32_t,
+<<<<<<< HEAD
+ "Pending_Read"  :uint,
+=======
+>>>>>>> 3e678284ada77b0bdedbbcc7bd7886ab76bf77f3
  metadata}
 ```
 
@@ -79,7 +91,11 @@ Accept: application/json;charset=utf-8
 Authorization: SING_AUTH USER_ID:secret_key\r\n\r\n
 
 {"Transaction_ID":uint32_t,
+<<<<<<< HEAD
+ "Object_Size"   :uint64_t(,"Commit":uint)}
+=======
  "Object_Size"   :uint64_t}
+>>>>>>> 3e678284ada77b0bdedbbcc7bd7886ab76bf77f3
 ```
 
 ```http
@@ -88,6 +104,10 @@ Content-Type: application/json;charset=utf-8
 Content-Length: {size of body}\r\n\r\n
 
 {"Transaction_ID":uint32_t,
+<<<<<<< HEAD
+ "Pending_Write" :uint,
+=======
+>>>>>>> 3e678284ada77b0bdedbbcc7bd7886ab76bf77f3
  metadata}
 ```
 
@@ -116,6 +136,20 @@ Content-Length: {size of body}\r\n\r\n
  "Error_Type"    :uint8_t}
 ```
 
+<<<<<<< HEAD
+#### Resume Pending Reading/Writing
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json;charset=utf-8
+Content-Length: {size of body}\r\n\r\n
+
+{"Transaction_ID":uint32_t,
+ "Continue"      :uint(,metadata)}
+```
+
+=======
+>>>>>>> 3e678284ada77b0bdedbbcc7bd7886ab76bf77f3
 #### Object Delete
 
 ```http
