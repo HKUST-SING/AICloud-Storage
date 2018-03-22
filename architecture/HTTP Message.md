@@ -3,7 +3,7 @@
 #### Authentication
 
 ```http
-GET / HTTP/1.1
+GET /auth HTTP/1.1
 Host: {server_address:port}
 Content-Length: {size of the body}
 Accept: application/json;charset=utf-8
