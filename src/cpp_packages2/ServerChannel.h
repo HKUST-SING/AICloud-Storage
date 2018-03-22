@@ -5,12 +5,18 @@
 #include <memory>
 
 
+// Boost lib
+#include <boost/asio/io_context.hpp>
+
+
 // Facebook folly lib
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocketException.h>
 
 
 // Project lib
+#include "Sender.h"
+#include "ChannelContext.h"
 
 namespace singaistorageipc
 {
@@ -67,27 +73,28 @@ class ServerChannel
         private:
           std::shared_ptr<Security> secure_;
           std::shared_ptr<Message>  msg_;
+
+
           
       }; // class ChannelWriteCallback
 	 
-      
 
-
-	  ServerChannel() = default;
+	    ServerChannel() = default;
       ServerChannel(const ServerChannel&) = delete;
       ServerChannel(ServerChannel&& other);
       virtual ~ServerChannel();
       bool initChannel();	
       void closeChannel();
 
-      bool sendMessage(std::shared_ptr<Message> msg, folly::AsyncWriter::WriteCallback* callback);
+      bool sendMessage(std::shared_ptr<Message> msg
+                      , folly::AsyncWriter::WriteCallback* callback);
       std::vector<std::unique_ptr<Message> > pollReadMessage(); 
  
+    private:
+      boost::asio::io_context ioc_;
+      RESTSender restSender_;
 
-       
-
-   
-    
+      ChannelContext cxt_;
 
 
 
