@@ -34,7 +34,7 @@ Content-Length: {size of the body}\r\n\r\n
 
 #### Object Get
 ```http
-GET /sing/{bucket_name}/{object_name} HTTP/1.1
+GET /{bucket_name}/{object_name} HTTP/1.1
 Host: {Server_address:port}
 Content-Length: {size of the body}
 Accept: application/json;charset=utf-8
@@ -72,7 +72,7 @@ Content-Length: {size of body}\r\n\r\n
 #### Object Write
 
 ```http
-PUT /sing/{bucket_name}/{object_name} HTTP/1.1
+PUT /{bucket_name}/{object_name} HTTP/1.1
 Host: {Server_address:port}
 Content-Length: {size of the body}
 Accept: application/json;charset=utf-8
@@ -131,7 +131,7 @@ Content-Length: {size of body}\r\n\r\n
 #### Object Delete
 
 ```http
-DELETE /sing/{bucket_name}/{object_name} HTTP/1.1
+DELETE /{bucket_name}/{object_name} HTTP/1.1
 Host: {Server_address:port}
 Content-Length: {size of the body}
 Accept: application/json;charset=utf-8
