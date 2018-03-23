@@ -8,13 +8,17 @@
 #pragma once
 
 /**
+ * Standar lib
+ */
+#include <functional>
+
+/**
  * External lib
  */
-#include <boost/asio/io_context.hpp>
-#include <boost/beast/core/error.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <folly/dynamic.h>
-#include <folly/Function.h>
 
 using tcp = boost::asio::ip::tcp;
 
@@ -24,37 +28,28 @@ class Sender{
 public:
 	virtual ~Sender() = default;
 	virtual int send(folly::dynamic,
-		folly::Function<void(boost::system::error_code const&,std::size_t)>) = 0;
+		std::function<void(boost::system::error_code const&,std::size_t)>) = 0;
 };
 
 class RESTSender : public Sender{
 
 public:
-	RESTSender(boost::asio::io_context ioc):socket_(ioc){};
+	RESTSender() = delete;
 	
-	explicit RESTSender(tcp::socket&& socket)
-		:socket_(std::move(socket)){}
+	explicit RESTSender(std::shared_ptr<tcp::socket> socket)
+		:socket_(socket){}
 
 	~RESTSender(){
-		closeSocket();
-	}
-
-	void connectServer(tcp::endpoint ep){
-		socket_.connect(ep);
-	}
-
-	void closeSocket(){
-		if(socket_.is_open()){
-			socket_.close();
-		}
+		
 	}
 
 	int send(folly::dynamic
-			,folly::Function<void(boost::system::error_code const&
+			,std::function<void(boost::system::error_code const&
 				,std::size_t)>) override;
 
 private:
-	tcp::socket socket_;
+	std::shared_ptr<tcp::socket> socket_;
+
 };
 
 }

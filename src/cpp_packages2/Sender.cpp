@@ -1,6 +1,8 @@
+
 /**
  * External lib
  */
+#include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/basic_endpoint.hpp>
@@ -26,9 +28,9 @@ const std::string MessageField::PASSWD;
 
 int
 RESTSender::send(folly::dynamic map
-				,folly::Function<void(boost::system::error_code const&
+				,std::function<void(boost::system::error_code const&
 								,std::size_t)> callback){
-	if(!socket_.is_open()){
+	if(!socket_->is_open()){
 		return -2;
 	}
 
@@ -81,8 +83,8 @@ RESTSender::send(folly::dynamic map
 	 * Create HTTP request
 	 */
 	http::request<http::string_body> req{verb,target,version};
-	std::string host = socket_.remote_endpoint().address().to_string();
-	host += std::to_string(socket_.remote_endpoint().port());
+	std::string host = socket_->remote_endpoint().address().to_string();
+	host += std::to_string(socket_->remote_endpoint().port());
 	req.set(http::field::host,host);
 	req.set(http::field::accept,"application/json");
 	req.set(http::field::accept_charset,"utf-8");
@@ -107,7 +109,7 @@ RESTSender::send(folly::dynamic map
 	/**
 	 * send the http request
 	 */
-	http::async_write(socket_, req, std::move(callback).asStdFunction());
+	http::async_write(*socket_, req, std::move(callback));
 	return 0;
 }
 

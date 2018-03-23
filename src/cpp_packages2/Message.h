@@ -33,9 +33,17 @@ public:
 
 class Message{
 public:
+	enum class MessageType : uint8_t{
+		AuthenticationRequest,
+		OpPermissionRequest,
+		AuthenticationResponse,
+		OpPermissionResponse
+	};
+
 	Message(uint32_t tranID, const std::string& userID)
 	:tranID_(tranID),userID_(userID){}
 
+	MessageType type_;
 	uint32_t tranID_;
 	std::string userID_; 	   // user id or user name
 
@@ -72,7 +80,9 @@ public:
 	AuthenticationRequest() = delete;
 	AuthenticationRequest(uint32_t tranID, const std::string& userID,
 		const std::string& password)
-	:Request(tranID,userID,password,""){}
+	:Request(tranID,userID,password,""){
+		type_ = Message::MessageType::AuthenticationRequest;
+	}
 
 	virtual folly::dynamic encode() override;
 };
@@ -91,7 +101,9 @@ public:
 		OpType opType, bool isCommit = false)
 	:Request(tranID,userID,password,objectPath)
 	,opType_(opType),isCommit_(isCommit)
-	,objectSize_(0){}
+	,objectSize_(0){
+		type_ = Message::MessageType::OpPermissionRequest;
+	}
 
 	OpType opType_;
 	bool isCommit_;
@@ -115,6 +127,7 @@ public:
 		INTERNAL_ERR = 6  // system internal error
 	};
 
+	Response() = delete;
 	Response(uint32_t tranID, const std::string& userID, StateCode stateCode)
 	:Message(tranID,userID),stateCode_(stateCode){}
 
@@ -126,9 +139,14 @@ public:
 
 class AuthenticationResponse : public Response{
 public:
+	AuthenticationResponse(){
+		type_ = Message::MessageType::AuthenticationResponse;
+	}
 	AuthenticationResponse(uint32_t tranID, const std::string& userID,
 		StateCode stateCode)
-	:Response(tranID,userID,stateCode){}
+	:Response(tranID,userID,stateCode){
+		type_ = Message::MessageType::AuthenticationResponse;
+	}
 
 	virtual void decode(folly::dynamic) override;
 };
@@ -153,13 +171,18 @@ public:
 		:cephObjectID_(a),index_(b),size_(c){}
 	}RadosObject;
 
+	OpPermissionResponse(){
+		type_ = Message::MessageType::OpPermissionResponse;
+	}
 	OpPermissionResponse(uint32_t tranID, const std::string& userID,
 		StateCode stateCode,
 		bool flag, MetaData metaData = {0,0,0},
 		std::vector<RadosObject> radosObjects = {})
 	:Response(tranID,userID,stateCode)
 	,flag_(flag),metaData_(metaData)
-	,radosObjects_(std::move(radosObjects)){}
+	,radosObjects_(std::move(radosObjects)){
+		type_ = Message::MessageType::OpPermissionResponse;
+	}
 
 	MetaData metaData_;
 	std::vector<RadosObject> radosObjects_;
