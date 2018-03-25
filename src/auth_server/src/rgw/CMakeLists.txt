@@ -124,7 +124,8 @@ set(rgw_a_srcs
   rgw_torrent.cc
   rgw_crypt.cc
   rgw_crypt_sanitize.cc
-  rgw_iam_policy.cc)
+  rgw_iam_policy.cc,
+  singstorage/rgw_sing_auth.cc)
 
 gperf_generate(${CMAKE_SOURCE_DIR}/src/rgw/rgw_iam_policy_keywords.gperf
   rgw_iam_policy_keywords.frag.cc)
