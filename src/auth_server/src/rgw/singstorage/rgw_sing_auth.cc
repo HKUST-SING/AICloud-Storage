@@ -30,9 +30,6 @@ namespace auth {
 namespace singstorage { 
 
 
-std::string::size_type 
-SignedMachineEngine::AUTH_KEY_LENGTH = std::string::size_type(256);
-
 bool
 SignedMachineEngine::is_applicable(const std::string& token) const noexcept
 {

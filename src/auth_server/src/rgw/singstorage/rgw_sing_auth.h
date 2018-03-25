@@ -11,7 +11,6 @@
 #include "../rgw_op.h"
 #include "../rgw_rest.h"
 #include "../rgw_auth.h"
-#include "../rgw_auth_keystone.h"
 #include "../rgw_auth_filters.h"
 #include <utility>
 
@@ -31,7 +30,8 @@ class SignedMachineEngine : public rgw::auth::Engine
 
   private:
     using result_t = rgw::auth::Engine::result_t;
-    static const constexpr std::string::size_type AUTH_KEY_LENGTH;
+    static const constexpr std::string::size_type AUTH_KEY_LENGTH = 
+                           std::string::size_type(256);
     
     CephContext* const cct_;
     RGWRados* const store_;
@@ -63,7 +63,7 @@ class SignedMachineEngine : public rgw::auth::Engine
       apl_factory_(apl_factory)
       {}
 
-    const char* get_name() consr noexcept override {
+    const char* get_name() const noexcept override {
     
       return "rgw::auth::singstorage::SignedMachineEngine";
     }
@@ -71,7 +71,7 @@ class SignedMachineEngine : public rgw::auth::Engine
 
     /* public interface used by the processors */
     result_t authenticate(const req_state* const st) const override {
-     return authenticate(extractor->get_token(st), st);
+     return authenticate(extractor_->get_token(st), st);
    }
 
 
@@ -81,8 +81,6 @@ class SignedMachineEngine : public rgw::auth::Engine
 
 class DefaultStrategy : public rgw::auth::Strategy,
                         public rgw::auth::LocalApplier::Factory
-
-
 {
 
   /** 
@@ -94,7 +92,7 @@ class DefaultStrategy : public rgw::auth::Strategy,
 
   private:
  
-   class SimpleTokenExtractor public rgw::auth::TokenExtractor
+   class SimpleTokenExtractor : public rgw::auth::TokenExtractor
    {
      /** 
       * Class Implements the TokenExtractor interface
@@ -189,7 +187,7 @@ class DefaultStrategy : public rgw::auth::Strategy,
 
 class RGW_SINGSTORAGE_Auth_Get: public RGWOp {
 public:
-  RGW_SIGSTORAGE_Auth_Get() {}
+  RGW_SINGSTORAGE_Auth_Get() {}
   ~RGW_SINGSTORAGE_Auth_Get() override {}
 
 
@@ -201,8 +199,8 @@ public:
 
 class RGWHandler_SINGSTORAGE_Auth: public RGWHandler_REST {
 public:
-  RGWHandler_SINGSOTRAGE_Auth() {}
-  ~RGWHandler_SINGSOTRAGE_Auth() override {}
+  RGWHandler_SINGSTORAGE_Auth() {}
+  ~RGWHandler_SINGSTORAGE_Auth() override {}
   RGWOp* op_get() override;
 
 
@@ -212,7 +210,7 @@ public:
   int read_permissions(RGWOp* op) override { return 0; }
 
   virtual RGWAccessControlPolicy* alloc_policy() {return nullptr;}
-  virtual void free_policy(RGWAccessControlPOlicy* policy) {}
+  virtual void free_policy(RGWAccessControlPolicy* policy) {}
 
 }; // class RGWHandler_SINGSTORAGE_Auth
 
