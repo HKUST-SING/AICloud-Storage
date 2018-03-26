@@ -18,6 +18,9 @@
 class RGWHandler_REST_SING : public RGWHandler_REST {
   friend class RGWRESTMgr_SING;
   friend class RGWRESTMgr_SING_Info;
+
+  static constexpr const std::string STORAGE_PREFIX = "sing";
+
 protected:
   const rgw::auth::Strategy& auth_strategy;
 

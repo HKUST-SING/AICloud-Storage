@@ -224,9 +224,11 @@ RGW_SINGSTORAGE_Auth_Get::execute()
     goto done;
   }
 
-
   // success
   ret = STATUS_ACCEPTED;
+
+  // send the tenant path
+  std::string tenant_path(std::move(info.user_id.to_str()));
   
 
 
@@ -238,20 +240,27 @@ done:
   dump_errno(s);
 
 
-  if (ret != STATUS_ACCEPTED) 
-  { // need to encode the the error type
-    assert(s->formatter & s->format == RGW_FORMAT_JSON);
-    
-    s->formatter->open_object_section("Result");
-    s->formatter->dump_int("Error_Type", err_code);
-    s->formatter->close_section(); // close JSON object
   
-  } 
+  // need to encode the the error type or tenant_path
+  assert(s->formatter & s->format == RGW_FORMAT_JSON);
+    
+  s->formatter->open_object_section("Result");
+  
+  if(ret == STATUS_ACCEPTED) // account
+  {
+    s->formatter->dump_string("Account", tenant_path);
+  }
+  else // some error occured
+  {
+    s->formatter->dump_int("Error_Type", err_code);
+  }
+
+  s->formatter->close_section(); // close JSON object
+  
 
   // complete the header and dump the body
   end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
  
-
 }
 
 
