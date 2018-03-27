@@ -8,10 +8,10 @@
 #include <boost/optional.hpp>
 #include <boost/utility/typed_in_place_factory.hpp>
 
-#include "rgw_op.h"
-#include "rgw_rest.h"
+#include "../rgw_op.h"
+#include "../rgw_rest.h"
 #include "rgw_sing_auth.h"
-#include "rgw_http_errors.h"
+#include "../rgw_http_errors.h"
 
 #include <boost/utility/string_ref.hpp>
 
@@ -62,6 +62,79 @@ public:
                                const rgw::auth::StrategyRegistry& auth_registry,
                                const std::string& frontend_prefix) override;
 };
+
+
+
+class RGWHandler_REST_Bucket_SING : public RGWHandler_REST_SING
+{
+  protected:
+    bool is_obj_update_op() override
+    {
+      return (s->op == OP_POST);
+    }
+
+  
+    //  operations provided by the bucket handler class  
+    RGWOp *get_obj_op(bool get_data);
+    RGWOp *op_get() override;
+    RGWOp *op_head() override;
+    RGWOp *op_put() override;
+    RGWOp *op_delete() override;
+    RGWOp *op_post() override;
+    RGWOp *op_options() override;
+
+
+  public:
+    using RGWHandler_REST_SING::RGWHandler_REST_SING;
+    ~RGWHandler_REST_Bucket_SING() override = default;
+
+
+    int init(RGWRados* const store, struct req_state* const state,
+             rgw::io::BasicClient* const cio) override 
+    {
+      return RGWHandler_REST_SING::init(store, state, cio);
+    }
+
+
+}; // class RGWHandler_REST_Bucket_SING
+
+
+
+class RGWHandler_REST_Obj_SING : public RGHandler_REST_SING
+{
+
+  protected:
+    bool is_obj_update_op() override
+    {
+      return (s->op == OP_POST);
+    }
+
+  
+    //  operations provided by the bucket handler class  
+    RGWOp *get_obj_op(bool get_data);
+    RGWOp *op_get() override;
+    RGWOp *op_head() override;
+    RGWOp *op_put() override;
+    RGWOp *op_delete() override;
+    RGWOp *op_post() override;
+    RGWOp *op_options() override;
+
+
+  public:
+    using RGWHandler_REST_SING::RGWHandler_REST_SING;
+
+    ~RGWHandler_REST_Obj_SING() override = default;
+
+    int init(RGWRados* const store, struct req_state* const state,
+             rgw::io::BasicClient* const cio) override
+    {
+      return RGWHandler_REST_SING::init(store, state, cio);
+    }
+ 
+
+
+}; // class RGWHandler_REST_Obj_SING
+
 
 class RGWHandler_REST_SING_Info : public RGWHandler_REST_SING {
 public:
