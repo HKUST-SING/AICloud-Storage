@@ -228,7 +228,14 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   ret = STATUS_ACCEPTED;
 
   // send the tenant path
-  std::string tenant_path(std::move(info.user_id.to_str()));
+  std::string tenant_path;
+  if(info.user_id.tenant.empty())
+  {
+    tenant_path = info.user_id.id;
+  else
+  {
+    tenant_path = std::move(info.user_id.tenant + ":" + info.user_id.id);
+  }
   
 
 

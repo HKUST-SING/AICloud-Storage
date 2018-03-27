@@ -14,8 +14,7 @@
 #include "common/ceph_json.h"
 
 #include "rgw_rest_sing.h"
-#include "rgw_acl_sing.h"
-#include "rgw_cors_sing.h"
+#include "rgw_acl_swift.h"
 #include "rgw_formats.h"
 #include "rgw_client_io.h"
 
