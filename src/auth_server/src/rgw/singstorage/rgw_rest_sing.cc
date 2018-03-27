@@ -426,7 +426,7 @@ RGWDeleteObj_ObjStore_SING::send_response()
 
 
 static uint64_t
-RGWGetObjLayput_SING::get_sing_error(const int sys_error)
+RGWGetObjLayout_SING::get_sing_error(const int sys_error)
 {
   switch(sys_error)
   {
@@ -468,7 +468,7 @@ RGWGetObjLayout_SING::send_response()
     << "manifest is 'nullptr'" << dendl;  
 
     const uint64_t sing_err = get_sing_error(op_ret);
-    s->formatter->dump_int("Error_Type", sing_err);
+    s->formatter->dump_unsigned("Error_Type", sing_err);
   }
   else
   {
@@ -482,9 +482,143 @@ RGWGetObjLayout_SING::send_response()
 
 }
 
+int
+RGWPutObj_ObjStore_SING::check_bucket()
+{
+  RGWAccessControlPolicy  buck_acl(s->cct);
+  RGWAccessControlPolicy* buck_acl_ptr;
+  optional<Policy>        buck_policy;
+  optional<Policy>*       buck_policy_ptr;
+
+  RGWBucketInfo           buck_info;
+  RGWBucketInfo*          buck_info_ptr;
+
+  
+
+  // try to retreive infomration about the bucket
+  RGWObjCtx  obj_ctx(store);
+  map<string, bufferlist> buck_attrs;
+
+  // this may fail since the bucket may not be created yet
+  int res = store->get_bucket_info(obj_ctx, s->user->user_id.tenant,
+                   s->bucket_name, buck_info, nullptr, 
+                   &buck_attrs);
+
+
+  if (res < 0)
+  {
+    ldout(s->cct, 0) << "could not get bucket info for bucket="
+                    <<  s->bucket_name << dendl;
+
+    return res;
+  }
+
+
+  rgw_bucket bucket   =   buck_info.bucket;
+  buck_info_ptr       =   &buck_info;
+  buck_acl_ptr        =   &buck_acl;
+
+
+  res 
+
+
+}
+
+
+
+void
+RGWPutObj_ObjStore_SING::init(RGWRados* store, struct req_state* state,
+                              RGWHandler* dialect_handler)
+{
+
+  // create your own handlers
+  put_op_ = new SING_PutObj;
+  get_op_ = new RGWGetObjLayout_SING;
+
+  
+  assert(put_op_ && get_op_);
+
+
+  // initialize the operations for future
+  // use
+  put_op_->init(store, state, dialect_handler);
+  get_op_->init(store, state, dialect_handler);
+
+  
+
+  RGWPutObj_ObjStore::init(store, state, dialect_handler); 
+
+}
+
+
+
+void
+RGWPutObj_ObjStore_SING::do_empty_response() const
+{
+
+  RGWObjManifest manifest;
+  // send an empty manifest
+
+
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  assert(tranID);
+  
+  dump_header(s, "HTTP_X_TRAN_ID", tranID);
+  set_req_state_err(s, STATUS_CREATED);
+  dump_errno(STATUS_CREATED);
+
+
+  s->formatter->open_object_section("Result");
+  manifest.dump(s->formatter); // encode as a JSON object
+  s->formatter->close_section(); // close JSON object
+
+  // send the body
+  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+}
+
+
+void
+RGWPutObj_ObjStore_SING::send_response()
+{
+ 
+  // check which version to use for sending a request to
+  // the client
+  if (get_op_->manifest) // means it has a data layout 
+                         // to send
+  {
+    get_op_->send_response(); // reuse the response
+  }
+  else // not layout exists
+  {
+    do_empty_response();
+  }
+ 
+}
+
 
 /********************* RGWOps End ***********************/
 
+
+
+RGWOp*
+RGWHandler_REST_Obj_SING::op_delete()
+{
+  return new RGWDeleteObj_ObjStore_SING; 
+}
+
+
+RGWOp*
+RGWHandler_REST_Obj_SING::op_get()
+{
+  return new RGWGetObjLayout_SING;
+}
+
+
+RGWOp*
+RGWHandler_REST_Obj_SING::op_put()
+{
+  return new RGWPutObj_ObjStore_SING;
+}
 
 
 RGWHandler_REST* RGWRESTMgr_SING_Info::get_handler(

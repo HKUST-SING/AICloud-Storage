@@ -112,13 +112,13 @@ class RGWHandler_REST_Obj_SING : public RGHandler_REST_SING
 
   
     //  operations provided by the bucket handler class  
-    RGWOp *get_obj_op(bool get_data);
+    RGWOp *get_obj_op(bool get_data) { return nullptr; };
     RGWOp *op_get() override;
-    RGWOp *op_head() override;
+    RGWOp *op_head() override { return nullptr; };
     RGWOp *op_put() override;
     RGWOp *op_delete() override;
-    RGWOp *op_post() override;
-    RGWOp *op_options() override;
+    RGWOp *op_post() override { return nullptr; };
+    RGWOp *op_options() override { return nullptr;};
 
 
   public:
@@ -187,6 +187,10 @@ public:
  * heads since the clients are supposed to uppload data.
  */
 
+
+class RGWPutObj_SING; // forward declaration
+
+
 class RGWDeleteObj_ObjStore_SING : public RGWDeleteObj_ObjStore
 {
 
@@ -206,6 +210,7 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
 {
 
   private:
+    friend class RGWPutObj_SING; // for accessing state
     static uint64_t get_sing_error(const int sys_error);
 
   public:
@@ -218,33 +223,100 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
 
 }; // class RGWGetObjLayout_SING
 
-class  RGWGetObj_ObjStore_SING : public RGWGetObj_ObjStore
+
+class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
 {
   private:
-    int custom_http_ret = 0;
+  
+    /** Private handlers for creating/checking buckets
+     *  and objects.
+     */ 
+    class SING_CreateBucket : public RGWCreateBucket_ObjStore
+    {
+      protected:
+        bool need_metadata_upload() const override { return true;}
+      
+      public:
+        SING_CreateBucket() {}
+        ~SING_CreateBucket() override {}
 
+        int get_params() override;
+        void send_response() override {}
+    }; // class SING_CreateBucket
+
+ 
+   class SING_PutObj : public RGWPutObj_ObjStore
+   {
+     public:
+       SING_PutObj() {}
+       ~SING_PutObj() override {}
+
+        int verify_permission() override;
+
+        int get_params() override;
+        
+        void send_response() override {} 
+   }; // class SING_PutObj
+    
+
+
+   // Pointers to the worker operations
+   SING_PutObj*        put_op_ = nullptr;    // put operation
+   SING_CreateBucket*  create_op_ = nullptr; // create bucket
+  
+   RGWGetObjLayout_SING* get_op_ = nullptr;  // get operation
+
+    
+   void do_empty_response() const; //  send an empty manifest to
+                              // the client
+
+    
   public:
-    RGWGetObj_ObjStore_SING() {}
-    ~RGWGetObj_ObjStore_SING override {}
+    RGWPutObj_SING() {}
+
+    ~RGPPutObj_SING() override
+     {
+       // release allocated resources
+       if(put_op_)
+       {
+         delete put_op_;
+         put_op = nullptr;
+       }     
+
+       if(create_op_)
+       {
+         delete create_op_;
+         create_op_ = nullptr;
+       }
+
+ 
+       if(get_op_)
+       {
+         delete get_op_;
+         det_op_ = nullptr;
+       }
+
+     }    
 
 
     int verify_permission() override;
-    int get_params() override;
-    int send_repsonse_data_error() override;
-    int send_response_data(bufferlist& bl, off_t ofs, off_t len) override;
+    int verify_op_mask() override { return 0; }
+    void init(RGWRados* store, struct req_state* state,
+              RGWHandler* dialect_handler) override;
+    
+
+    uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
+
+    void send_response() override;
+    int get_data(bufferlist& bl) override {}
+     
+    
+
+    
 
 
-    void set_custom_http_response(const int http_ret)
-    {
-      custom_http_ret = http_ret;
-    }
 
-    bool need_object_expiration() override
-    {
-      return false;
-    }
-
-}; // class RGWGetObj_ObjStore_SING
+}; // class RGWPutObj_ObjStore_SING
 
 
 #endif
