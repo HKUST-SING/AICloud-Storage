@@ -3,7 +3,7 @@
  * used in channel initialization
  */
 
-#pragma
+#pragma once
 
 namespace singaistorageipc{
 

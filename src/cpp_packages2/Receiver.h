@@ -30,6 +30,7 @@ using tcp = boost::asio::ip::tcp;
 namespace singaistorageipc{
 
 class Receiver{
+public:
 	virtual ~Receiver() = default;
 	virtual void startReceive() = 0;
 };
@@ -41,6 +42,8 @@ public:
 		std::shared_ptr<std::vector<std::unique_ptr<Message>>> receivePool, 
 		std::shared_ptr<boost::mutex> mutex)
 		:socket_(socket),receivePool_(receivePool),mutex_(mutex){}
+
+	~RESTReceiver() = default;
 
 	void startReceive() override{
 		receive();
@@ -73,7 +76,7 @@ private:
 	/**
 	 * Insert receiving message into the pool
 	 */
-	void poolInsert(std::unqiue_ptr<Message> msg)
+	void poolInsert(std::unique_ptr<Message> msg);
 
 };
 

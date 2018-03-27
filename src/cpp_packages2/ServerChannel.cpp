@@ -18,13 +18,14 @@
 #include "Sender.h"
 #include "ChannelContext.h"
 
-using ip = boost::asio::ip;
+using tcp = boost::asio::ip::tcp;
 
 namespace singaistorageipc{
 
-bool initChannel(){
-	ip::tcp::endpoint ep(ip::address::from_string(
-							cxt_.remoteServerAddress_.c_str()), cxt_.port);	
+bool
+ServerChannel::initChannel(){
+	tcp::endpoint ep(boost::asio::ip::address::from_string(
+							cxt_.remoteServerAddress_.c_str()), cxt_.port_);	
 	try{
 		socket_->connect(ep);
 	}
@@ -39,7 +40,7 @@ bool initChannel(){
 	 */
 	std::thread tmpthread([&]{
 			restReceiver_.startReceive();
-			ioc_.run()});
+			ioc_.run();});
 	socketThread_ = std::move(tmpthread);
 
 	return true;

@@ -40,6 +40,7 @@ public:
 		OpPermissionResponse
 	};
 
+	Message() = default;
 	Message(uint32_t tranID, const std::string& userID)
 	:tranID_(tranID),userID_(userID){}
 
@@ -127,7 +128,7 @@ public:
 		INTERNAL_ERR = 6  // system internal error
 	};
 
-	Response() = delete;
+	Response() = default;
 	Response(uint32_t tranID, const std::string& userID, StateCode stateCode)
 	:Message(tranID,userID),stateCode_(stateCode){}
 
@@ -157,7 +158,8 @@ public:
 		uint64_t globalObjectID_;
 		uint64_t totalObjectSize_;
 		uint32_t numberOfShards_;
-
+		
+		MetaData() = default;
 		MetaData(uint64_t a, uint64_t b, uint32_t c)
 		:globalObjectID_(a),totalObjectSize_(b),numberOfShards_(c){}
 	}MetaData;

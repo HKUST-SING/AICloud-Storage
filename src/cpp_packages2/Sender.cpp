@@ -21,11 +21,12 @@ using tcp = boost::asio::ip::tcp;
 namespace http = boost::beast::http;
 
 namespace singaistorageipc{
+/*
 const std::string MessageField::OP_TYPE;
 const std::string MessageField::PATH;
 const std::string MessageField::USER_ID;
 const std::string MessageField::PASSWD;
-
+*/
 int
 RESTSender::send(folly::dynamic map
 				,std::function<void(boost::system::error_code const&
@@ -84,6 +85,7 @@ RESTSender::send(folly::dynamic map
 	 */
 	http::request<http::string_body> req{verb,target,version};
 	std::string host = socket_->remote_endpoint().address().to_string();
+	host += ":";
 	host += std::to_string(socket_->remote_endpoint().port());
 	req.set(http::field::host,host);
 	req.set(http::field::accept,"application/json");
