@@ -174,6 +174,9 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   const char* user   = s->info.env->get("HTTP_X_AUTH_USER");
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
 
+
+  assert(key && user && tranID);
+
   s->prot_flags |= RGW_REST_SWIFT; // use SWIFT flags as it matches
                                    // our settings and no need to
                                    // modify external classes

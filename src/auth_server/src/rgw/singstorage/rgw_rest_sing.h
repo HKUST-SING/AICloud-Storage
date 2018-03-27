@@ -178,4 +178,56 @@ public:
                                const std::string& frontend_prefix) override;
 };
 
+
+
+/**
+ * The following classes are used for creating/deleting
+ * buckets and object. We only operate on the object
+ * heads since the clients are supposed to uppload data.
+ */
+
+class RGWDeleteObj_ObjStore_SING : public RGWDeleteObj_ObjStore
+{
+
+  public:
+    RGWDeleteObj_ObjStore_SING() {}
+    ~RGWDeleteObj_Objstore_SING() override {}
+
+    int verify_permission() override;
+    int get_params() override;
+    bool need_object_expiration() override { return true; }
+    void send_response() override;
+
+}; // class RGWDeleteObj_ObjStore
+
+
+class  RGWGetObj_ObjStore_SING : public RGWGetObj_ObjStore
+{
+  private:
+    int custom_http_ret = 0;
+
+  public:
+    RGWGetObj_ObjStore_SING() {}
+    ~RGWGetObj_ObjStore_SING override {}
+
+
+    int verify_permission() override;
+    int get_params() override;
+    int send_repsonse_data_error() override;
+    int send_response_data(bufferlist& bl, off_t ofs, off_t len) override;
+
+
+    void set_custom_http_response(const int http_ret)
+    {
+      custom_http_ret = http_ret;
+    }
+
+    bool need_object_expiration() override
+    {
+      return false;
+    }
+
+}; // class RGWGetObj_ObjStore_SING
+
+
 #endif

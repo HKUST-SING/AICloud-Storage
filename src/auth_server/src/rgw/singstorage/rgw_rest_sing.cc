@@ -318,6 +318,112 @@ RGWRESTMgr_SING::get_handler(struct req_state* const s,
   return new RGWHandler_REST_Obj_SING(auth_strategy);
 }
 
+
+/********************* RGWOps ****************************/
+int
+RGWDeleteObj_ObjStore_SING::verify_permission()
+{
+  op_ret = RGWDeleteObj_ObjStore::verify_permission();
+
+  /**
+   * User has no access if s/he is not authorized
+   * to perform DELETE/WRITE operations.
+   */
+  if(op_ret == -EACCES || op_ret == -EPERM) 
+                       // no authorization
+  {
+    return -EPERM;
+  }
+  else
+  {
+   return op_ret; // may contain some other error code
+  }
+
+}
+
+
+int
+RGWDeleteObj_ObjStore_SING::get_params()
+{
+  const string& mm = s->info.args.get("multipart-manifest");
+
+  multipart_delete = (mm.compare("delete") == 0);
+
+  return RGWDeleteObj_ObjStore::get_params();
+
+}
+
+
+void 
+RGWDeleteObj_ObjStore_SING::send_response()
+{
+  int r = op_ret;
+
+  if(multipart_delete)
+  {
+    r= 0;
+  }
+  else if(!r)
+  {
+    r = STATUS_NO_CONTENT;
+  }
+
+  // get transaction ID
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  
+  assert(tranID); // make sure there is a transaction ID
+
+  set_req_state_err(s, r);
+  dump_errno(s);
+  dump_header(s, "HTTP_X_TRAN_ID", tranID); 
+
+  if(multipart_delete)
+  {
+    end_header(s, this /* RGWop */, nullptr, /* contype */, CHUNKED_TRANSFER_ENCODING);
+
+    if(deleter)
+    {
+      bulkdelete_respond(deleter->get_num_deleted(),
+                         deleter->get_num_unfound(),
+                         deleter->get_failures(),
+                         s->prot_flags,
+                         *s->formatter);
+    } // if
+    else
+    {
+      if(-ENOENT == op_ret)
+      {
+        bulkdelete_respond(0,1,{}, s->prot_flags,
+                           *s->formatter);
+      } //if  
+      else
+      {
+        RGWBulkDelete::acct_path_t path;
+        path.bucket_name = s->bucket_name;
+        path.obj_key     = s->object; 
+
+        RGWBulkDelete::fail_desc_t fail_desc;
+        fail_desc.err  = op_ret;
+        fail_desc.path = path;
+
+        bulkdelete_respond(0, 0, {fail_desc}, 
+                           s->prot_flags, *s->formatter);        
+      }//else
+    }// else
+  }// if
+  else
+  {
+    end_header(s, this);
+  } // else
+ 
+
+
+  rgw_flush_formatter_and_reset(s, s->formatter);
+}
+/********************* RGWOps End ***********************/
+
+
+
 RGWHandler_REST* RGWRESTMgr_SING_Info::get_handler(
   struct req_state* const s,
   const rgw::auth::StrategyRegistry& auth_registry,
