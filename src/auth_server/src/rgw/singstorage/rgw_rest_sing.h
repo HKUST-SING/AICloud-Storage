@@ -19,7 +19,7 @@ class RGWHandler_REST_SING : public RGWHandler_REST {
   friend class RGWRESTMgr_SING;
   friend class RGWRESTMgr_SING_Info;
 
-  static constexpr const std::string STORAGE_PREFIX = "sing";
+  static constexpr const std::string STORAGE_PREFIX = "sing";  
 
 protected:
   const rgw::auth::Strategy& auth_strategy;
@@ -31,6 +31,7 @@ protected:
   static int init_from_header(struct req_state* s,
                               const std::string& frontend_prefix);
 public:
+
   RGWHandler_REST_SING(const rgw::auth::Strategy& auth_strategy)
     : auth_strategy(auth_strategy) {
   }
@@ -200,6 +201,22 @@ class RGWDeleteObj_ObjStore_SING : public RGWDeleteObj_ObjStore
 
 }; // class RGWDeleteObj_ObjStore
 
+
+class RGWGetObjLayout_SING : public RGWGetObjLayout
+{
+
+  private:
+    static uint64_t get_sing_error(const int sys_error);
+
+  public:
+    RGWGetObjLayout_SING() = default;
+    ~RGWGetObjLayout_SING() override {}
+
+    void send_response() override; // send a JSON
+                                   // containing
+                                   // object layout
+
+}; // class RGWGetObjLayout_SING
 
 class  RGWGetObj_ObjStore_SING : public RGWGetObj_ObjStore
 {

@@ -20,6 +20,7 @@
 
 #include "rgw_auth.h"
 #include "rgw_sing_auth.h"
+#include "rgw_sing_error_code.h"
 
 #include "rgw_request.h"
 #include "rgw_process.h"
@@ -119,6 +120,7 @@ int RGWHandler_REST_SING::validate_bucket_name(const string& bucket)
   return 0;
 }
 
+
 static void next_tok(string& str, string& tok, char delim)
 {
   if (str.size() == 0) {
@@ -212,7 +214,7 @@ int RGWHandler_REST_SING::init_from_header(struct req_state* const s,
 
   std::string tenant_path;
 
-  int ret = allocate_formatter(s, RGW_FORMAT_PLAIN, true);
+  int ret = allocate_formatter(s, RGW_FORMAT_JSON, false);
   if (ret < 0)
     return ret;
 
@@ -420,6 +422,67 @@ RGWDeleteObj_ObjStore_SING::send_response()
 
   rgw_flush_formatter_and_reset(s, s->formatter);
 }
+
+
+
+static uint64_t
+RGWGetObjLayput_SING::get_sing_error(const int sys_error)
+{
+  switch(sys_error)
+  {
+    case -EPERM:
+    {
+      return rgw::singstorage::SingErrorCode::ACL_ERR;
+    }
+  
+    case -EACCES:
+    {
+      return  rgw:;singstorage::SingErrorCode::PATH_NOT_FOUND;
+
+    }
+
+   default:
+     return rgw::singstorage::SingErrorCode::INTERNAL_ERR; 
+
+}
+
+
+void
+RGWGetObjLayout_SING::send_response()
+{
+
+
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  assert(tranID);
+  
+  dump_header(s, "HTTP_X_TRAN_ID", tranID);
+  set_req_state_err(s, op_ret);
+  dump_errno(op_ret);
+
+
+  s->formatter->open_object_section("Result");
+
+   if(!manifest || op_ret < 0)
+  {
+    ldout(s->cct, 20) << "NOTICE: send_response() " 
+    << "manifest is 'nullptr'" << dendl;  
+
+    const uint64_t sing_err = get_sing_error(op_ret);
+    s->formatter->dump_int("Error_Type", sing_err);
+  }
+  else
+  {
+    manifest->dump(s->formatter); // encode as a JSON object
+  }
+
+  s->formatter->close_section(); // close JSON object
+
+  // send the body
+  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+
+}
+
+
 /********************* RGWOps End ***********************/
 
 

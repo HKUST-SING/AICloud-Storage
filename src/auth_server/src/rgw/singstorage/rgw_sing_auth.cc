@@ -12,6 +12,7 @@
 #include "../rgw_http_client.h"
 #include "../rgw_rest.h"
 #include "rgw_sing_auth.h"
+#include "rgw_sing_error_code.h"
 
 
 
@@ -20,10 +21,6 @@
 #define AUTH_PASS 0x02 // password is incorrect
 #define AUTH_ERR  0x10 // some internal error
 
-// HTTP Status Codes
-#define HTTP_OK 200
-#define HTTP_UNAUTHORIZED 401
-#define HTTP_NOT_FOUND 404
 
 namespace rgw {
 namespace auth {
@@ -168,7 +165,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 {
 
   int ret = -EPERM;
-  int err_code = AUTH_ERR;  
+  uint64_t err_code = rgw::singstorage::SINGErrorCode::USER_ERR; // no such username  
 
   const char* key    = s->info.env->get("HTTP_X_AUTH_KEY");
   const char* user   = s->info.env->get("HTTP_X_AUTH_USER");
@@ -193,7 +190,6 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 
   if(!key || !user) 
   {
-    err_code = AUTH_USER; // no user provided
     goto done; // no authentication possible
   }
     
@@ -206,6 +202,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   if((ret = rgw_get_user_info_by_swift(store, user_str, info)) < 0)
   {
     // internal error 
+    err_code = rgw::singstorage::SINGErrorCode::INTERNAL_ERR; 
     goto done;
   }
 
@@ -213,7 +210,6 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   siter = info.swift_keys.find(user_str);
   if(siter == info.swift_keys.end()) // no such user found
   {
-    err_code = AUTH_USER;
     goto done;
   }
 
@@ -223,7 +219,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   if(sing_key->key.compare(key) != 0)
   {
     //dout (0) << "NOTICE: RGW_SING_Auth_Get::execute(): bad singstorage key" << dendl;
-    err_code = AUTH_PASS;
+    err_code = rgw::singstorage::SINGErrorCode::PASSWD_ERR;
     goto done;
   }
 
@@ -252,7 +248,7 @@ done:
 
   
   // need to encode the the error type or tenant_path
-  assert(s->formatter & s->format == RGW_FORMAT_JSON);
+  assert(s->formatter && s->format == RGW_FORMAT_JSON);
     
   s->formatter->open_object_section("Result");
   
@@ -262,7 +258,7 @@ done:
   }
   else // some error occured
   {
-    s->formatter->dump_int("Error_Type", err_code);
+    s->formatter->dump_unsigned("Error_Type", err_code);
   }
 
   s->formatter->close_section(); // close JSON object
