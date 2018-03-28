@@ -105,13 +105,18 @@ RESTSender::send(folly::dynamic map
 	map.erase(MessageField::USER_ID);
 	map.erase(MessageField::PASSWD);
 
+	uint32_t tranID = folly::convertTo<uint32_t>(
+						map[MessageField::TRANSACTION_ID]);
+
 	req.body() = folly::toJson(std::move(map));
 	req.prepare_payload();
 
 	/**
 	 * send the http request
 	 */
-	http::async_write(*socket_, req, std::move(callback));
+	reqMap_[tranID] = std::move(req);
+	http::async_write(*socket_, reqMap_[tranID], 
+		boost::bind(&RESTSender::sendCallback_,this,tranID,callback,_1,_2));
 	return 0;
 }
 

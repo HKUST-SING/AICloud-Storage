@@ -32,7 +32,7 @@ void
 RESTReceiver::receive(){
 	boost::beast::http::response<
 			boost::beast::http::dynamic_body> newresponse;
-	response_ = newresponse;
+	response_ = std::move(newresponse);
 	http::async_read(*socket_,buffer_,response_,
 		boost::bind(&RESTReceiver::onRead,this,_1,_2));
 }
