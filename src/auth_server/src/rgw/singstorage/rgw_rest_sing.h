@@ -188,7 +188,7 @@ public:
  */
 
 
-class RGWPutObj_SING; // forward declaration
+class RGWPutObj_ObjStore_SING; // forward declaration
 
 
 class RGWDeleteObj_ObjStore_SING : public RGWDeleteObj_ObjStore
@@ -210,7 +210,7 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
 {
 
   private:
-    friend class RGWPutObj_SING; // for accessing state
+    friend class RGWPutObj_ObjStore_SING; // for accessing state
     static uint64_t get_sing_error(const int sys_error);
 
   public:
@@ -240,56 +240,37 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
         SING_CreateBucket() {}
         ~SING_CreateBucket() override {}
 
-        int get_params() override;
+        int get_params() override { return 0;};
         void send_response() override {}
-    }; // class SING_CreateBucket
+    }; // class SING_CreateBucket    
 
+
+   // Pointers to the worker operation
+   RGWGetObjLayout_SING* get_op_ = nullptr; // get operation
+   bool bucket_exists            = false;   // does bucket exist?   
+      
  
-   class SING_PutObj : public RGWPutObj_ObjStore
-   {
-     public:
-       SING_PutObj() {}
-       ~SING_PutObj() override {}
-
-        int verify_permission() override;
-
-        int get_params() override;
-        
-        void send_response() override {} 
-   }; // class SING_PutObj
-    
-
-
-   // Pointers to the worker operations
-   SING_PutObj*        put_op_ = nullptr;    // put operation
-   SING_CreateBucket*  create_op_ = nullptr; // create bucket
+   void do_empty_response();       // send an empty manifest to
+                                   // the client
   
-   RGWGetObjLayout_SING* get_op_ = nullptr;  // get operation
+   uint64_t get_obj_size();        // retrieve object size
+                                   // to be written
+ 
+   void create_temp_manifest() const {} // create and initialize
+                                        // manifest for user
 
-    
-   void do_empty_response() const; //  send an empty manifest to
-                              // the client
+   int create_bucket() const; // try to create a bucket
+                              // if the required bucket does
+                              // not exist.
 
     
   public:
-    RGWPutObj_SING() {}
+    RGWPutObj_ObjStore_SING() {}
 
-    ~RGPPutObj_SING() override
+    ~RGPPutObj_ObjStore_SING() override
      {
        // release allocated resources
-       if(put_op_)
-       {
-         delete put_op_;
-         put_op = nullptr;
-       }     
 
-       if(create_op_)
-       {
-         delete create_op_;
-         create_op_ = nullptr;
-       }
-
- 
        if(get_op_)
        {
          delete get_op_;
@@ -300,21 +281,19 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
 
 
     int verify_permission() override;
-    int verify_op_mask() override { return 0; }
     void init(RGWRados* store, struct req_state* state,
               RGWHandler* dialect_handler) override;
-    
+   
 
-    uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
+    void execute() override;
+    void pre_exec() override;
+
+    int init_processing() override;   
+    int get_params() override { return 0; }
 
     void send_response() override;
-    int get_data(bufferlist& bl) override {}
+    int get_data(bufferlist& bl) override { return 0; }
      
-    
-
-    
-
-
 
 }; // class RGWPutObj_ObjStore_SING
 

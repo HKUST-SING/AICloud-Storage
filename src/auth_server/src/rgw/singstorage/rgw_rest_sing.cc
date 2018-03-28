@@ -14,22 +14,34 @@
 #include "common/ceph_json.h"
 
 #include "rgw_rest_sing.h"
-#include "rgw_acl_swift.h"
-#include "rgw_formats.h"
-#include "rgw_client_io.h"
+#include "../rgw_acl_swift.h"
+#include "../rgw_formats.h"
+#include "../rgw_client_io.h"
 
-#include "rgw_auth.h"
+#include "../rgw_auth.h"
 #include "rgw_sing_auth.h"
 #include "rgw_sing_error_code.h"
 
-#include "rgw_request.h"
-#include "rgw_process.h"
+#include "../rgw_request.h"
+#include "../rgw_process.h"
 
 #include <array>
 #include <sstream>
 #include <memory>
+#include <limits>
 
 #include <boost/utility/string_ref.hpp>
+
+
+// get maximum interger value
+static constexpr const size_t MAX_INT_VAL = static_cast<const size_t>(std::numeric_limits<int>::max());
+
+
+// default data bucket name
+// for testing is enough
+#define DEFAULT_DATA_POOL "default.rgw.buckets.data"
+
+
 
 int RGWHandler_REST_SING::authorize()
 {
@@ -532,16 +544,14 @@ RGWPutObj_ObjStore_SING::init(RGWRados* store, struct req_state* state,
 {
 
   // create your own handlers
-  put_op_ = new SING_PutObj;
   get_op_ = new RGWGetObjLayout_SING;
 
   
-  assert(put_op_ && get_op_);
+  assert(get_op_);
 
 
   // initialize the operations for future
   // use
-  put_op_->init(store, state, dialect_handler);
   get_op_->init(store, state, dialect_handler);
 
   
@@ -552,8 +562,294 @@ RGWPutObj_ObjStore_SING::init(RGWRados* store, struct req_state* state,
 
 
 
+int 
+RGWPutObj_ObjStore_SING::create_bucket() const
+{
+
+  // create an object of the SING_CreateBucket class
+  // so that it would handle the creation procedure
+  auto op_ptr = new RGWPutObj_ObjStore_SING::SING_CreateBucket;
+  assert(op_ptr);
+
+  // initialize the object
+  op_ptr->init(store, s, dialect_handler); 
+
+
+  s->op_type = op_ptr->get_type();
+
+  int res = op_ptr->init_processing();
+  if(res < 0)
+  {
+    goto done_bucket;
+  }
+
+  res = op_ptr->verify_permission();
+  if(res < 0)
+  {
+    goto done_bucket;
+  }
+
+  res = op_ptr->verify_params();
+  if(res < 0)
+  {
+   goto done_bucket;
+  }
+
+  op_ptr->pre_exec();
+  op_ptr->execute();
+  op_ptr->complete();
+
+
+  res = op_ptr->get_ret();
+
+
+done_bucket:
+
+
+  // clean up the operation
+  delete op_ptr;
+  op_ptr = nullptr;
+
+  // reset the opearation type  
+  s->op_type = RGWPutObj_ObjStore::get_type();
+
+
+  // return the result of creation
+  return res;
+
+}
+
+
+
+int
+RGWPutObj_ObjStore_SING::verify_permission()
+{
+  if(!bucket_exists)
+  {
+    op_ret = -404; // not found
+    return -404;
+  }
+
+  int res = RGWPutObj_ObjStore::verify_permission();
+  if (res < 0)
+  {
+    op_ret = -EPERM;
+    return -EPERM;
+  }
+
+
+  return 0; // success
+}
+
+
+int
+RGPutObj_ObjStore_SING::pre_exec() 
+{
+
+  return RGWPutObj_ObjStore::pre_exec();
+}
+
+
+
+uint64_t
+RGWPutObj_ObjStore_SING::get_obj_size()
+{
+
+  uint64_t res_len = 0;
+
+  if(s->content_length <=0)
+  {
+    return 0; // no content
+  }
+
+  
+  const size_t need_read = static_cast<size_t>(s->content_length);
+
+  if(need_read > MAX_INT_VAL)
+  {
+    return 0; // too big content
+  }  
+
+  size_t left_read = need_read;
+
+  char* json_buffer = new char[need_read]; // need to read
+
+  size_t read = 0;
+  int len = 0;
+
+  while(left_read)
+  {
+    len = recv_body(s, (json_buffer+read), left_read);
+
+    if(len < 0)
+    {
+      goto end_read_json;
+    }
+   
+    // cast int to size_t
+    const size_t got_data = static_cast<const size_t>(len);
+
+
+    // update read for pointers
+    read += got_data;
+    if(got_data > left_read)
+    {
+      break;
+    }
+
+    left_read -= got_data;
+
+  }// while
+  
+
+  // decode the char array into a JSON object.
+  JSONParser parser;
+  
+  bool ret = parser.parse(json_buffer, static_cast<int>(need_read));
+  
+  if(!ret)
+  {
+    goto end_read_json; 
+  }
+
+
+  auto iter = parser.find_first("Result"); // find a JSON
+                                           // object that 
+                                           // encapsultes 
+                                           // object size
+  if(iter.end())
+  { // did not find
+    goto end_read_json;
+  }
+
+  auto obj_size = iter->find_first("Object_Size"); // look for 
+                                                   // object size
+
+  if(obj_size.end())
+  {
+    goto end_read_json;
+  }
+
+  unsigned long long size_val = 0ULL;
+
+  decode_json_obj(size_val, *obj_size);
+
+  // cast to uint64_t
+  res_len = static_cast<uint64_t>(size_val);
+
+  
+
+end_read_json:
+  delete[] json_buffer;
+  
+  return res_len;  
+
+
+
+}
+
+void 
+RGWPutObj_ObjStore_SING::execute()
+{
+  
+  // retrieve data stored in the body
+  // of the request
+
+  const uint64_t obj_size = get_obj_size();
+
+  if (obj_size == 0)
+  {
+    op_ret = -ERR_TOO_SMALL;
+    return;
+  }
+
+
+  op_ret = store->check_quota(s->bucket_owner.get_id(), s->bucket,
+                              user_quota, bucket_quota, obj_size);
+
+  if(op_ret < 0)
+  {
+
+   ldout(s->cct, 20) << "checked_quota() returned ret=" 
+                     << op_ret << dendl;
+ 
+
+   op_ret = -ERR_QUOTA_EXCEEDED;
+   return;
+  }
+
+  op_ret = store->check_bucket_shards(s->bucket_info, s->bucket, 
+                                      bucket_quota);
+
+  if(op_ret < 0)
+  {
+
+    ldout(s->cct, 20) << "check_bucket_shards() returned ret="
+                      << op_ret << dendl; 
+
+    return; 
+  }
+  
+    
+  // checked all the options
+  s->op_type = get_op_->get_type(); 
+  get_op_->pre_exec();
+  get_op_->execute();
+
+  s->op_type = RGWPutObj_ObjStore::get_type(); // reset type
+}
+
+
+
+int 
+RGWPutObj_ObjStore_SING::init_processing()
+{
+
+  // first run the super class check in order
+  // to make sure that we proceed further
+  op_ret = RGWPutObj_ObjStore::init_processing();
+  
+  if(op_ret < 0)
+  {
+    return op_ret; // something went wrong
+  }
+
+
+  // now we need to check if the bucket which is 
+  // being accessed by the user exists or not
+  RGWObjectCtx  tmpCtx(store);
+  RGWBucketInfo tmpInfo;
+  const int res = store->get_bucket_info(tmpCtx, s->bucket_tenant,
+                                         s->bucket_name, tmpInfo,
+                                         nullptr, nullptr);
+
+  if(res < 0 && res != -ENOENT)
+  {
+    op_ret = res; // set the error code and return
+    return res; 
+  }
+
+  // check if need to create a bucket before processing further
+  if(res == -ENOENT)
+  {
+    const int tmp_res = create_bucket();
+    if (tmp_res  < 0)
+    { // error occurred
+      op_ret = tmp_res;
+      return tmp_res;
+    }
+  }
+  
+
+  bucket_exists = true; // the bucket must exist now
+
+  return 0; // successfully created a bucket or retrieved
+            // information about a bucket 
+
+}
+
 void
-RGWPutObj_ObjStore_SING::do_empty_response() const
+RGWPutObj_ObjStore_SING::do_empty_response()
 {
 
   RGWObjManifest manifest;
@@ -588,7 +884,7 @@ RGWPutObj_ObjStore_SING::send_response()
   {
     get_op_->send_response(); // reuse the response
   }
-  else // not layout exists
+  else // no layout exists
   {
     do_empty_response();
   }
