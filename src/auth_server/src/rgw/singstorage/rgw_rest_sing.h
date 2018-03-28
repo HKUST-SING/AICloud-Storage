@@ -19,7 +19,7 @@ class RGWHandler_REST_SING : public RGWHandler_REST {
   friend class RGWRESTMgr_SING;
   friend class RGWRESTMgr_SING_Info;
 
-  static constexpr const std::string STORAGE_PREFIX = "sing";  
+  static constexpr const std::string STORAGE_PREFIX("sing");  
 
 protected:
   const rgw::auth::Strategy& auth_strategy;
@@ -101,7 +101,7 @@ class RGWHandler_REST_Bucket_SING : public RGWHandler_REST_SING
 
 
 
-class RGWHandler_REST_Obj_SING : public RGHandler_REST_SING
+class RGWHandler_REST_Obj_SING : public RGWHandler_REST_SING
 {
 
   protected:
@@ -140,10 +140,11 @@ class RGWHandler_REST_Obj_SING : public RGHandler_REST_SING
 class RGWHandler_REST_SING_Info : public RGWHandler_REST_SING {
 public:
   using RGWHandler_REST_SING::RGWHandler_REST_SING;
-  ~RGWHandler_REST_SING_Info() override = default;
+  ~RGWHandler_REST_SING_Info() override {}
 
   RGWOp *op_get() override {
-    return new RGWInfo_ObjStore_SING();
+    //return new RGWInfo_ObjStore_SING();
+    return nullptr;
   }
 
   int init(RGWRados* const store,

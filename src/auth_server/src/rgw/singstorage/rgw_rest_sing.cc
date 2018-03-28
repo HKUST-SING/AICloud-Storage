@@ -321,7 +321,7 @@ RGWRESTMgr_SING::get_handler(struct req_state* const s,
     return nullptr;
   }
 
-  const auto& auth_strategy = auth_registry.get_sing();
+  //const auto& auth_strategy = auth_registry.get_sing();
 
   if (s->init_state.url_bucket.empty() || s->object.empty()) 
   {
@@ -923,6 +923,8 @@ RGWHandler_REST* RGWRESTMgr_SING_Info::get_handler(
   const std::string& frontend_prefix)
 {
   s->prot_flags |= RGW_REST_SWIFT;
-  const auto& auth_strategy = auth_registry.get_sing();
-  return new RGWHandler_REST_SING_Info(auth_strategy);
+  //const auto& auth_strategy = auth_registry.get_sing();
+
+   return nullptr;
+  //return new RGWHandler_REST_SING_Info(auth_strategy);
 }
