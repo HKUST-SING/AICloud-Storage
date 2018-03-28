@@ -11,7 +11,6 @@
 #include "../rgw_op.h"
 #include "../rgw_rest.h"
 #include "../rgw_auth.h"
-#include "../rgw_auth_filters.h"
 #include <utility>
 
 namespace rgw {

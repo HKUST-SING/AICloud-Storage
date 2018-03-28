@@ -15,18 +15,18 @@ namespace singstorage
     */
 
 
-    public:
-   
-    using sing_err_t = constexpr const uint64_t;
+      using sing_err_t = const uint64_t;
 
-    /* Internal SING ERROR Codes */
-    static sing_err_t INERNAL_ERR    = 255;
-    static sing_err_t SUCCESS        =   0;
-    static sing_err_t USER_ERR       =   1; // no such user
-    static sing_err_t PASSWD_ERR     =   2; // wrong password
-    static sing_err_t PATH_NOT_FOUND =   3; // path not found
-    static sing_err_t ACL_ERR        =   4; // ACL error
-    static sing_err_t QUOTA_ERR      =   5; // quota error 
+    public:
+
+      /* Internal SING ERROR Codes */
+      static sing_err_t INERNAL_ERR    = 255;
+      static sing_err_t SUCCESS        =   0;
+      static sing_err_t USER_ERR       =   1; // no such user
+      static sing_err_t PASSWD_ERR     =   2; // wrong password
+      static sing_err_t PATH_NOT_FOUND =   3; // path not found
+      static sing_err_t ACL_ERR        =   4; // ACL error
+      static sing_err_t QUOTA_ERR      =   5; // quota error 
    
 
   }; // class SingErrorCode
