@@ -29,13 +29,17 @@
 #include <sstream>
 #include <memory>
 #include <limits>
+#include <cstdlib>
 
 #include <boost/utility/string_ref.hpp>
 
 
+#define SING_HTTP_OK 200
+
 // get maximum interger value
 static constexpr const size_t MAX_INT_VAL = static_cast<const size_t>(std::numeric_limits<int>::max());
 
+static constexpr const string SING_SHADOW_NS = RGW_OBJ_NS_SHADOW;
 
 // default data bucket name
 // for testing is enough
@@ -260,7 +264,7 @@ int RGWHandler_REST_SING::init_from_header(struct req_state* const s,
   s->init_state.url_bucket = first;
 
   s->object =
-      rgw_obj_key(req, s->info.env->get("HTTP_X_OBJECT_VERSION_ID", "")); /* rgw sing extension */
+      rgw_obj_key(req); /* rgw sing extension */
   s->info.effective_uri.append("/" + s->object.name);
   
 
@@ -321,7 +325,7 @@ RGWRESTMgr_SING::get_handler(struct req_state* const s,
     return nullptr;
   }
 
-  //const auto& auth_strategy = auth_registry.get_sing();
+  const auto& auth_strategy = auth_registry.get_sing();
 
   if (s->init_state.url_bucket.empty() || s->object.empty()) 
   {
@@ -440,16 +444,21 @@ RGWDeleteObj_ObjStore_SING::send_response()
 static uint64_t
 RGWGetObjLayout_SING::get_sing_error(const int sys_error)
 {
-  switch(sys_error)
+
+  const int check_err = std::abs(sys_error);
+
+  switch(check_err)
   {
-    case -EPERM:
+    case EPERM:
     {
       return rgw::singstorage::SingErrorCode::ACL_ERR;
     }
   
-    case -EACCES:
+    case EACCES:
+    case ERR_NO_SUCH_BUCKET:
+    case ENOENT:
     {
-      return  rgw:;singstorage::SingErrorCode::PATH_NOT_FOUND;
+      return  rgw::singstorage::SingErrorCode::PATH_NOT_FOUND;
 
     }
 
@@ -468,8 +477,18 @@ RGWGetObjLayout_SING::send_response()
   assert(tranID);
   
   dump_header(s, "HTTP_X_TRAN_ID", tranID);
-  set_req_state_err(s, op_ret);
-  dump_errno(op_ret);
+  
+  if(manifest && op_ret >=0)
+  {
+    set_req_state_err(s, SING_HTTP_OK);
+    dump_errno(s);
+  }
+  
+
+  else{
+    set_req_state_err(s, op_ret);
+    dump_errno(s);
+  }
 
 
   s->formatter->open_object_section("Result");
@@ -484,7 +503,33 @@ RGWGetObjLayout_SING::send_response()
   }
   else
   {
+
+    // get head object
+    rgw_raw_obj head_obj;
+    const bool ret_res = store->obj_to_raw(
+                      manifest->head_placement_rule,
+                      manifest->obj, &head_obj);     
+
+    if(!ret_res)
+    {
+       // some inernal error
+       s->formatter->dump_unsigned("Error_Type", 
+          rgw::singstorage::SINGErrorCode::INTERNAL_ERR);
+
+       return; 
+    }
+
+
+    // manifest for replying
+    s->formatter->open_object_section("Data_Manifest");
     manifest->dump(s->formatter); // encode as a JSON object
+    s->formatter->close_section();
+
+    // add raw object of the head
+    s->formatter->open_object_section("Head_Object");
+    head_obj.dump(s->formatter); // encode as a JSON
+    s->formatter->close_section(); // close Head_Object
+
   }
 
   s->formatter->close_section(); // close JSON object
@@ -493,49 +538,6 @@ RGWGetObjLayout_SING::send_response()
   end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
 
 }
-
-int
-RGWPutObj_ObjStore_SING::check_bucket()
-{
-  RGWAccessControlPolicy  buck_acl(s->cct);
-  RGWAccessControlPolicy* buck_acl_ptr;
-  optional<Policy>        buck_policy;
-  optional<Policy>*       buck_policy_ptr;
-
-  RGWBucketInfo           buck_info;
-  RGWBucketInfo*          buck_info_ptr;
-
-  
-
-  // try to retreive infomration about the bucket
-  RGWObjCtx  obj_ctx(store);
-  map<string, bufferlist> buck_attrs;
-
-  // this may fail since the bucket may not be created yet
-  int res = store->get_bucket_info(obj_ctx, s->user->user_id.tenant,
-                   s->bucket_name, buck_info, nullptr, 
-                   &buck_attrs);
-
-
-  if (res < 0)
-  {
-    ldout(s->cct, 0) << "could not get bucket info for bucket="
-                    <<  s->bucket_name << dendl;
-
-    return res;
-  }
-
-
-  rgw_bucket bucket   =   buck_info.bucket;
-  buck_info_ptr       =   &buck_info;
-  buck_acl_ptr        =   &buck_acl;
-
-
-  res 
-
-
-}
-
 
 
 void
@@ -627,6 +629,9 @@ RGWPutObj_ObjStore_SING::verify_permission()
   if(!bucket_exists)
   {
     op_ret = -404; // not found
+
+    sing_err = sing_err_name::PATH_NOT_FOUND;
+
     return -404;
   }
 
@@ -634,6 +639,9 @@ RGWPutObj_ObjStore_SING::verify_permission()
   if (res < 0)
   {
     op_ret = -EPERM;
+    
+    sing_err = sing_err_name::ACL_ERR;
+
     return -EPERM;
   }
 
@@ -643,7 +651,7 @@ RGWPutObj_ObjStore_SING::verify_permission()
 
 
 int
-RGPutObj_ObjStore_SING::pre_exec() 
+RGWPutObj_ObjStore_SING::pre_exec() 
 {
 
   return RGWPutObj_ObjStore::pre_exec();
@@ -656,9 +664,11 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 {
 
   uint64_t res_len = 0;
+  sing_err = sing_err_name::INTERNAL_ERR;
 
   if(s->content_length <=0)
-  {
+  { 
+    sing_err = sing_err_name::SMALL_ERR;
     return 0; // no content
   }
 
@@ -667,6 +677,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
   if(need_read > MAX_INT_VAL)
   {
+    sing_err = sing_err_name::LARGE_ERR;
     return 0; // too big content
   }  
 
@@ -674,12 +685,12 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
   char* json_buffer = new char[need_read]; // need to read
 
-  size_t read = 0;
+  size_t read_bytes = 0;
   int len = 0;
 
   while(left_read)
   {
-    len = recv_body(s, (json_buffer+read), left_read);
+    len = recv_body(s, (json_buffer+read_bytes), left_read);
 
     if(len < 0)
     {
@@ -691,7 +702,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
 
     // update read for pointers
-    read += got_data;
+    read_bytes += got_data;
     if(got_data > left_read)
     {
       break;
@@ -738,6 +749,8 @@ RGWPutObj_ObjStore_SING::get_obj_size()
   res_len = static_cast<uint64_t>(size_val);
 
   
+  // no errors
+  sing_err = sing_err_name::SUCCESS;
 
 end_read_json:
   delete[] json_buffer;
@@ -760,6 +773,16 @@ RGWPutObj_ObjStore_SING::execute()
   if (obj_size == 0)
   {
     op_ret = -ERR_TOO_SMALL;
+  
+    return;
+  }
+
+  if(obj_size > s->cct->_conf->rgw_max_put_size)
+  {
+    op_ret = -ERR_TOO_LARGE;
+   
+    sing_err = sing_err_name::LARGE_ERR; // too large object
+
     return;
   }
 
@@ -773,6 +796,7 @@ RGWPutObj_ObjStore_SING::execute()
    ldout(s->cct, 20) << "checked_quota() returned ret=" 
                      << op_ret << dendl;
  
+   sing_err = sing_err_name::QUOTA_ERR;
 
    op_ret = -ERR_QUOTA_EXCEEDED;
    return;
@@ -783,6 +807,8 @@ RGWPutObj_ObjStore_SING::execute()
 
   if(op_ret < 0)
   {
+
+    sing_err = sing_err_name::QUOTA_ERR;
 
     ldout(s->cct, 20) << "check_bucket_shards() returned ret="
                       << op_ret << dendl; 
@@ -797,6 +823,10 @@ RGWPutObj_ObjStore_SING::execute()
   get_op_->execute();
 
   s->op_type = RGWPutObj_ObjStore::get_type(); // reset type
+
+  // keep the value of data to write
+  data_size = obj_size; // need for creating stripes
+
 }
 
 
@@ -811,20 +841,26 @@ RGWPutObj_ObjStore_SING::init_processing()
   
   if(op_ret < 0)
   {
+    sing_err = sing_err_name::INTERNAL_ERR;
     return op_ret; // something went wrong
   }
 
 
   // now we need to check if the bucket which is 
   // being accessed by the user exists or not
-  RGWObjectCtx  tmpCtx(store);
-  RGWBucketInfo tmpInfo;
-  const int res = store->get_bucket_info(tmpCtx, s->bucket_tenant,
-                                         s->bucket_name, tmpInfo,
-                                         nullptr, nullptr);
+  //RGWObjectCtx  tmpCtx(store);
+  RGWObjectCtx* tmpPtr = static_cast<RGWObjectCtx*>(s->obj_ctx);
+
+  const int res = store->get_bucket_info(
+                  *tmpPtr, 
+                  s->bucket_tenant,
+                  s->bucket_name, s->bucket_info,
+                  nullptr, nullptr);
 
   if(res < 0 && res != -ENOENT)
   {
+
+    sing_err = sing_err_name::ACL_ERR;
     op_ret = res; // set the error code and return
     return res; 
   }
@@ -832,11 +868,28 @@ RGWPutObj_ObjStore_SING::init_processing()
   // check if need to create a bucket before processing further
   if(res == -ENOENT)
   {
-    const int tmp_res = create_bucket();
-    if (tmp_res  < 0)
+    op_ret = create_bucket();
+    if (op_ret  < 0)
     { // error occurred
-      op_ret = tmp_res;
-      return tmp_res;
+    
+      sing_err = sing_err_name::ACL_ERR;
+
+      return op_ret;
+    }
+    else 
+    { // retry to retrieve bucket info
+
+      op_ret = store->get_bucket_info(
+                              *tmpPtr, s->bucket_tenant,
+                              s->bucket_name, s->bucket_info,
+                              nullptr, nullptr);
+
+      if(op_ret < 0)
+      {
+        sing_err = sing_err_name::INTERNAL_ERR;
+        return op_ret;
+      }
+
     }
   }
   
@@ -848,28 +901,216 @@ RGWPutObj_ObjStore_SING::init_processing()
 
 }
 
+
 void
-RGWPutObj_ObjStore_SING::do_empty_response()
+RGWPutObj_ObjStore_SING::do_error_response()
 {
-
-  RGWObjManifest manifest;
-  // send an empty manifest
-
-
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
   assert(tranID);
   
   dump_header(s, "HTTP_X_TRAN_ID", tranID);
-  set_req_state_err(s, STATUS_CREATED);
-  dump_errno(STATUS_CREATED);
+  set_req_state_err(s, op_ret);
+  dump_errno(s);
 
 
   s->formatter->open_object_section("Result");
+  s->dump_unsigned("Error_Type", sing_err);
+  s->formatter->close_section(); // close JSON object
+
+  // send the body
+  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+
+
+}
+
+
+int
+RGWPutObj_ObjStore_SING::create_temp_manifest()
+{}
+
+
+void
+RGWPutObj_ObjStore_SING::do_empty_response()
+{
+
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  assert(tranID);
+  op_ret = STATUS_CREATED;
+  
+  dump_header(s, "HTTP_X_TRAN_ID", tranID);
+  set_req_state_err(s, STATUS_CREATED);
+  dump_errno(s);
+
+
+  s->formatter->open_object_section("Result");
+
+  // inform the user that the layout has to be
+  // filled
+
   manifest.dump(s->formatter); // encode as a JSON object
   s->formatter->close_section(); // close JSON object
 
   // send the body
   end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+}
+
+
+
+
+int
+RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
+                         rgw_raw_obj& obj,
+                         uint64_t& offset,
+                         uint64_t& stipe_size)
+{
+
+  // get starting offset
+  offset = manifest.get_obj_size(); // current object size
+  
+
+  const bool conv_op = store->rgw_obj_to_raw(
+             manifest.get_head_placement_rule(),
+             manifest.get_obj(), obj);
+
+  if(!conv_op) // some error occured
+  {
+    sing_err = sing_err_name::INTERNAL_ERR;
+    return -ERR_INVALID_OBJECT_NAME; 
+  }
+
+  // update the object size value
+  //const uint64_t new_obj_size = manifest.get_obj_size() + data_size;
+  // update object size
+  //manifest.set_obj_size(new_obj_size);
+
+
+  // success
+  RGWObjManifestRule rule;
+  const bool found = manifest.get_rule(0, &rule);
+
+
+  if(!found)
+  {
+    derr << "ERROR: manifest->get_rule could not find rule" << dendl;
+    // use the maximum head size
+    stripe_size = manifest.get_max_head_size();
+  }
+  else
+  {
+    stripe_size = rule.stripe_max_size; // maximum Rados obj size
+  }
+
+  return 0;
+}
+
+
+
+void
+RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest,
+                         const rgw_raw_obj& prefix_obj,
+                         const string&  tail_path,
+                         const uint64_t data_offset,
+                         const uint64_t max_rados_size)
+
+{
+
+ const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  assert(tranID);
+  
+  dump_header(s, "HTTP_X_TRAN_ID", tranID);
+  
+  // no errors occurred
+  // send a manifest
+  set_req_state_err(s, SING_HTTP_OK);
+  dump_errno(s);
+
+
+  // 'Result' field
+  s->formatter->open_object_section("Result");
+
+  // 'Data_Manifest' field
+  s->formatter->open_object_section("Data_Manifest");  
+
+  manifest.dump(s->formatter); // encode as a JSON object
+  
+  // close 'Data_Manifest' field
+  s->formatter->close_section();
+
+
+  // 'Head_Object' field
+  s->formatter->open_object_section("Head_Object");
+  prefix_obj.dump(s->formatter); // encode as a JSON
+  s->formatter->close_section(); // close Head_Object
+
+  // 'Tail_Prefix'
+  s->formatter->dump_string("Tail_Prefix", tail_path);
+
+  // 'Data_Offset' field
+  s->formatter->dump_unsigend("Data_Offset", data_offset);
+  
+  // 'Max_Rados_Size' field
+  s->formatter->dump_unsigned("Max_Rados_Size", max_rados_size);
+
+
+  // close 'Result' field
+  s->formatter->close_section(); // close JSON object
+
+  // send the body
+  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+
+}
+
+
+int
+RGWPutObj_ObjStore_SING::build_tail_path(const rgw_raw_obj& head_obj,
+                              const string& tail_prefix,
+                              string& tail_path)
+{
+
+  // Get the object path used for  
+  // creating new Rados objects. 
+  // The path contains bucket_marker, maybe_namespace, and then tail
+  // prefix
+
+  std::stringstream build_path; // path value
+  const string& oid_val = head_obj.oid;
+
+  auto pos_val = oid_val.find("_");
+ 
+  if(pos_val == std::string::npos)
+  { // undescore not found
+  
+    sing_err = sing_err_name::INTERNAL_ERR;
+    return -ERR_INVALID_OBJECT_NAME;
+
+  }
+ 
+  // found the bucket marker
+  // look for shadow namespace
+  auto pos_ns = oid_val.find(SING_SHADOW_NS);
+
+  if(pos_ns == std::string::npos)
+  { // need to append the namespace
+    build_path << std::move(oid_val.substr(0, pos_val)) 
+               << SING_SHADOW_NS << tail_prefix;
+  }
+  else // it has been found in the string
+  {
+    decltype(oid_val.length()) end_idx = pos_ns + SING_SHADOW_NS.length();
+   
+    // read everything from 0 till end_idx
+    build_path << std::move(oid_val.substr(0, end_idx))
+               << tail_prefix;
+ 
+  }
+
+
+  
+
+  // done building the path
+  tail_path = std::move(build_path.str()); // return the string
+  
+  return 0;
 }
 
 
@@ -879,16 +1120,211 @@ RGWPutObj_ObjStore_SING::send_response()
  
   // check which version to use for sending a request to
   // the client
-  if (get_op_->manifest) // means it has a data layout 
-                         // to send
+
+  // check if there was an error
+  if(op_ret < 0 || sing_err != sing_err_name::SUCCESS)
   {
-    get_op_->send_response(); // reuse the response
+    do_error_response();
   }
-  else // no layout exists
+  else
   {
-    do_empty_response();
-  }
+
+    rgw_raw_obj prefix_obj;
+    uint64_t str_offset;  // where to start writing data
+    uint64_t stripe_size; // Rados Obj maximum size
+    RGWObjManifest tmpManifest;
+    RGWObjManifest* man_ptr = &tmpManifest;
+    int res_code = 0;
+
+
+    if(get_op->manifest)
+    {
+      // succeeded in retrieving a manifest (data layout)
+      res_code = extend_manifest(*(get_op->manifest),
+                          prefix_obj, str_offset,
+                          stripe_size);
+
+      man_ptr = get_op->manifest; // set manifest to point
+                                  // to value
+
+    }
+    else
+    {
+       // create a new manifest
+       res_code = create_new_manifest(tmpManifest,
+                    prefix_obj, str_offset, stripe_size);
  
+
+    }
+
+
+    // check the return code
+    if(res_code < 0) // error occured
+    {
+      op_ret = res_code;
+
+      do_error_response();
+    }
+
+    else // manifest opeartion successfully completed
+    {
+      string tmp_tail;
+      res_code = build_tail_path(prefix_obj, man_ptr->get_prefix(),
+                      tmp_tail);
+
+       if(res_code < 0)
+       { // something wrong with the path
+         op_ret = res_code;
+         do_error_response();
+       }
+       else
+       {
+        do_send_response((*man_ptr), prefix_obj,
+                       tmp_tail, // tail path
+                       str_offset,
+                       stripe_size);
+
+      }
+    }
+
+
+ } // else
+  
+}
+
+
+int
+RGWPutObj_ObStore_SING::prepare_init(uint64_t* chunk_size, const rgw_obj& obj)
+{
+
+  const int res_code = store->get_max_chunk_size(
+            s->bucket_info.placement_rule,
+            obj, chunk_size);
+
+  if(res_code < 0)
+  {
+    return res_code;
+  }
+
+
+  return 0;
+}
+
+
+int
+RGWPutObj_Objstore_SING::init_manifest(CephContext* cct,
+                     RGWObjManifest* man_ptr, 
+                     const string& placement_rule, 
+                     rgw_bucket& bucket, 
+                     rgw_obj& obj)
+{
+  
+  man_ptr->set_tail_placement(placement_rule, bucket);
+  man_ptr->set_head(placement_rule, obj, 0);
+
+  // generate a random string for stroring the object
+  
+  char buf[33];
+  gen_rand_alphanumeric(cct, buf, sizeof(buf) - sizeof(char));
+  
+  // use the passed string for
+  // generting keys
+  
+  string = oid_prefix(".");
+  oid_prefix.append(buf);
+  oid_prefix.append("_");
+
+  /* TODO: Need to check if the generated object does not
+     exists yet */
+
+ 
+  man_ptr->set_prefix(oid_prefix);
+
+  man_ptr->set_tail_instance(obj.key.instance);
+  //man_ptr->set_obj_size(data_size); // initialize the size
+
+  man_ptr->update_iterators();
+
+
+ 
+  return 0;
+}
+
+
+
+
+int
+RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
+                                rgw_raw_obj& raw_obj,
+                                uint64_t& offset)
+{
+
+  // create a new manifest according to object name, bucket
+  // name and object size.
+  
+
+
+  rgw_obj head_obj; // create a head object  
+  head_obj.init(s->bucket, s->object.name);
+  head_obj.key.set_instance("");
+
+
+  uint64_t max_chunk_size = 0;
+  int res_code = prepare_init(&max_chunk_size, head_obj);
+
+  if(res_code < 0)
+  {
+    op_ret = res_code;
+    sing_err = sing_err_name::INTERNAL_ERR;
+    return res_code;
+  }
+
+  // set placement rules of the manifest
+  manifest.set_trivial_rule(max_chunk_size,
+                            store->ctx()->_conf->rgw_obj_stripe_size);
+
+
+  bool gen_again = false; // if the generated random
+                          // prefix does not overlap with
+                          // objects
+
+  do
+  {
+    res_code = init_manifest(store->ctx(), &manifest,
+                             s->bucket_info.placement_rule,
+                             head_obj.bucket,
+                             head_obj);
+ 
+    if(res_code < 0)
+    {
+      // some internal error with buckets
+      ldout(store->ctx(), 0) << "create_new_manifest: generaotr.create_begin"
+                           << dendl;
+      sing_err = sing_err_name::INTERNAL_ERR;
+      return res_code;
+    }
+
+
+    // initialized the manifest; create stripes for writing data
+    const conv_res =  store->obj_to_raw(
+                           manifest->head_placement_rule,
+                           manifest->obj, &raw_obj);
+
+    if(!con_res)
+    {   
+      sing_err = sing_err_name::INTERNAL_ERR;
+      return -ERR_INVALID_OBJECT_NAME;
+    } 
+
+
+  } while(gen_again); // try creating manifest until no overlaps found
+             
+
+
+  offset = 0; // start from the very beginning
+
+  return 0; // successfully created a manifest
+
 }
 
 

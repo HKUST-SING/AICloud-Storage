@@ -241,28 +241,64 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
         SING_CreateBucket() {}
         ~SING_CreateBucket() override {}
 
-        int get_params() override { return 0;};
+        int get_params() override 
+        {
+          policy.create_default(s->user->user_id, s->user->display_name);
+          return 0;
+        };
         void send_response() override {}
-    }; // class SING_CreateBucket    
+    }; // class SING_CreateBucket   
+ 
 
+   uint64_t data_size = 0; // data size to store in
+                           // the cluster
 
    // Pointers to the worker operation
-   RGWGetObjLayout_SING* get_op_ = nullptr; // get operation
-   bool bucket_exists            = false;   // does bucket exist?   
-      
- 
-   void do_empty_response();       // send an empty manifest to
-                                   // the client
+   RGWGetObjLayout_SING* get_op_{nullptr{; // get operation
+   bool bucket_exists{false};   // does bucket exist? 
+
+   using sing_err_name = rgw::singstorage::SINGErrorCode;  
+   uint64_t sing_err{sing_err_name::SUCCESS}; // SING specific error 
+   
+
+   void do_error_response();       // send an errno code
+
+   int extend_manifest(RGWObjManifest& manifest,
+                       rgw_raw_obj& obj,
+                       uint64_t& offset,
+                       uint64_t& stripe_size);         
+                                   // means the object
+                                   // already exists;
+                                   // need to extend the manifest
+
+   int create_new_manifest(RGWObjManifest& manifest,
+                           rgw_raw_obj& obj,
+                           uint64_t& offset,
+                           uint64_t& stripe_size);     
+                                   // new object ==> new manifest
+
+   int prepare_init(uint64_t* chunk_size, const rgw_obj& obj);
+   int build_tail_path(const rgw_raw_obj& write_obj, 
+                        const string& tail_prefix,
+                        string& tail_path);
+
+   // send the manifest to the worker
+   void do_send_response(const RGWObjManifest& manifest,
+                         const rgw_raw_obj& obj,
+                         const string& tail_path,
+                         const uint64_t str_offset,
+                         const uint64_t max_rados_size); 
+  
   
    uint64_t get_obj_size();        // retrieve object size
                                    // to be written
  
-   void create_temp_manifest() const {} // create and initialize
-                                        // manifest for user
 
-   int create_bucket() const; // try to create a bucket
+   int create_bucket();       // try to create a bucket
                               // if the required bucket does
                               // not exist.
+
+   
 
     
   public:

@@ -26,7 +26,9 @@ namespace singstorage
       static sing_err_t PASSWD_ERR     =   2; // wrong password
       static sing_err_t PATH_NOT_FOUND =   3; // path not found
       static sing_err_t ACL_ERR        =   4; // ACL error
-      static sing_err_t QUOTA_ERR      =   5; // quota error 
+      static sing_err_t QUOTA_ERR      =   5; // quota error
+      static sing_err_t LARGE_ERR      =   6; // object too big 
+      static sing_err_t SMALL_ERR      =   7; // object too small
    
 
   }; // class SingErrorCode
