@@ -30,6 +30,7 @@
 #include <memory>
 #include <limits>
 #include <cstdlib>
+#include <algorithm>
 
 #include <boost/utility/string_ref.hpp>
 
@@ -695,7 +696,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
     if(len < 0)
     {
-      goto end_read_json;
+      goto put_end_read_json;
     }
    
     // cast int to size_t
@@ -721,7 +722,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
   
   if(!ret)
   {
-    goto end_read_json; 
+    goto put_end_read_json; 
   }
 
 
@@ -731,7 +732,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
                                            // object size
   if(iter.end())
   { // did not find
-    goto end_read_json;
+    goto put_end_read_json;
   }
 
   auto obj_size = iter->find_first("Object_Size"); // look for 
@@ -739,7 +740,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
   if(obj_size.end())
   {
-    goto end_read_json;
+    goto put_end_read_json;
   }
 
   unsigned long long size_val = 0ULL;
@@ -753,7 +754,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
   // no errors
   sing_err = sing_err_name::SUCCESS;
 
-end_read_json:
+put_end_read_json:
   delete[] json_buffer;
   
   return res_len;  
@@ -923,44 +924,12 @@ RGWPutObj_ObjStore_SING::do_error_response()
 }
 
 
-int
-RGWPutObj_ObjStore_SING::create_temp_manifest()
-{}
-
-
-void
-RGWPutObj_ObjStore_SING::do_empty_response()
-{
-
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
-  assert(tranID);
-  op_ret = STATUS_CREATED;
-  
-  dump_header(s, "HTTP_X_TRAN_ID", tranID);
-  set_req_state_err(s, STATUS_CREATED);
-  dump_errno(s);
-
-
-  s->formatter->open_object_section("Result");
-
-  // inform the user that the layout has to be
-  // filled
-
-  manifest.dump(s->formatter); // encode as a JSON object
-  s->formatter->close_section(); // close JSON object
-
-  // send the body
-  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
-}
-
-
-
 
 int
 RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
                          rgw_raw_obj& obj,
                          uint64_t& offset,
-                         uint64_t& stipe_size)
+                         uint64_t& stripe_size)
 {
 
   // get starting offset
@@ -1344,6 +1313,85 @@ RGWPost_Manifest_SING::init(RGWRados* store,
 }
 
 
+
+void
+RGWPost_Manifest_SING::execute()
+{
+  // update the metadata field
+  if(!manifest || !obj_data_)
+  {
+    return; // don't do anything
+  }
+
+
+  // need to update the metadata 
+  // by issueing the write_meta method of the RGWRados::Object::Write
+  policy.create_default(s->user->user_id, s->user->display_name); // set the default policy 
+
+  
+  // make sure never write any data to the header object
+  RGWObjectCtx& obj_ctx = *(static_cast<RGWObjectCtx*>(s->obj_ctx));
+
+  obj_ctx.obj.set_atomic(manifest->get_obj());
+  RGWRados::Object op_target(store, s->bucket_info, *(static_cast<RGWObjectCtx*>(s->obj_ctx)), manifest->get_obj());
+  RGWRados::Object::Write obj_op(&op_target);
+
+  obj_op.meta.manifest     =  manifest;
+  obj_op.meta.remove_objs  =  nullptr; // nothing to remove
+  obj_op.meta.ptag         =  &s->req_id;
+  obj_op.meta.owner        =  s->owner.get_id();
+  obj_op.meta.flags        =  PUT_OBJ_CREATE;
+  obj_op.meta.modify_tail  =  false; // NOT SURE about this (now no need since the worker modifies)
+  obj_op.meta.completeMultipart = false; // no multipart
+  
+
+  // set some attributes
+  std::map<string, bufferlist> attrs;
+  bufferlist acl_bl; 
+  policy.encode(acl_bl);
+  attrs[RGW_ATTR_ACL] = acl_bl; //ACL attribute
+  op_ret = obj_op.write_meta(0, obj_data_, attrs);
+
+  if(op_ret < 0)
+  {
+    sing_err = sing_err_name::INTERNAL_ERR;
+  } 
+  
+}
+
+void
+RGWPost_Manifest_SING::send_response()
+{
+  
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  assert(tranID);
+  
+  dump_header(s, "HTTP_X_TRAN_ID", tranID);
+  
+  if(sing_err == sing_err_name::SUCCESS)
+  {
+    set_req_state_err(s, SING_HTTP_OK);
+    dump_errno(s);
+  }
+  
+  else // soemthing went wrong
+  {
+    set_req_state_err(s, op_ret);
+    dump_errno(s);
+  }
+
+
+  // 'Result' field
+  s->formatter->open_object_section("Result");
+  s->formatter->dump_unsigned("Error_Type", sing_err);
+  // close 'Result'
+  s->formatter->close_section(); 
+
+  // send a JSON response to the client
+  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+}
+
+
 int
 RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
 {
@@ -1435,11 +1483,6 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
   // decode the tail bucket
   tail_bucket.decode_json(*(man_tail_plc_itr->find_first("bucket")));
   
-  rgw_bucket_placement tmpBucketPlacement;
-  tmpBucketPlacement.placement_rule = std::move(man_tail_placement_rule);
-  tmpBucketPlacement.bucket         = std::move(tail_bucket);
-
-
 
   // final step is to decode the rules
   for(; !man_rules_itr.end(); ++man_rules_itr)
@@ -1462,16 +1505,20 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
   manifest = new RGWObjManifest_SING();
   assert(manifest);
 
-  // now use simple assignment to copy the values
-  manifest->explicit_objs = man_explicit_objs;
-  manifest->objs.swap(obj_parts);
-  manifest->obj_size      = static_cast<uint64_t>(man_obj_size);
-  manifest->head_size     = static_cast<uint64_t>(man_head_size);
-  manifest->max_head_size = static_cast<uint64_t>(man_max_head_size);
-  manifest->prefix.swap(man_prefix);
-  manifest->tail_instance.swap(man_tail_instance);
-  manifest->rules.swap(obj_rules);
-  manifest->tail_placement = std::move(tmpBucketPlacement);
+  // now set the values
+  // SING manifest methods
+  manifest->set_explicit_sing(man_explicit_obj);
+  manifest->set_objs_sing(std::move(obj_rules));
+  manifest->set_rules_sing(std::move(obj_rules));
+
+  // RGWObjmanifest methods
+  manifest->set_tail_placement(man_tail_placement_rule, tail_bucket);
+  manifest->set_prefix(man_prefix);
+  manifest->set_head_size(static_cast<uint64_t>(man_head_size));
+  manifest->set_obj_size(static_cast<uint64_t>(man_obj_size));
+  manifest->set_max_head_size(static_cast<uint64_t>(man_max_head_size));
+  manifest->set_tail_instance(man_tail_instance);
+
 
   // success
   sing_err = sing_err_name::SUCCESS;
@@ -1597,8 +1644,35 @@ RGWPost_Manifest_SING::decode_json_manifest()
    
 
   // set the object field to the decoded one
-  manifest->obj = std::move(rgw_obj(headBucket, headKey));
+  uint64_t tmp_head_size = manifest->get_head_size();
+  const string&  tmp_head_placement = manifest->get_tail_placement().placement_rule;
+  manifest->set_head(tmp_head_placement, rgw_obj(headBucket, headKey), tmp_head_size);
 
+
+  // get the old value of the data
+  unsigned long long completed_data = 0;  
+
+  try
+  {
+    JSONDecoder::decode_json("Data_offset", completed_data, *iter, true);
+  } catch(JSONDecoder::err& exp)
+  {
+    res_code = -ERR_NO_SUCH_UPLOAD;
+    goto post_end_read_json;
+  }
+
+
+  // calculate the written data size
+  const uint64_t read_size_val = static_cast<const uint64_t>(completed_data);
+  obj_data_ = (read_size_val < manifest->get_obj_size()) ?\
+                              (manifest->get_obj_size() - read_size_val):\
+                              0;
+
+  if(!ob_data_)
+  {
+    sing_err = sing_err_name::SMALL_ERR;
+    goto post_end_read_json;
+  }
 
   /******** DONE Decoding the Received Manifest ***********/
   

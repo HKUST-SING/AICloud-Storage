@@ -3,7 +3,9 @@
 
 #ifndef CEPH_RGW_REST_SING_H
 #define CEPH_RGW_REST_SING_H
-#define TIME_BUF_SIZE 128
+
+
+#include <utility>
 
 #include <boost/optional.hpp>
 #include <boost/utility/typed_in_place_factory.hpp>
@@ -186,6 +188,12 @@ public:
  * The following classes are used for creating/deleting
  * buckets and object. We only operate on the object
  * heads since the clients are supposed to uppload data.
+ *
+ * NOTICE: Since head objects are deleted every time a new
+ *         operation on the object is executed 
+ *         (see: RGWRados::Object::Write::write_meta),
+ *         for now we must ensure that we never
+ *         write raw data in the head object.
  */
 
 
@@ -384,15 +392,30 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
 
         ~RGWObjManifest_SING() = default; 
 
-       
+        void set_explicit_sing(const bool ex_val)
+        {
+          explicit_obj = ex_val;
+        }       
+
+        void set_objs_sing(std::map<uint64_t, RGWObjManifestPart>&& others)
+        { 
+          objs = std::move(others);
+        }
+
+       void set_rules_sing(std::map<uint64_t, RGWObjManifestRule>&& others)
+       {
+         rules = std::move(others);
+       } 
 
     }; // class RGWPbjManifest_SING
     RGWObjManifest_SING* manifest{nullptr};    
 
     // error code
     uint64_t sing_err{sing_err_name::SUCCESS};
-    
 
+    // data written to the cluster
+    uint64_t obj_data_{0};
+  
     int decode_json_manifest();
     int manifest_decoding(JSONObjIter& jitr);
 
