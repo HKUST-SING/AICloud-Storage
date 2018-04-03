@@ -117,7 +117,7 @@ class RGWHandler_REST_Obj_SING : public RGWHandler_REST_SING
     RGWOp *op_head() override { return nullptr; };
     RGWOp *op_put() override;
     RGWOp *op_delete() override;
-    RGWOp *op_post() override { return nullptr; };
+    RGWOp *op_post() override;
     RGWOp *op_options() override { return nullptr;};
 
 
@@ -334,5 +334,108 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
 
 }; // class RGWPutObj_ObjStore_SING
 
+
+
+class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
+{
+
+  private:
+    static constexpr const std::string EMPTY_STRING("");
+    
+    using sing_err_name = rgw::singstorage::SINGErrorCode;
+
+
+    // manifest for writing to the cluster
+    // ingerited version used for accessing internal
+    // manifest structures since they are 'protected'
+    struct RGWObjManifest_SING : public RGWObjManifest
+    {
+        RGWObjManifest_SING() 
+        : RGWObjManifest()
+        {}
+
+        RGWObjManifest_SING(const RGWObjManifest_SING& other)
+        : RGWObjManifest()
+        {
+          *this = other;
+        }
+
+        RGWObjManifest_SING& operator=(const RGWObjManifest_SING& other)
+        {
+          explicit_objs  =   other.explicit_objs;
+          objs           =   other.objs;
+          obj_size       =   other.obj_size;
+          obj            =   other.obj;
+          head_size      =   other.head_size;
+          max_head_size  =   other.max_head_size;
+          prefix         =   other.prefix;
+          tail_placement =   other.tail_placement;
+          rules          =   other.rules;
+          tail_instance  =   other.tail_instance;
+          
+          begin_iter.set_manifest(this);
+          end_iter.set_manifest(this);
+
+          begin_iter.seek(other.begin_iter.get_ofs());
+          end_iter.seek(other.end_iter.get_ofs());
+
+          return *this;
+        }
+
+        ~RGWObjManifest_SING() = default; 
+
+       
+
+    }; // class RGWPbjManifest_SING
+    RGWObjManifest_SING* manifest{nullptr};    
+
+    // error code
+    uint64_t sing_err{sing_err_name::SUCCESS};
+    
+
+    int decode_json_manifest();
+    int manifest_decoding(JSONObjIter& jitr);
+
+
+  protected:
+    std::string get_current_filename() const override
+    {
+      return RGWPost_Manifest_SING::EMPTY_STRING;
+    }
+
+   std::string get_current_content_type() const override
+   {
+     return RGWPost_Manifest_SING::EMPTY_STRING;
+   }
+
+   bool is_next_file_to_upload override {return false;}
+
+  public:
+  
+    RGWPost_Manifest_SING() {}
+    ~RGWPost_Manifest_SING override
+    {
+      if (manifest)
+      {
+        delete manifest;
+        manifest = nullptr;
+      }
+    }
+
+    int verify_permission() override { return 0;}
+    int get_params() override { return 0; } 
+    int get_data(ceph::bufferlist& bl, bool&again) { return 0;}
+    void init(RGWRados* store, struct req_state* state, 
+              RGWHandler* handler) override;
+
+
+    int init_processing() override;
+
+    void send_response() override;
+    void pre_exec() override {}
+    void execute() override;
+  
+
+}; // class RGWPost_Manifest_SING
 
 #endif

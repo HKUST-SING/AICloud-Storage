@@ -29,7 +29,7 @@ namespace singstorage
       static sing_err_t QUOTA_ERR      =   5; // quota error
       static sing_err_t LARGE_ERR      =   6; // object too big 
       static sing_err_t SMALL_ERR      =   7; // object too small
-   
+      static sing_err_t BODY_TYPE_ERR  =   8; // wrong content type
 
   }; // class SingErrorCode
 

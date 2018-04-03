@@ -524,9 +524,10 @@ RGWGetObjLayout_SING::send_response()
     s->formatter->open_object_section("Data_Manifest");
     manifest->dump(s->formatter); // encode as a JSON object
     s->formatter->close_section();
+    
 
     // add raw object of the head
-    s->formatter->open_object_section("Head_Object");
+    s->formatter->open_object_section("Head_Raw_Object");
     head_obj.dump(s->formatter); // encode as a JSON
     s->formatter->close_section(); // close Head_Object
 
@@ -743,7 +744,7 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
   unsigned long long size_val = 0ULL;
 
-  decode_json_obj(size_val, *obj_size);
+  ::decode_json_obj(size_val, *obj_size);
 
   // cast to uint64_t
   res_len = static_cast<uint64_t>(size_val);
@@ -756,8 +757,6 @@ end_read_json:
   delete[] json_buffer;
   
   return res_len;  
-
-
 
 }
 
@@ -1037,10 +1036,17 @@ RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest,
   s->formatter->close_section();
 
 
-  // 'Head_Object' field
+  // 'Head_Object' field (needed for later use when reply)
   s->formatter->open_object_section("Head_Object");
+  manifest.get_obj().dump(s->formatter);
+
+  s->formatter->close_section(); // close 'Head_Object'
+ 
+
+  // 'Head_Raw_Object' field
+  s->formatter->open_object_section("Head_Raw_Object");
   prefix_obj.dump(s->formatter); // encode as a JSON
-  s->formatter->close_section(); // close Head_Object
+  s->formatter->close_section(); // close Head_Raw_Object
 
   // 'Tail_Prefix'
   s->formatter->dump_string("Tail_Prefix", tail_path);
@@ -1328,6 +1334,349 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
 }
 
 
+void
+RGWPost_Manifest_SING::init(RGWRados* store, 
+                            struct req_state* state,
+                            RGWHandler* handler)
+{
+
+  RGWPostObj_Objstore::init(store, state, handler);
+}
+
+
+int
+RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
+{
+
+  // read the manifest from the JSON
+  // and try to decode it
+  // need to read the same order as formatter dumps
+
+  
+  sing_err = sing_err_name::BODY_TYPE_ERR;
+  
+  JSONObjIter itr = json_obj->find_first("objs");
+  
+  if(itr.end() || !itr->is_array())
+  {
+    
+    return -ERR_NO_SUCH_FILE_UPLOAD;
+  }
+
+
+  unsigned long long tmp_ofs, tmp_loc_ofs, tmp_size;
+  rgw_bucket  bucket_val;
+  rgw_obj_key key_val;
+  std::map<uint64_t, RGWObjManifestPart> obj_parts;
+
+  // read the maps for the manifest
+  for(; !objs_itr.end(); ++obj_itr)
+  { // decode all the parts
+    
+    try
+    { 
+      JSONDecoder::decode_json("ofs", tmp_ofs, *objs_itr, true);
+      auto part_itr = objs_itr->find_first("part");
+      auto loc_itr  = part_itr->find_first("loc");
+      
+      // location
+      auto bucket_itr = loc_itr->find_first("bucket");
+      bucket_val.decode_json(*bucket_itr);
+
+      auto key_itr = loc_itr->find_first("key");
+      key_val.decode_json(*key_itr);
+
+      // loc_ofs
+      JSONDecoder::decode_json("loc_ofs", tmp_loc_ofs, part_itr, true);
+      JSONDecoder::decode_json("size", tmp_size, part_itr, true);
+
+      // create a part
+      RGWObjManifestPart tmpPart;
+      tmpPart.loc = std::move(rgw_obj(bucket_val, key_val));
+      tmpPart.loc_ofs = static_cast<uint64_t>(tmp_loc_ofs);
+      tmpPart.size    = static_cast<uint64_t>(tmp_size);
+
+      // create a part
+      obj_parts[static_cast<uint64_t>(tmp_ofs)] = std::move(tmpPart);
+      
+
+    } catch(JSONDecoder::err& e)
+     {
+       return -ERR_NO_SUCH_FILE_UPLOAD;
+     }
+    
+  } // for (iterate over parts)
+
+  // parts have been created
+  unsigned long long man_obj_size, man_head_size, man_max_head_size;
+  bool man_explicit_objs;
+  std::string man_prefix, man_tail_instance, man_tail_placement_rule;
+  rgw_bucket tail_bucket;
+  std::map<uint64_t, RGWObjManifestRule> obj_rules;
+
+  try // try to decode the rest of manifest
+  {
+   auto man_tail_plc_itr = json_obj->find_first("tail_placement");
+   auto man_rules_itr    = json_obj->find_first("rules");
+
+   // start decoding
+   JSONDecoder::decode_json("obj_size", man_obj_size, *jsob_obj, true);
+   JSONDecoder::decode_Json("explicit_objs", man_explicit_objs, *json_obj, true);
+   JSONDecoder::decode_json("head_size", man_head_size, *json_obj, true);
+   JSONDecoder::decode_json("max_head_size", man_max_head_size, *json_obj, true);
+   JSONDecoder::decode_json("prefix", man_prefix, *json_obj, true);
+   JSONDeocder::decode_json("tail_instance", man_tail_instance, *json_obj, true);
+
+
+  // decode the placement rule and manifest rules
+  JSONDecoder::decode_json("placement_rule", man_tail_placement_rule,
+                            *man_tail_plc_itr, true);
+
+  // decode the tail bucket
+  tail_bucket.decode_json(*(man_tail_plc_itr->find_first("bucket")));
+  
+  rgw_bucket_placement tmpBucketPlacement;
+  tmpBucketPlacement.placement_rule = std::move(man_tail_placement_rule);
+  tmpBucketPlacement.bucket         = std::move(tail_bucket);
+
+
+
+  // final step is to decode the rules
+  for(; !man_rules_itr.end(); ++man_rules_itr)
+  {
+    // decode the rules
+    ::decode_json_obj(obj_rules, *man_rules_itr);
+  }
+
+  } catch (JSONDecoder::err& e)
+  {
+    return -ERR_NO_SUCH_FILE_UPLOAD;
+  }
+  
+
+  // all values have been decoded
+  // use them and initialize the manifest
+
+
+  // create a manifest
+  manifest = new RGWObjManifest_SING();
+  assert(manifest);
+
+  // now use simple assignment to copy the values
+  manifest->explicit_objs = man_explicit_objs;
+  manifest->objs.swap(obj_parts);
+  manifest->obj_size      = static_cast<uint64_t>(man_obj_size);
+  manifest->head_size     = static_cast<uint64_t>(man_head_size);
+  manifest->max_head_size = static_cast<uint64_t>(man_max_head_size);
+  manifest->prefix.swap(man_prefix);
+  manifest->tail_instance.swap(man_tail_instance);
+  manifest->rules.swap(obj_rules);
+  manifest->tail_placement = std::move(tmpBucketPlacement);
+
+  // success
+  sing_err = sing_err_name::SUCCESS;
+  
+  return 0;
+
+}
+
+int
+RGWPost_Manifest_SING::decode_json_manifest()
+{
+
+
+  sing_err = sing_err_name::INTERNAL_ERR;
+
+  if(s->content_length <=0)
+  { 
+    sing_err = sing_err_name::SMALL_ERR;
+    return -ERR_TOO_SMALL; // no content
+  }
+
+  
+  const size_t need_read = static_cast<size_t>(s->content_length);
+
+  if(need_read > MAX_INT_VAL)
+  {
+    sing_err = sing_err_name::LARGE_ERR;
+
+    return -ERR_TOO_LARGE; // too big content
+  }  
+
+
+  int res_code = -ERR_NO_SUCH_UPLOAD; // response code
+
+  size_t left_read = need_read;
+
+  char* json_buffer = new char[need_read]; // need to read
+
+  size_t read_bytes = 0;
+  int len = 0;
+
+  while(left_read)
+  {
+    len = recv_body(s, (json_buffer+read_bytes), left_read);
+
+    if(len < 0)
+    {
+      goto end_read_json;
+    }
+   
+    // cast int to size_t
+    const size_t got_data = static_cast<const size_t>(len);
+
+
+    // update read for pointers
+    read_bytes += got_data;
+    if(got_data > left_read)
+    {
+      break;
+    }
+
+    left_read -= got_data;
+
+  }// while
+  
+
+  // decode the char array into a JSON object.
+  JSONParser parser;
+  
+  bool ret = parser.parse(json_buffer, static_cast<int>(need_read));
+  
+  if(!ret)
+  {
+    goto post_end_read_json; 
+  }
+
+
+  auto iter = parser.find_first("Result"); // find a JSON
+                                           // object that 
+                                           // encapsultes 
+                                           // the manifest
+  if(iter.end())
+  { // did not find
+    goto post_end_read_json;
+  }
+
+  auto obj_mani = iter->find_first("Data_Manifest"); // look for 
+                                                     // manifest
+
+  if(obj_mani.end())
+  {
+    goto post_end_read_json;
+  }
+
+  
+
+  res_code = manifest_decoding(obj_mani);
+  
+  if(res_code < 0)
+  {
+    goto post_end_read_json;
+  }
+
+  // decode the object field of the manifest
+  rgw_obj_key headKey;
+  rgw_bucket  headBucket;
+
+  // 'Head_Object' field
+
+  auto head_iter = iter->find_first("Head_Object");
+  
+  // try to decode
+  try
+  {
+    headBucket.decode_json(*(head_iter->find_first("bucket")));
+    headKey.decode_json(*(head_iter->find_first("key")));
+
+  } catch(JSONDecoder::err& exp)
+  {
+    res_code = -ERR_NO_SUCH_UPLOAD;
+    goto post_end_read_json;
+  }
+   
+
+  // set the object field to the decoded one
+  manifest->obj = std::move(rgw_obj(headBucket, headKey));
+
+
+  /******** DONE Decoding the Received Manifest ***********/
+  
+  // no errors
+  sing_err = sing_err_name::SUCCESS;
+  res_code = 0; 
+
+
+post_end_read_json:
+  delete[] json_buffer;
+  
+  return res_code;  
+
+
+}
+
+
+
+int
+RGWPost_Manifest_SING::init_processing()
+{
+
+  int res_code = RGWPostObj_ObjStore::ini_processing();
+
+  if(res_code < 0)
+  {
+    sing_err = sing_err_name::INTERNAL_ERR;
+    
+    return res_code;
+  }
+
+
+  // read the body and try to decode into 
+  // a JSON object
+  
+  const char* content_type = s->info.env->get("CONTENT_TYPE", "");
+
+  if(!content_type)
+  {
+    sing_err = sing_err_name::BODY_TYPE_ERR;
+    op_ret = -ERR_INVALID_UTF8;
+
+    return -ERR_INVALID_UTF8;
+ 
+  }
+
+
+  std::string  type_str(content_type);
+  std::transform(type_str.begin(). type_str.end(), type_str.begin(),
+                 std::tolower); // transform to lower case first
+
+  auto find_json = type_str.find("json");
+
+  if(find_json == std::string::npos)
+  {
+    sing_err = sing_err_name::BODY_TYPE_ERR;
+    op_ret = -ERR_INVALID_UTF8;
+
+    return -ERR_INVALID_UTF8;
+  }
+
+  // read the body and get JSON object
+  res_code = decode_json_manifest();  
+  
+  if(res_code < 0)
+  {
+    op_ret = res_code;
+    return res_code;
+  }
+  
+
+  // successfully initialized the manifest 
+  return 0;
+
+}
+
+
+
 /********************* RGWOps End ***********************/
 
 
@@ -1350,6 +1699,12 @@ RGWOp*
 RGWHandler_REST_Obj_SING::op_put()
 {
   return new RGWPutObj_ObjStore_SING;
+}
+
+RGWOp*
+RGWHandler_REST_Obj_SING::op_post()
+{
+  return new RGWPost_Manifest_SING;
 }
 
 
