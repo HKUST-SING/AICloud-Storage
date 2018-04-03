@@ -1,6 +1,3 @@
-#ifndef CEPH_RGW_SINGSTORAGE_AUTH_H
-#define CEPH_RGW_SINGSTORAGE_AUTH_H
-
 /**
  * Class uses a very similar way of authenticating storage users
  * to the one used by the provided SWIFT implementation. In fact,
@@ -11,6 +8,8 @@
 #include "../rgw_client_io.h"
 #include "../rgw_http_client.h"
 #include "../rgw_rest.h"
+#include "../rgw_common.h"
+#include "../rgw_swift_auth.cc"
 #include "rgw_sing_auth.h"
 #include "rgw_sing_error_code.h"
 
@@ -21,6 +20,8 @@
 #define AUTH_PASS 0x02 // password is incorrect
 #define AUTH_ERR  0x10 // some internal error
 
+
+extern std::string extract_swift_subuser(const std::string&);
 
 namespace rgw {
 namespace auth {
@@ -109,7 +110,7 @@ SignedMachineEngine::authenticate(const std::string& token,
   // extract information from the token
   // (username and secret shared key)
 
-  std::pair<std::string, std::string> vals = std::move(extract_data(token));
+  std::pair<std::string, std::string> vals = std::move(extract_auth_data(token));
 
   // check if the parsed values are valid
   if(!vals.first.length() || !vals.second.length())
@@ -146,7 +147,7 @@ SignedMachineEngine::authenticate(const std::string& token,
   }
 
 
-  auto apl = apl_factory->create_apl_local(cct_, state, user_info,
+  auto apl = apl_factory_->create_apl_local(cct_, state, user_info,
                                            extract_swift_subuser(vals.first));
 
 

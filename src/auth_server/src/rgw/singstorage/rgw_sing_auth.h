@@ -1,6 +1,15 @@
 #ifndef CEPH_RGW_SINGSTORAGE_AUTH_H
 #define CEPH_RGW_SINGSTORAGE_AUTH_H
 
+
+#include "../rgw_op.h"
+#include "../rgw_rest.h"
+#include "../rgw_auth.h"
+#include "../rgw_auth_filters.h"
+#include <utility>
+
+
+
 /**
  * Class uses a very similar way of authenticating storage users
  * to the one used by the provided SWIFT implementation. In fact,
@@ -8,10 +17,6 @@
  */
 
 
-#include "../rgw_op.h"
-#include "../rgw_rest.h"
-#include "../rgw_auth.h"
-#include <utility>
 
 namespace rgw {
 namespace auth {
