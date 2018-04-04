@@ -12,8 +12,13 @@
 
 #include "../rgw_op.h"
 #include "../rgw_rest.h"
-#include "rgw_sing_auth.h"
 #include "../rgw_http_errors.h"
+#include "../rgw_common.h"
+
+
+#include "rgw_sing_auth.h"
+#include "rgw_sing_error_code.h"
+
 
 #include <boost/utility/string_ref.hpp>
 
@@ -21,7 +26,7 @@ class RGWHandler_REST_SING : public RGWHandler_REST {
   friend class RGWRESTMgr_SING;
   friend class RGWRESTMgr_SING_Info;
 
-  static constexpr const std::string STORAGE_PREFIX("sing");  
+  static const std::string STORAGE_PREFIX;  
 
 protected:
   const rgw::auth::Strategy& auth_strategy;
@@ -180,7 +185,8 @@ public:
   RGWHandler_REST *get_handler(struct req_state* s,
                                const rgw::auth::StrategyRegistry& auth_registry,
                                const std::string& frontend_prefix) override;
-};
+
+}; // class RGWHandler_REST
 
 
 
@@ -204,8 +210,10 @@ class RGWDeleteObj_ObjStore_SING : public RGWDeleteObj_ObjStore
 {
 
   public:
-    RGWDeleteObj_ObjStore_SING() {}
-    ~RGWDeleteObj_Objstore_SING() override {}
+    RGWDeleteObj_ObjStore_SING()
+    : RGWDeleteObj_ObjStore()
+    {}
+    ~RGWDeleteObj_ObjStore_SING() override {}
 
     int verify_permission() override;
     int get_params() override;
@@ -253,7 +261,8 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
         {
           policy.create_default(s->user->user_id, s->user->display_name);
           return 0;
-        };
+        }
+
         void send_response() override {}
     }; // class SING_CreateBucket   
  
@@ -262,10 +271,12 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
                            // the cluster
 
    // Pointers to the worker operation
-   RGWGetObjLayout_SING* get_op_{nullptr{; // get operation
+   RGWGetObjLayout_SING* get_op_{nullptr}; // get operation
    bool bucket_exists{false};   // does bucket exist? 
 
-   using sing_err_name = rgw::singstorage::SINGErrorCode;  
+   using sing_err_name   = rgw::singstorage::SINGErrorCode; 
+
+ 
    uint64_t sing_err{sing_err_name::SUCCESS}; // SING specific error 
    
 
@@ -290,8 +301,13 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
                         const string& tail_prefix,
                         string& tail_path);
 
+   int init_manifest(CephContext* cct, RGWObjManifest* man_ptr,
+                     const string& placement_rule,
+                     rgw_bucket& bucket,
+                     rgw_obj& obj);
+
    // send the manifest to the worker
-   void do_send_response(const RGWObjManifest& manifest,
+   void do_send_response(RGWObjManifest& manifest,
                          const rgw_raw_obj& obj,
                          const string& tail_path,
                          const uint64_t str_offset,
@@ -310,16 +326,18 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
 
     
   public:
-    RGWPutObj_ObjStore_SING() {}
+    RGWPutObj_ObjStore_SING() 
+    : RGWPutObj_ObjStore() 
+    {}
 
-    ~RGPPutObj_ObjStore_SING() override
+    ~RGWPutObj_ObjStore_SING() override
      {
        // release allocated resources
 
        if(get_op_)
        {
          delete get_op_;
-         det_op_ = nullptr;
+         get_op_ = nullptr;
        }
 
      }    
@@ -348,16 +366,18 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
 {
 
   private:
-    static constexpr const std::string EMPTY_STRING("");
-    
-    using sing_err_name = rgw::singstorage::SINGErrorCode;
+    static const std::string EMPTY_STRING;
+   
+    using sing_err_name = rgw::singstorage::SINGErrorCode; 
 
 
     // manifest for writing to the cluster
     // ingerited version used for accessing internal
     // manifest structures since they are 'protected'
-    struct RGWObjManifest_SING : public RGWObjManifest
+    class RGWObjManifest_SING : public RGWObjManifest
     {
+
+      public:
         RGWObjManifest_SING() 
         : RGWObjManifest()
         {}
@@ -370,22 +390,13 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
 
         RGWObjManifest_SING& operator=(const RGWObjManifest_SING& other)
         {
-          explicit_objs  =   other.explicit_objs;
-          objs           =   other.objs;
-          obj_size       =   other.obj_size;
-          obj            =   other.obj;
-          head_size      =   other.head_size;
-          max_head_size  =   other.max_head_size;
-          prefix         =   other.prefix;
-          tail_placement =   other.tail_placement;
-          rules          =   other.rules;
-          tail_instance  =   other.tail_instance;
+          // use pointers in order to call
+          // the assignment operator of the super class
+          RGWObjManifest* parent_ptr = static_cast<RGWObjManifest*>(this);
+          const RGWObjManifest* other_ptr  = static_cast<const RGWObjManifest*>(&other);
           
-          begin_iter.set_manifest(this);
-          end_iter.set_manifest(this);
-
-          begin_iter.seek(other.begin_iter.get_ofs());
-          end_iter.seek(other.end_iter.get_ofs());
+         // use the assignment operator of the parent
+         *parent_ptr = *other_ptr;
 
           return *this;
         }
@@ -394,7 +405,7 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
 
         void set_explicit_sing(const bool ex_val)
         {
-          explicit_obj = ex_val;
+          explicit_objs = ex_val;
         }       
 
         void set_objs_sing(std::map<uint64_t, RGWObjManifestPart>&& others)
@@ -405,6 +416,11 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
        void set_rules_sing(std::map<uint64_t, RGWObjManifestRule>&& others)
        {
          rules = std::move(others);
+       }
+
+       rgw_obj& get_obj_sing() 
+       {
+         return obj;
        } 
 
     }; // class RGWPbjManifest_SING
@@ -417,7 +433,7 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
     uint64_t obj_data_{0};
   
     int decode_json_manifest();
-    int manifest_decoding(JSONObjIter& jitr);
+    int manifest_decoding(JSONObj* jitr);
 
 
   protected:
@@ -431,12 +447,18 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
      return RGWPost_Manifest_SING::EMPTY_STRING;
    }
 
-   bool is_next_file_to_upload override {return false;}
+   bool is_next_file_to_upload() override 
+   {
+     return false;
+   }
 
   public:
   
-    RGWPost_Manifest_SING() {}
-    ~RGWPost_Manifest_SING override
+    RGWPost_Manifest_SING()
+    : RGWPostObj_ObjStore()
+    {}
+
+    ~RGWPost_Manifest_SING() override
     {
       if (manifest)
       {
@@ -455,7 +477,7 @@ class RGWPost_Manifest_SING : public RGWPostObj_ObjStore
     int init_processing() override;
 
     void send_response() override;
-    void pre_exec() override {}
+    void pre_exec() override { RGWPostObj_ObjStore::pre_exec();}
     void execute() override;
   
 

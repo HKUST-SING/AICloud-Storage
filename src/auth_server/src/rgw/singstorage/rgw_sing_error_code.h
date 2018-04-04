@@ -20,7 +20,7 @@ namespace singstorage
     public:
 
       /* Internal SING ERROR Codes */
-      static sing_err_t INERNAL_ERR    = 255;
+      static sing_err_t INTERNAL_ERR   = 255;
       static sing_err_t SUCCESS        =   0;
       static sing_err_t USER_ERR       =   1; // no such user
       static sing_err_t PASSWD_ERR     =   2; // wrong password

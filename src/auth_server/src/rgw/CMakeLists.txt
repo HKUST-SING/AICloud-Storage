@@ -38,6 +38,7 @@ function(gperf_generate input output)
     )
 endfunction()
 
+
 set(rgw_a_srcs
   rgw_acl.cc
   rgw_acl_s3.cc
@@ -124,8 +125,9 @@ set(rgw_a_srcs
   rgw_torrent.cc
   rgw_crypt.cc
   rgw_crypt_sanitize.cc
-  rgw_iam_policy.cc,
-  singstorage/rgw_sing_auth.cc)
+  rgw_iam_policy.cc
+  singstorage/rgw_sing_auth.cc
+  singstorage/rgw_rest_sing.cc)
 
 gperf_generate(${CMAKE_SOURCE_DIR}/src/rgw/rgw_iam_policy_keywords.gperf
   rgw_iam_policy_keywords.frag.cc)

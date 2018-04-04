@@ -9,7 +9,8 @@
 #include "../rgw_http_client.h"
 #include "../rgw_rest.h"
 #include "../rgw_common.h"
-#include "../rgw_swift_auth.cc"
+
+
 #include "rgw_sing_auth.h"
 #include "rgw_sing_error_code.h"
 
@@ -21,7 +22,14 @@
 #define AUTH_ERR  0x10 // some internal error
 
 
-extern std::string extract_swift_subuser(const std::string&);
+std::string extract_swift_subuser_sing(const std::string& swift_user_name) {
+  size_t pos = swift_user_name.find(':');
+  if (std::string::npos == pos) {
+    return swift_user_name;
+  } else {
+    return swift_user_name.substr(pos + 1);
+  }
+}
 
 namespace rgw {
 namespace auth {
@@ -148,7 +156,7 @@ SignedMachineEngine::authenticate(const std::string& token,
 
 
   auto apl = apl_factory_->create_apl_local(cct_, state, user_info,
-                                           extract_swift_subuser(vals.first));
+                 extract_swift_subuser_sing(vals.first));
 
 
   return result_t::grant(std::move(apl));
@@ -183,15 +191,15 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   string user_str;
   RGWUserInfo info;
   bufferlist bl; 
-  RGWAcessKey* sing_key;
+  RGWAccessKey* sing_key;
   map<string, RGWAccessKey>::iterator siter;
-
+  string tenant_path; // tenant path
 
 
 
   if(!key || !user) 
   {
-    goto done; // no authentication possible
+    goto done_get_sing_auth; // no authentication possible
   }
     
 
@@ -204,14 +212,14 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   {
     // internal error 
     err_code = rgw::singstorage::SINGErrorCode::INTERNAL_ERR; 
-    goto done;
+    goto done_get_sing_auth;
   }
 
 
   siter = info.swift_keys.find(user_str);
   if(siter == info.swift_keys.end()) // no such user found
   {
-    goto done;
+    goto done_get_sing_auth;
   }
 
 
@@ -221,25 +229,25 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   {
     //dout (0) << "NOTICE: RGW_SING_Auth_Get::execute(): bad singstorage key" << dendl;
     err_code = rgw::singstorage::SINGErrorCode::PASSWD_ERR;
-    goto done;
+    goto done_get_sing_auth;
   }
 
   // success
   ret = STATUS_ACCEPTED;
 
   // send the tenant path
-  std::string tenant_path;
+ 
   if(info.user_id.tenant.empty())
   {
     tenant_path = info.user_id.id;
+  }
   else
   {
     tenant_path = std::move(info.user_id.tenant + ":" + info.user_id.id);
   }
   
 
-
-done:
+done_get_sing_auth:
 
   // add the HTTP headers
   dump_header(s, "HTTP_X_TRAN_ID", tranID); 

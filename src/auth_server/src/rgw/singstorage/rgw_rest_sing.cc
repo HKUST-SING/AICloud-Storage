@@ -35,16 +35,80 @@
 #include <boost/utility/string_ref.hpp>
 
 
+#define dout_context g_ceph_context
+#define dout_subsys  ceph_subsys_rgw
+
 #define SING_HTTP_OK 200
 
 // get maximum interger value
 static constexpr const size_t MAX_INT_VAL = static_cast<const size_t>(std::numeric_limits<int>::max());
 
-static constexpr const string SING_SHADOW_NS = RGW_OBJ_NS_SHADOW;
+static const string SING_SHADOW_NS = RGW_OBJ_NS_SHADOW;
+
+const std::string RGWHandler_REST_SING::STORAGE_PREFIX = "sing";
+const std::string RGWPost_Manifest_SING::EMPTY_STRING  =   "";
 
 // default data bucket name
 // for testing is enough
 #define DEFAULT_DATA_POOL "default.rgw.buckets.data"
+
+
+
+static void bulkdelete_respond(const unsigned num_deleted,
+                               const unsigned int num_unfound,
+                               const std::list<RGWBulkDelete::fail_desc_t>& failures,
+                               const int prot_flags,                  /* in  */
+                               ceph::Formatter& formatter)            /* out */
+{
+  formatter.open_object_section("delete");
+
+  string resp_status;
+  string resp_body;
+
+  if (!failures.empty()) {
+    int reason = ERR_INVALID_REQUEST;
+    for (const auto fail_desc : failures) {
+      if (-ENOENT != fail_desc.err && -EACCES != fail_desc.err) {
+        reason = fail_desc.err;
+      }
+    }
+    rgw_err err;
+    set_req_state_err(err, reason, prot_flags);
+    dump_errno(err, resp_status);
+  } else if (0 == num_deleted && 0 == num_unfound) {
+    /* 400 Bad Request */
+    dump_errno(400, resp_status);
+    resp_body = "Invalid bulk delete.";
+  } else {
+    /* 200 OK */
+    dump_errno(200, resp_status);
+  }
+
+  encode_json("Number Deleted", num_deleted, &formatter);
+  encode_json("Number Not Found", num_unfound, &formatter);
+  encode_json("Response Body", resp_body, &formatter);
+  encode_json("Response Status", resp_status, &formatter);
+
+  formatter.open_array_section("Errors");
+  for (const auto fail_desc : failures) {
+    formatter.open_array_section("object");
+
+    stringstream ss_name;
+    ss_name << fail_desc.path;
+    encode_json("Name", ss_name.str(), &formatter);
+
+    rgw_err err;
+    set_req_state_err(err, fail_desc.err, prot_flags);
+    string status;
+    dump_errno(err, status);
+    encode_json("Status", status, &formatter);
+    formatter.close_section();
+  }
+  formatter.close_section();
+
+  formatter.close_section();
+}
+
 
 
 
@@ -251,7 +315,8 @@ int RGWHandler_REST_SING::init_from_header(struct req_state* const s,
 
   next_tok(req, first, '/');
 
-  dout(10) << "ver=" << ver << " first=" << first << " req=" << req << dendl;
+  dout(10) << "first=" << first << " req=" << req << dendl;
+
   if (first.size() == 0 || req.size() == 0)
   {
     s->format = RGW_FORMAT_JSON;
@@ -398,7 +463,7 @@ RGWDeleteObj_ObjStore_SING::send_response()
 
   if(multipart_delete)
   {
-    end_header(s, this /* RGWop */, nullptr, /* contype */, CHUNKED_TRANSFER_ENCODING);
+    end_header(s, this /* RGWop */, nullptr /* contype */, CHUNKED_TRANSFER_ENCODING);
 
     if(deleter)
     {
@@ -442,7 +507,7 @@ RGWDeleteObj_ObjStore_SING::send_response()
 
 
 
-static uint64_t
+uint64_t
 RGWGetObjLayout_SING::get_sing_error(const int sys_error)
 {
 
@@ -452,19 +517,21 @@ RGWGetObjLayout_SING::get_sing_error(const int sys_error)
   {
     case EPERM:
     {
-      return rgw::singstorage::SingErrorCode::ACL_ERR;
+      return rgw::singstorage::SINGErrorCode::ACL_ERR;
     }
   
     case EACCES:
     case ERR_NO_SUCH_BUCKET:
     case ENOENT:
     {
-      return  rgw::singstorage::SingErrorCode::PATH_NOT_FOUND;
+      return  rgw::singstorage::SINGErrorCode::PATH_NOT_FOUND;
 
     }
 
    default:
-     return rgw::singstorage::SingErrorCode::INTERNAL_ERR; 
+     return rgw::singstorage::SINGErrorCode::INTERNAL_ERR; 
+
+  } // switch
 
 }
 
@@ -508,8 +575,8 @@ RGWGetObjLayout_SING::send_response()
     // get head object
     rgw_raw_obj head_obj;
     const bool ret_res = store->obj_to_raw(
-                      manifest->head_placement_rule,
-                      manifest->obj, &head_obj);     
+                      manifest->get_head_placement_rule(),
+                      manifest->get_obj(), &head_obj);     
 
     if(!ret_res)
     {
@@ -567,7 +634,7 @@ RGWPutObj_ObjStore_SING::init(RGWRados* store, struct req_state* state,
 
 
 int 
-RGWPutObj_ObjStore_SING::create_bucket() const
+RGWPutObj_ObjStore_SING::create_bucket()
 {
 
   // create an object of the SING_CreateBucket class
@@ -581,22 +648,34 @@ RGWPutObj_ObjStore_SING::create_bucket() const
 
   s->op_type = op_ptr->get_type();
 
-  int res = op_ptr->init_processing();
-  if(res < 0)
+  int res_code = op_ptr->init_processing();
+ 
+  if(res_code < 0)
   {
-    goto done_bucket;
+    delete op_ptr;
+    op_ptr = nullptr;
+
+    return res_code;
   }
 
-  res = op_ptr->verify_permission();
-  if(res < 0)
+  res_code = op_ptr->verify_permission();
+ 
+  if(res_code < 0)
   {
-    goto done_bucket;
+    delete op_ptr;
+    op_ptr = nullptr;
+    
+    return res_code;
   }
 
-  res = op_ptr->verify_params();
-  if(res < 0)
+  res_code = op_ptr->verify_params();
+ 
+  if(res_code < 0)
   {
-   goto done_bucket;
+   delete op_ptr;
+   op_ptr = nullptr;
+
+   return res_code;
   }
 
   op_ptr->pre_exec();
@@ -604,10 +683,7 @@ RGWPutObj_ObjStore_SING::create_bucket() const
   op_ptr->complete();
 
 
-  res = op_ptr->get_ret();
-
-
-done_bucket:
+  res_code = op_ptr->get_ret();
 
 
   // clean up the operation
@@ -619,7 +695,7 @@ done_bucket:
 
 
   // return the result of creation
-  return res;
+  return res_code;
 
 }
 
@@ -652,11 +728,10 @@ RGWPutObj_ObjStore_SING::verify_permission()
 }
 
 
-int
+void
 RGWPutObj_ObjStore_SING::pre_exec() 
 {
-
-  return RGWPutObj_ObjStore::pre_exec();
+  RGWPutObj_ObjStore::pre_exec();
 }
 
 
@@ -696,7 +771,9 @@ RGWPutObj_ObjStore_SING::get_obj_size()
 
     if(len < 0)
     {
-      goto put_end_read_json;
+      // avoid using goto
+      delete[] json_buffer; 
+      return 0;
     }
    
     // cast int to size_t
@@ -719,10 +796,11 @@ RGWPutObj_ObjStore_SING::get_obj_size()
   JSONParser parser;
   
   bool ret = parser.parse(json_buffer, static_cast<int>(need_read));
-  
+ 
   if(!ret)
   {
-    goto put_end_read_json; 
+    delete[] json_buffer;
+    return 0;  
   }
 
 
@@ -732,18 +810,22 @@ RGWPutObj_ObjStore_SING::get_obj_size()
                                            // object size
   if(iter.end())
   { // did not find
-    goto put_end_read_json;
+    delete[] json_buffer;
+    return 0;
   }
 
-  auto obj_size = iter->find_first("Object_Size"); // look for 
+  auto obj_size = (*iter)->find_first("Object_Size"); // look for 
                                                    // object size
+
+
+  unsigned long long size_val = 0ULL; // for reading size
 
   if(obj_size.end())
   {
-    goto put_end_read_json;
+    delete[] json_buffer;
+    return 0;
   }
 
-  unsigned long long size_val = 0ULL;
 
   ::decode_json_obj(size_val, *obj_size);
 
@@ -753,8 +835,6 @@ RGWPutObj_ObjStore_SING::get_obj_size()
   
   // no errors
   sing_err = sing_err_name::SUCCESS;
-
-put_end_read_json:
   delete[] json_buffer;
   
   return res_len;  
@@ -914,7 +994,7 @@ RGWPutObj_ObjStore_SING::do_error_response()
 
 
   s->formatter->open_object_section("Result");
-  s->dump_unsigned("Error_Type", sing_err);
+  s->formatter->dump_unsigned("Error_Type", sing_err);
   s->formatter->close_section(); // close JSON object
 
   // send the body
@@ -936,9 +1016,9 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
   offset = manifest.get_obj_size(); // current object size
   
 
-  const bool conv_op = store->rgw_obj_to_raw(
+  const bool conv_op = store->obj_to_raw(
              manifest.get_head_placement_rule(),
-             manifest.get_obj(), obj);
+             manifest.get_obj(), &obj);
 
   if(!conv_op) // some error occured
   {
@@ -974,7 +1054,7 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
 
 void
-RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest,
+RGWPutObj_ObjStore_SING::do_send_response(RGWObjManifest& manifest,
                          const rgw_raw_obj& prefix_obj,
                          const string&  tail_path,
                          const uint64_t data_offset,
@@ -1021,7 +1101,7 @@ RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest,
   s->formatter->dump_string("Tail_Prefix", tail_path);
 
   // 'Data_Offset' field
-  s->formatter->dump_unsigend("Data_Offset", data_offset);
+  s->formatter->dump_unsigned("Data_Offset", data_offset);
   
   // 'Max_Rados_Size' field
   s->formatter->dump_unsigned("Max_Rados_Size", max_rados_size);
@@ -1112,14 +1192,14 @@ RGWPutObj_ObjStore_SING::send_response()
     int res_code = 0;
 
 
-    if(get_op->manifest)
+    if(get_op_->manifest)
     {
       // succeeded in retrieving a manifest (data layout)
-      res_code = extend_manifest(*(get_op->manifest),
+      res_code = extend_manifest(*(get_op_->manifest),
                           prefix_obj, str_offset,
                           stripe_size);
 
-      man_ptr = get_op->manifest; // set manifest to point
+      man_ptr = get_op_->manifest; // set manifest to point
                                   // to value
 
     }
@@ -1169,7 +1249,7 @@ RGWPutObj_ObjStore_SING::send_response()
 
 
 int
-RGWPutObj_ObStore_SING::prepare_init(uint64_t* chunk_size, const rgw_obj& obj)
+RGWPutObj_ObjStore_SING::prepare_init(uint64_t* chunk_size, const rgw_obj& obj)
 {
 
   const int res_code = store->get_max_chunk_size(
@@ -1187,7 +1267,7 @@ RGWPutObj_ObStore_SING::prepare_init(uint64_t* chunk_size, const rgw_obj& obj)
 
 
 int
-RGWPutObj_Objstore_SING::init_manifest(CephContext* cct,
+RGWPutObj_ObjStore_SING::init_manifest(CephContext* cct,
                      RGWObjManifest* man_ptr, 
                      const string& placement_rule, 
                      rgw_bucket& bucket, 
@@ -1205,7 +1285,7 @@ RGWPutObj_Objstore_SING::init_manifest(CephContext* cct,
   // use the passed string for
   // generting keys
   
-  string = oid_prefix(".");
+  string oid_prefix(".");
   oid_prefix.append(buf);
   oid_prefix.append("_");
 
@@ -1218,9 +1298,6 @@ RGWPutObj_Objstore_SING::init_manifest(CephContext* cct,
   man_ptr->set_tail_instance(obj.key.instance);
   //man_ptr->set_obj_size(data_size); // initialize the size
 
-  man_ptr->update_iterators();
-
-
  
   return 0;
 }
@@ -1231,7 +1308,8 @@ RGWPutObj_Objstore_SING::init_manifest(CephContext* cct,
 int
 RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
                                 rgw_raw_obj& raw_obj,
-                                uint64_t& offset)
+                                uint64_t& offset,
+                                uint64_t& stripe_size)
 {
 
   // create a new manifest according to object name, bucket
@@ -1281,11 +1359,11 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
 
 
     // initialized the manifest; create stripes for writing data
-    const conv_res =  store->obj_to_raw(
-                           manifest->head_placement_rule,
-                           manifest->obj, &raw_obj);
+    const bool conv_res =  store->obj_to_raw(
+                             manifest.get_head_placement_rule(),
+                             manifest.get_obj(), &raw_obj);
 
-    if(!con_res)
+    if(!conv_res)
     {   
       sing_err = sing_err_name::INTERNAL_ERR;
       return -ERR_INVALID_OBJECT_NAME;
@@ -1297,6 +1375,7 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
 
 
   offset = 0; // start from the very beginning
+  stripe_size = store->ctx()->_conf->rgw_obj_stripe_size;
 
   return 0; // successfully created a manifest
 
@@ -1309,7 +1388,7 @@ RGWPost_Manifest_SING::init(RGWRados* store,
                             RGWHandler* handler)
 {
 
-  RGWPostObj_Objstore::init(store, state, handler);
+  RGWPostObj_ObjStore::init(store, state, handler);
 }
 
 
@@ -1332,7 +1411,7 @@ RGWPost_Manifest_SING::execute()
   // make sure never write any data to the header object
   RGWObjectCtx& obj_ctx = *(static_cast<RGWObjectCtx*>(s->obj_ctx));
 
-  obj_ctx.obj.set_atomic(manifest->get_obj());
+  obj_ctx.obj.set_atomic(manifest->get_obj_sing());
   RGWRados::Object op_target(store, s->bucket_info, *(static_cast<RGWObjectCtx*>(s->obj_ctx)), manifest->get_obj());
   RGWRados::Object::Write obj_op(&op_target);
 
@@ -1393,7 +1472,7 @@ RGWPost_Manifest_SING::send_response()
 
 
 int
-RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
+RGWPost_Manifest_SING::manifest_decoding(JSONObj* json_obj)
 {
 
   // read the manifest from the JSON
@@ -1403,12 +1482,12 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
   
   sing_err = sing_err_name::BODY_TYPE_ERR;
   
-  JSONObjIter itr = json_obj->find_first("objs");
+  JSONObjIter objs_itr = json_obj->find_first("objs");
   
-  if(itr.end() || !itr->is_array())
+  if(objs_itr.end() || !(*objs_itr)->is_array())
   {
     
-    return -ERR_NO_SUCH_FILE_UPLOAD;
+    return -ERR_NO_SUCH_UPLOAD;
   }
 
 
@@ -1418,25 +1497,25 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
   std::map<uint64_t, RGWObjManifestPart> obj_parts;
 
   // read the maps for the manifest
-  for(; !objs_itr.end(); ++obj_itr)
+  for(; !objs_itr.end(); ++objs_itr)
   { // decode all the parts
     
     try
     { 
       JSONDecoder::decode_json("ofs", tmp_ofs, *objs_itr, true);
-      auto part_itr = objs_itr->find_first("part");
-      auto loc_itr  = part_itr->find_first("loc");
+      auto part_itr = (*objs_itr)->find_first("part");
+      auto loc_itr  = (*part_itr)->find_first("loc");
       
       // location
-      auto bucket_itr = loc_itr->find_first("bucket");
+      auto bucket_itr = (*loc_itr)->find_first("bucket");
       bucket_val.decode_json(*bucket_itr);
 
-      auto key_itr = loc_itr->find_first("key");
+      auto key_itr = (*loc_itr)->find_first("key");
       key_val.decode_json(*key_itr);
 
       // loc_ofs
-      JSONDecoder::decode_json("loc_ofs", tmp_loc_ofs, part_itr, true);
-      JSONDecoder::decode_json("size", tmp_size, part_itr, true);
+      JSONDecoder::decode_json("loc_ofs", tmp_loc_ofs, *part_itr, true);
+      JSONDecoder::decode_json("size", tmp_size, *part_itr, true);
 
       // create a part
       RGWObjManifestPart tmpPart;
@@ -1450,7 +1529,7 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
 
     } catch(JSONDecoder::err& e)
      {
-       return -ERR_NO_SUCH_FILE_UPLOAD;
+       return -ERR_NO_SUCH_UPLOAD;
      }
     
   } // for (iterate over parts)
@@ -1468,12 +1547,12 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
    auto man_rules_itr    = json_obj->find_first("rules");
 
    // start decoding
-   JSONDecoder::decode_json("obj_size", man_obj_size, *jsob_obj, true);
-   JSONDecoder::decode_Json("explicit_objs", man_explicit_objs, *json_obj, true);
-   JSONDecoder::decode_json("head_size", man_head_size, *json_obj, true);
-   JSONDecoder::decode_json("max_head_size", man_max_head_size, *json_obj, true);
-   JSONDecoder::decode_json("prefix", man_prefix, *json_obj, true);
-   JSONDeocder::decode_json("tail_instance", man_tail_instance, *json_obj, true);
+   JSONDecoder::decode_json("obj_size", man_obj_size, json_obj, true);
+   JSONDecoder::decode_json("explicit_objs", man_explicit_objs, json_obj, true);
+   JSONDecoder::decode_json("head_size", man_head_size, json_obj, true);
+   JSONDecoder::decode_json("max_head_size", man_max_head_size, json_obj, true);
+   JSONDecoder::decode_json("prefix", man_prefix, json_obj, true);
+   JSONDecoder::decode_json("tail_instance", man_tail_instance, json_obj, true);
 
 
   // decode the placement rule and manifest rules
@@ -1481,19 +1560,68 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
                             *man_tail_plc_itr, true);
 
   // decode the tail bucket
-  tail_bucket.decode_json(*(man_tail_plc_itr->find_first("bucket")));
+  tail_bucket.decode_json(*((*man_tail_plc_itr)->find_first("bucket")));
   
 
   // final step is to decode the rules
+  unsigned long long rule_map_idx, rule_start_ofs, 
+                     rule_part_size, rule_stripe_max_size;
+
+  unsigned long      rule_start_part_num;
+  string rule_override_prefix;
+  JSONObjIter rule_tmp_iter;
+  JSONObjIter rule_tmp_key;
+  JSONObjIter rule_tmp_val;  
+
   for(; !man_rules_itr.end(); ++man_rules_itr)
   {
-    // decode the rules
-    ::decode_json_obj(obj_rules, *man_rules_itr);
-  }
+
+    // find entry
+    rule_tmp_iter = (*man_rules_itr)->find_first("entry");    
+    
+    // find key-value
+    rule_tmp_key = (*rule_tmp_iter)->find_first("key");
+    rule_tmp_val = (*rule_tmp_iter)->find_first("val");
+
+    // decode map key
+    ::decode_json_obj(rule_map_idx, *rule_tmp_key);
+    
+    // decode the value (rule)
+    rule_tmp_iter = (*rule_tmp_val)->find_first("start_part_num");
+    ::decode_json_obj(rule_start_part_num, *rule_tmp_iter);
+    
+    rule_tmp_iter = (*rule_tmp_val)->find_first("start_ofs");
+    ::decode_json_obj(rule_start_ofs, *rule_tmp_iter);
+
+    rule_tmp_iter = (*rule_tmp_val)->find_first("part_size");
+    ::decode_json_obj(rule_part_size, *rule_tmp_iter);
+
+    rule_tmp_iter = (*rule_tmp_val)->find_first("stripe_max_size");
+    ::decode_json_obj(rule_stripe_max_size, *rule_tmp_iter);
+
+    rule_tmp_iter = (*rule_tmp_val)->find_first("override_prefix");
+    ::decode_json_obj(rule_override_prefix, *rule_tmp_iter);
+
+
+    RGWObjManifestRule tmp_obj_rule(static_cast<uint32_t>(rule_start_part_num),
+                                    static_cast<uint64_t>(rule_start_ofs),
+                                    static_cast<uint64_t>(rule_part_size),
+                                    static_cast<uint64_t>(rule_stripe_max_size));
+
+    // copy efficiently the content
+    tmp_obj_rule.override_prefix.swap(rule_override_prefix);
+
+    // enocde the rule into the map
+    obj_rules[static_cast<uint64_t>(rule_map_idx)] = std::move(tmp_obj_rule);
+    
+    
+  } // for rules
+
+
 
   } catch (JSONDecoder::err& e)
   {
-    return -ERR_NO_SUCH_FILE_UPLOAD;
+    return -ERR_NO_SUCH_UPLOAD;
   }
   
 
@@ -1507,8 +1635,8 @@ RGWPost_Manifest_SING::manifest_decoding(JSONObjIter& json_obj)
 
   // now set the values
   // SING manifest methods
-  manifest->set_explicit_sing(man_explicit_obj);
-  manifest->set_objs_sing(std::move(obj_rules));
+  manifest->set_explicit_sing(man_explicit_objs);
+  manifest->set_objs_sing(std::move(obj_parts));
   manifest->set_rules_sing(std::move(obj_rules));
 
   // RGWObjmanifest methods
@@ -1566,7 +1694,8 @@ RGWPost_Manifest_SING::decode_json_manifest()
 
     if(len < 0)
     {
-      goto end_read_json;
+      delete[] json_buffer;
+      return res_code;
     }
    
     // cast int to size_t
@@ -1592,7 +1721,8 @@ RGWPost_Manifest_SING::decode_json_manifest()
   
   if(!ret)
   {
-    goto post_end_read_json; 
+    delete[] json_buffer;
+    return res_code;
   }
 
 
@@ -1602,24 +1732,28 @@ RGWPost_Manifest_SING::decode_json_manifest()
                                            // the manifest
   if(iter.end())
   { // did not find
-    goto post_end_read_json;
+    delete[] json_buffer;
+    return res_code;
   }
 
-  auto obj_mani = iter->find_first("Data_Manifest"); // look for 
-                                                     // manifest
+  auto obj_mani = (*iter)->find_first("Data_Manifest"); // look for 
+                                                       // manifest
 
   if(obj_mani.end())
   {
-    goto post_end_read_json;
+    delete[] json_buffer;
+    return res_code;
   }
 
   
 
-  res_code = manifest_decoding(obj_mani);
+  res_code = manifest_decoding(*obj_mani);
   
   if(res_code < 0)
   {
-    goto post_end_read_json;
+    delete[] json_buffer;
+
+    return res_code;
   }
 
   // decode the object field of the manifest
@@ -1628,20 +1762,26 @@ RGWPost_Manifest_SING::decode_json_manifest()
 
   // 'Head_Object' field
 
-  auto head_iter = iter->find_first("Head_Object");
+  auto head_iter = (*iter)->find_first("Head_Object");
   
   // try to decode
   try
   {
-    headBucket.decode_json(*(head_iter->find_first("bucket")));
-    headKey.decode_json(*(head_iter->find_first("key")));
+    headBucket.decode_json(*((*head_iter)->find_first("bucket")));
+    headKey.decode_json(*((*head_iter)->find_first("key")));
 
   } catch(JSONDecoder::err& exp)
   {
     res_code = -ERR_NO_SUCH_UPLOAD;
-    goto post_end_read_json;
+    delete[] json_buffer;
   }
    
+
+  if(res_code < 0)
+  {
+    return res_code;
+  }
+  
 
   // set the object field to the decoded one
   uint64_t tmp_head_size = manifest->get_head_size();
@@ -1658,9 +1798,13 @@ RGWPost_Manifest_SING::decode_json_manifest()
   } catch(JSONDecoder::err& exp)
   {
     res_code = -ERR_NO_SUCH_UPLOAD;
-    goto post_end_read_json;
+    delete[] json_buffer;
   }
 
+  if(res_code < 0)
+  {
+    return res_code;
+  }
 
   // calculate the written data size
   const uint64_t read_size_val = static_cast<const uint64_t>(completed_data);
@@ -1668,10 +1812,14 @@ RGWPost_Manifest_SING::decode_json_manifest()
                               (manifest->get_obj_size() - read_size_val):\
                               0;
 
-  if(!ob_data_)
+  if(!obj_data_)
   {
     sing_err = sing_err_name::SMALL_ERR;
-    goto post_end_read_json;
+    res_code = -ERR_NO_SUCH_UPLOAD;
+    
+    delete[] json_buffer;
+
+    return res_code;
   }
 
   /******** DONE Decoding the Received Manifest ***********/
@@ -1679,9 +1827,6 @@ RGWPost_Manifest_SING::decode_json_manifest()
   // no errors
   sing_err = sing_err_name::SUCCESS;
   res_code = 0; 
-
-
-post_end_read_json:
   delete[] json_buffer;
   
   return res_code;  
@@ -1695,7 +1840,7 @@ int
 RGWPost_Manifest_SING::init_processing()
 {
 
-  int res_code = RGWPostObj_ObjStore::ini_processing();
+  int res_code = RGWPostObj_ObjStore::init_processing();
 
   if(res_code < 0)
   {
@@ -1708,7 +1853,7 @@ RGWPost_Manifest_SING::init_processing()
   // read the body and try to decode into 
   // a JSON object
   
-  const char* content_type = s->info.env->get("CONTENT_TYPE", "");
+  const char* content_type = s->info.env->get("CONTENT_TYPE", nullptr);
 
   if(!content_type)
   {
@@ -1720,9 +1865,10 @@ RGWPost_Manifest_SING::init_processing()
   }
 
 
+  // HTTP Headers use ASCII encoding
   std::string  type_str(content_type);
-  std::transform(type_str.begin(). type_str.end(), type_str.begin(),
-                 std::tolower); // transform to lower case first
+  std::transform(type_str.begin(), type_str.end(), type_str.begin(),
+                 [] (unsigned char c) { return std::tolower(c); }); // transform to lower case first
 
   auto find_json = type_str.find("json");
 
@@ -1782,7 +1928,9 @@ RGWHandler_REST_Obj_SING::op_post()
 }
 
 
-RGWHandler_REST* RGWRESTMgr_SING_Info::get_handler(
+
+RGWHandler_REST* 
+RGWRESTMgr_SING_Info::get_handler(
   struct req_state* const s,
   const rgw::auth::StrategyRegistry& auth_registry,
   const std::string& frontend_prefix)
@@ -1790,6 +1938,6 @@ RGWHandler_REST* RGWRESTMgr_SING_Info::get_handler(
   s->prot_flags |= RGW_REST_SWIFT;
   //const auto& auth_strategy = auth_registry.get_sing();
 
-   return nullptr;
+  return nullptr;
   //return new RGWHandler_REST_SING_Info(auth_strategy);
 }
