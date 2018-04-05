@@ -21,8 +21,10 @@ include(GNUInstallDirs)
 # Include Facebok folly as an imported target
 find_package(FacebookFolly REQUIRED)
 
-# Ceph librados has to be included as well
+
+#Ceph librados has to be included as well
 find_package(CephRados REQUIRED)
+
 
 # Boost library required
 find_package(Boost 1.66 REQUIRED)
@@ -39,4 +41,6 @@ add_subdirectory(remote)
 add_executable(rados_cli rados_client.cpp)
 
 # Link to all dependencies
-target_link_libraries(rados_cli clusterlib remotelib)
+target_link_libraries(rados_cli PRIVATE 
+                          singstorage::clusterlib 
+                          singstorage::remotelib)

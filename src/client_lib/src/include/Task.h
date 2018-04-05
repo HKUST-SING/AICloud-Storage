@@ -9,15 +9,15 @@
 
 namespace singaistorageipc{
 
-class Task{
+struct Task
+{
 
-public:
 	enum class OpType : uint8_t
 	{
 		READ   = 1,
 		WRITE  = 2,
 		DELETE = 3,
-        	CLOSE  = 4
+        CLOSE  = 4
 	};
 
 	// result infomation
@@ -28,8 +28,26 @@ public:
 		OP_ERR_PATH      =   2, // no path exists (for READ operations)
 		OP_ERR_QUOTA     =   3, // not enough available storage (not implemented yet)
 		OP_ERR_LOCK      =   4, // tried to acquire lock of data and failed multiple times 
+        OP_PARTIAL_READ  =   5, // sucessfully read part of the data
+                                // ==> issue another READ
+
 		OP_ERR_INTERNAL  = 255  // internal error (generic error)
 	};
+
+
+    // Task fields/atributes
+	std::string username_;  // global user id used internally within the storage system
+	std::string path_;
+	OpType opType_;
+	uint64_t dataAddr_;
+	uint32_t dataSize_;
+	uint32_t tranID_;
+	uint32_t workerID_;
+
+	uint64_t objSize_; // used by Unix service and worker to determine object size
+	OpCode opCode_;
+
+
 
 	/**
 	 * Used for create a request.
@@ -93,9 +111,9 @@ public:
    
 
 
-	inline uint64_t getUserID() const
+	inline const std::string& getUsername() const
     {
-		return userID_;
+		return username_;
 	}
 
 
@@ -140,19 +158,13 @@ public:
 	}
 
 
-public:
-	uint64_t userID_;  // global user id used internally within the storage system
-	std::string path_;
-	OpType opType_;
-	uint64_t dataAddr_;
-	uint32_t dataSize_;
-	uint32_t tranID_;
-	uint32_t workerID_;
+}; // struct Task
 
-	uint64_t objSize_; // used by Unix service and worker to determine object size
-	OpCode opCode_;
 
-}; // class Task
 
+struct ObjectInfo
+{
+
+}; // struct ObjectInfo
 
 } // namesapce singaistorageipc

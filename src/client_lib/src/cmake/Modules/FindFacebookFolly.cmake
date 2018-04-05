@@ -3,8 +3,8 @@
 # 
 #  This will define the following variables:: 
 #
-#    FACEBOOKFOOLY_FOUND   - True if the system has folly
-#    FACEBOOKFOLLY_VERSION - Facebook folly version which was found
+#    FACEBOOKFOOLY_FOUND       - True if the system has folly
+#    FACEBOOKFOLLY_VERSION     - Facebook folly version which was found
 #
 #  and the following imported targets::
 #
@@ -45,43 +45,25 @@ if(FOLLY_FOUND)
     if(NOT TARGET FacebookFolly::FacebookFolly)
         add_library(FacebookFolly::FacebookFolly UNKNOWN IMPORTED)
     endif()
-    if (FOLLY_LIBRARY_RELEASE)
-        set_property(TARGET FacebookFolly::FacebookFolly 
-                     APPEND PROPERTY 
-                     IMPORTED_CONFIGURATIONS RELEASE)
-
-        set_target_properties(FacebookFolly::FacebookFolly PROPERTIES
-                              IMPORTED_LOCATION_RELEASE 
-                              "${FOLLY_LIBRARY_RELEASE}")
-
-    endif()
-
-    if(FOLLY_LIBRARY_DEBUG)
-        set_property(TARGET FacebookFolly::FacebookFolly
-                     APPEND PROPERTY
-                     IMPORTED_CONFIGURATIONS DEBUG)
-        set_target_properties(FacebookFolly::FacebookFolly PROPERTIES
-                              IMPORTED_LOCATION_DEBUG
-                              "${FOLLY_LIBRARY_DEBUG}")
-
-    endif()
 
     set_target_properties(FacebookFolly::FacebookFolly PROPERTIES
                           INTERFACE_COMPILE_OPTIONS 
                           "${PC_folly_CFLAGS_OTHER}"
                           INTERFACE_INCLUDE_DIRECTORIES 
-                          "${FOLLY_INCLUDE_DIR}")
-
+                          "${FOLLY_INCLUDE_DIR}"
+                          IMPORTED_LOCATION 
+                          "${FOLLY_LIBRARY}")
 endif()
 
 
 # pass the values to the user
-set(FACEBOOKFOLLY_FOUND FOLLY_FOUND)
-set(FACEBOOKFOLLY_VERSION FOLLY_VERSION)
+set(FACEBOOKFOLLY_FOUND        ${FOLLY_FOUND})
+set(FACEBOOKFOLLY_VERSION     "${FOLLY_VERSION}")
+
 
 mark_as_advanced(
-    FOLLY_INCLUDE_DIR
-    FOLLY_LIBRARY
+    FACEBOOKFOLLY_FOUND
+    FACEBOOKFOLLY_VERSION
 )
                           
 

@@ -15,12 +15,15 @@
 
 
 // Project lib
-#include "remote/Security.h"
 #include "include/Task.h"
-
+#include "CephContext.h"
 
 namespace singaistorageipc
 {
+
+
+// Forward delcaration
+class Security;
 
 
 // Facebook folly Future

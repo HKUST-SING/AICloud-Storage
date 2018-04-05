@@ -3,12 +3,13 @@
 # 
 #  This will define the following variables:: 
 #
-#    CEPHRADOS_FOUND   - True if the system has folly
-#    CEPHRADOS_VERSION - Facebook folly version which was found
+#    CEPHRADOS_FOUND       - True if the system has folly
+#    CEPHRADOS_VERSION     - Ceph librados version which was found
 #
+#    
 #  and the following imported targets::
 #
-#    CephRados::CephRados - The Facebook Folly target
+#    CephRados::CephRados - The Ceph librados target
 
 
 # try to get hints for the paths
@@ -45,43 +46,26 @@ if(RADOS_FOUND)
     if(NOT TARGET CephRados::CephRados)
         add_library(CephRados::CephRados UNKNOWN IMPORTED)
     endif()
-    if (RADOS_LIBRARY_RELEASE)
-        set_property(TARGET CephRados::CephRados 
-                     APPEND PROPERTY 
-                     IMPORTED_CONFIGURATIONS RELEASE)
-
-        set_target_properties(CephRados::CephRados PROPERTIES
-                              IMPORTED_LOCATION_RELEASE 
-                              "${RADOS_LIBRARY_RELEASE}")
-
-    endif()
-
-    if(RADOS_LIBRARY_DEBUG)
-        set_property(TARGET CephRados::CephRados
-                     APPEND PROPERTY
-                     IMPORTED_CONFIGURATIONS DEBUG)
-        set_target_properties(CephRados::CephRados PROPERTIES
-                              IMPORTED_LOCATION_DEBUG
-                              "${RADOS_LIBRARY_DEBUG}")
-
-    endif()
 
     set_target_properties(CephRados::CephRados PROPERTIES
                           INTERFACE_COMPILE_OPTIONS 
                           "${PC_rados_CFLAGS_OTHER}"
                           INTERFACE_INCLUDE_DIRECTORIES 
-                          "${RADOS_INCLUDE_DIR}")
+                          "${RADOS_INCLUDE_DIR}"
+                          IMPORTED_LOCATION
+                          "${RADOS_LIBRARY}")
 
 endif()
 
 
 # pass the values to the user
-set(CEPHRADOS_FOUND RADOS_FOUND)
-set(CEPHRADOS_VERSION RADOS_VERSION)
+set(CEPHRADOS_FOUND         ${RADOS_FOUND})
+set(CEPHRADOS_VERSION      "${RADOS_VERSION}")
+
 
 mark_as_advanced(
-    RADOS_INCLUDE_DIR
-    RADOS_LIBRARY
+    CEPHRADOS_FOUND
+    CEPHRADOS_VERSION
 )
                           
 

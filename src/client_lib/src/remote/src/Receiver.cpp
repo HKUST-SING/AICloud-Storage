@@ -10,8 +10,8 @@
 /**
  * Internal lib
  */
-#include "Receiver.h"
-#include "Message.h"
+#include "remote/Receiver.h"
+#include "remote/Message.h"
 
 namespace http = boost::beast::http;
 

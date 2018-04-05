@@ -88,6 +88,7 @@ public:
 
 
 
+/*
 typedef struct AuthenticationResponse
 {
   public:
@@ -112,11 +113,11 @@ typedef struct AuthenticationResponse
     tranID_(opID)
   {}
 
-
+*/
   /**
    * Default constructor.
    */
-  AuthenticationResponse()
+/*  AuthenticationResponse()
   : user_("", ""),
     authCode_(AuthCode::INTERNAL_ERR),
     tranID_(0)
@@ -161,9 +162,10 @@ typedef struct AuthenticationResponse
 
 
 } AuthenticationResponse; // struct
+*/
 
 
-
+/*
 typedef struct OpPermissionResponse
 {
   public:
@@ -253,7 +255,7 @@ typedef struct OpPermissionResponse
 
 
 } OpPermissionResponse; // struct
-
+*/
 
 
 typedef struct IOResult

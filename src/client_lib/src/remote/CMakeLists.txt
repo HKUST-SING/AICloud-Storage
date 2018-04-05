@@ -12,14 +12,21 @@ add_library(remotelib
     src/ServerChannel.cpp
     src/Receiver.cpp)
 
+add_library(singstorage::remotelib ALIAS remotelib)
 
 # Define include directories
-target_include_directories(remotelib PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR/include}>
+
+# Need to change this?
+#include_directories("${CMAKE_SOURCE_DIR}")
+
+
+target_include_directories(remotelib INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
     PRIVATE src
     include
-    ${PROJECT_SOURCE_DIR})
+    "${CMAKE_SOURCE_DIR}"
+    )
 
 
 
@@ -30,12 +37,15 @@ target_compile_features(remotelib
       cxx_strong_enums
     PRIVATE
       cxx_decltype
+      cxx_trailing_return_types
+      cxx_decltype_auto
    )
 
 
 
 # Define a dependency on the librados and folly libraries
 target_link_libraries(remotelib
-    FacebookFolly::FacebookFolly
-    boost::boost
+    PUBLIC
+      FacebookFolly::FacebookFolly
+      boost::boost
     )

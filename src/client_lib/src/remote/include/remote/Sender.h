@@ -31,7 +31,7 @@ class Sender{
 public:
 	virtual ~Sender() = default;
 	virtual int send(folly::dynamic,
-		std::function<void(boost::system::error_code const&,std::size_t)>) = 0;
+		boost::function<void(boost::system::error_code const&,std::size_t)>) = 0;
 };
 
 class RESTSender : public Sender{

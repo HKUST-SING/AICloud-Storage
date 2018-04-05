@@ -7,6 +7,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/basic_endpoint.hpp>
 #include <boost/asio/ip/address.hpp>
+#include <boost/bind.hpp>
 #include <folly/dynamic.h>
 #include <folly/DynamicConverter.h>
 #include <folly/json.h>
@@ -15,7 +16,7 @@
  * Internal lib
  */
 #include "remote/Message.h"
-#include "Sender.h"
+#include "remote/Sender.h"
 
 using tcp = boost::asio::ip::tcp;
 namespace http = boost::beast::http;
@@ -116,7 +117,7 @@ RESTSender::send(folly::dynamic map
 	 */
 	reqMap_[tranID] = std::move(req);
 	http::async_write(*socket_, reqMap_[tranID], 
-		boost::bind(&RESTSender::sendCallback_,this,tranID,callback,_1,_2));
+		boost::bind(&RESTSender::sendCallback, this,tranID,callback,_1,_2));
 	return 0;
 }
 

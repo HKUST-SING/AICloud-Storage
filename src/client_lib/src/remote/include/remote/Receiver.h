@@ -23,7 +23,7 @@
 /**
  * Internal lib
  */
-#include "Message.h"
+#include "remote/Message.h"
 
 using tcp = boost::asio::ip::tcp;
 

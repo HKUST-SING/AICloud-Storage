@@ -33,7 +33,7 @@ StoreWorker::~StoreWorker()
   // release all the retrieved objects 
   // and enqueued tasks
 
-  pendTasks_.clear();
+  pendReads_.clear();
 
 
   while(!tasks_.empty()) // since the worker is being destroyed,
@@ -222,9 +222,9 @@ StoreWorker::processReadOp(
         std::pair<folly::Promise<Task>, const Task&>& task)
 {
   // first test if the operation is a pending one
-  auto checkRead = pendReads_.find(task.second.tranID_)
+  auto checkRead = pendReads_.find(task.second.tranID_);
   
-  if(checkRead == pend_reads_.end())
+  if(checkRead == pendReads_.end())
   { 
     // new READ operation
   }
@@ -268,14 +268,16 @@ StoreWorker::handlePendingRead(
 {
  
   // check if the Task path mathes the unique ID
-  std::assert(itr->second.globalId.compare(task.second.path_));
+  assert(itr->second.getGlobalObjectId().compare(task.second.path_));
   
-  uint64_t dataRead = static_cast<uint64_t>(task->second.dataSize_);
+  uint64_t dataRead = static_cast<uint64_t>(task.second.dataSize_);
   char* rawData = itr->second.getRawBytes(dataRead);
-  std::assert(rawData); // ensure that there is data
+  assert(rawData); // ensure that there is data
 
   // write to the data to the shared memory
-  char* ptr = static_cast<char*>(task.second.dataAddr_);
+  // (use C-type casting since C++ complains)
+  char* ptr = (char*) task.second.dataAddr_;
+
   std::memcpy(ptr, rawData, dataRead); // write data to the memory
   
   // notify the user about it
@@ -285,18 +287,18 @@ StoreWorker::handlePendingRead(
   // check if I can still read more data
   if(itr->second.storeObjComplete())
   { // done reading the entire object
-    tmp.opCode_ = Task::OpCode::SUCCESS;
+    tmp.opCode_ = Task::OpCode::OP_SUCCESS;
     // remove the iterator from the map
     pendReads_.erase(itr);
   }
   else
   { // need to read more data
-    tmp.opCode = Tasl::OpCode::PARTIAL_READ;
+    tmp.opCode_ = Task::OpCode::OP_PARTIAL_READ;
   } 
   
   // a READ operation completed
   // notify the future
-  task->first.setValue(std::move(tmp));
+  task.first.setValue(std::move(tmp));
 
 }
 

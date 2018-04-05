@@ -10,10 +10,11 @@
 
 
 // Project lib
+#include "include/Task.h"
 #include "Authentication.h"
-#include "Task.h"
-#include "ServerChannel.h"
+#include "Message.h"
 #include "SecureKey.h"
+#include "ServerChannel.h"
 #include "Cache.h"
 
 namespace singaistorageipc
@@ -104,7 +105,7 @@ class Security
 	 * @param op  : IO operation to be performed on data
 	 */
 
-	virtual folly:Future<ObjectInfo> 
+	virtual folly::Future<ObjectInfo> 
 		lockAndRetrieveInfo(const std::string& path,
 							const Task::OpType op) = 0;
 

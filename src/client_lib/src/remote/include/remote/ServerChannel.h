@@ -25,6 +25,9 @@
 namespace singaistorageipc
 {
 
+
+class Security; // forward delcaration
+
 class ServerChannel
 {
 
@@ -44,18 +47,18 @@ class ServerChannel
       class ChannelWriteCallback: public folly::AsyncWriter::WriteCallback
       {
         public:
-          explicit ChannnelWriteCallback(std::shared_ptr<Security> sec)
-          : secure_(sec),
+          explicit ChannelWriteCallback(std::shared_ptr<Security> sec)
+          : secure_{sec},
             msg_(nullptr)
           {}
            
-          ChannelWriteCallbakc(std::shared_ptr<Security> sec,
+          ChannelWriteCallback(std::shared_ptr<Security> sec,
                                std::shared_ptr<Message> msg)
-          : secure_(sec),
+          : secure_{sec},
             msg_(msg)
           {}
 
-          ChannelWriteCallback(const ChannelWriteCallbakc&) = delete;
+          ChannelWriteCallback(const ChannelWriteCallback&) = delete;
           ChannelWriteCallback() = delete;
 
           ChannelWriteCallback(ChannelWriteCallback&& other)
