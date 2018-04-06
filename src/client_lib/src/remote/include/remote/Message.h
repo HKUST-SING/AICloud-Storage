@@ -9,10 +9,12 @@
 #include <vector>
 #include <map>
 
+
 /**
  * External lib
  */
-#include <folly/dynamic.h>
+#include <folly/io/IOBuf.h>
+
 
 namespace singaistorageipc{
 
@@ -40,25 +42,24 @@ public:
 		OpPermissionResponse
 	};
 
+    enum class MessageEncoding : int 
+    {
+      NONE_ENC  = 0, // no encoding 
+      JSON_ENC  = 1, // message data uses JSON for encoding
+      ASCII_ENC = 2, // message data uses ASCII for encocing
+      BYTES_ENC = 3, // message data raw bytes
+      ERR_ENC   = -1 // some error happened 
+    }; // enum MessageEncoding
+
 	Message() = default;
 	Message(uint32_t tranID, const std::string& userID)
 	:tranID_(tranID),userID_(userID){}
 
-	MessageType type_;
-	uint32_t tranID_;
-	std::string userID_; 	   // user id or user name
-
-	/**
-	 * folly::dynamic is a map from dynamic
-	 * to dynamic
-	 * this method usually is called by the sender
-	 */
-	virtual folly::dynamic encode();
-
-	/**
-	 * this method usually is called by the receiver
-	 */
-	virtual void decode(folly::dynamic);
+	MessageType                   type_;
+	uint32_t                      tranID_;
+	std::string                   userID_;  // user id or user name
+    std::unique_ptr<folly::IOBuf> data_;    // message data to send  
+    MessageEncoding               msgEnc_;  // data type encoding
 };
 
 class Request : public Message{
@@ -93,7 +94,8 @@ public:
 	enum class OpType : uint8_t{
 		READ   = 0,
 		WRITE  = 1,
-		DELETE = 2
+		DELETE = 2,
+        COMMIT = 3
 	};
 
 	OpPermissionRequest() = delete;
