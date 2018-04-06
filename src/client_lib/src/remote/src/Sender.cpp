@@ -63,11 +63,13 @@ RESTSender::send(folly::dynamic map
 				verb = http::verb::get; // READ
 				break;
 			case 1:
-				verb = http::verb::put; // WRIET
+				verb = http::verb::put; // WRITE/GET Path
 				break;
 			case 2:
 				verb = http::verb::delete_; // DELETE
 				break;
+            case 3:
+                verb = http::verb::post;    // POST/COMMIT
 			default:
 				/**
 				 * Unknown type
