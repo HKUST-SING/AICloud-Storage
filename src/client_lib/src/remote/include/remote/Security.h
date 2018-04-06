@@ -69,7 +69,7 @@ class Security
      *          result of the request
      */
 
-     virtual folly::Future<AuthenticationResponse> 
+     virtual folly::Future<Response> 
              clientConnect(const UserAuth& user) = 0;
 
      /**
@@ -87,7 +87,7 @@ class Security
      *          result of the request
      */
 
-     virtual folly::Future<OpPermissionResponse> 
+     virtual folly::Future<Response> 
              checkPerm(const std::string& path,
                        const UserAuth& user,
                        const Task::OpType op,
@@ -118,7 +118,7 @@ class Security
       * @return: async interface for waiting reponse
       */
 
-     virtual folly::Future<OpPermissionResponse>
+     virtual folly::Future<Response>
              sendIOResult(const IOResult& res) = 0;
 
 

@@ -68,7 +68,7 @@ public:
 	Request() = delete;
 	Request(uint32_t tranID, const std::string& userID,
 		const std::string& password,
-		const std::string& objectPath = "",
+		const std::string& objectPath,
 		OpType opType)
 	:Message(tranID,userID),password_(password)
 	,objectPath_(objectPath),opType_(opType){}

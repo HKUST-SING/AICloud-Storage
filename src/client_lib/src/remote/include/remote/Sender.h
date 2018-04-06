@@ -33,7 +33,7 @@ namespace singaistorageipc{
 class Sender{
 public:
 	virtual ~Sender() = default;
-	virtual int send(std::share_ptr<Request>,
+	virtual int send(std::shared_ptr<Request>,
 		boost::function<void(boost::system::error_code const&,std::size_t)>) = 0;
 };
 
@@ -50,7 +50,7 @@ public:
 		reqMap_.clear();
 	}
 
-	int send(std::share_ptr<Request>
+	int send(std::shared_ptr<Request>
 		,boost::function<void(boost::system::error_code const&
 			,std::size_t)>) override;
 

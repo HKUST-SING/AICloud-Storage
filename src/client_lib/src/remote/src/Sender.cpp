@@ -21,7 +21,7 @@ namespace http = boost::beast::http;
 namespace singaistorageipc{
 
 int
-RESTSender::send(std::share_ptr<Request> request
+RESTSender::send(std::shared_ptr<Request> request
 		,boost::function<void(boost::system::error_code const&
 				     ,std::size_t)> callback)
 {
@@ -116,9 +116,9 @@ RESTSender::send(std::share_ptr<Request> request
 	/**
 	 * send the http request
 	 */
-	reqMap_[tranID] = std::move(req);
-	http::async_write(*socket_, reqMap_[tranID], 
-		boost::bind(&RESTSender::sendCallback, this,tranID,callback,_1,_2));
+	reqMap_[request->tranID_] = std::move(req);
+	http::async_write(*socket_, reqMap_[request->tranID_], 
+		boost::bind(&RESTSender::sendCallback,this,request->tranID_,callback,_1,_2));
 	return 0;
 }
 
