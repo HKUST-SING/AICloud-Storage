@@ -18,7 +18,6 @@
 #include <boost/beast/http.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/thread/mutex.hpp>
-#include <folly/dynamic.h>
 
 /**
  * Internal lib
@@ -39,7 +38,7 @@ class RESTReceiver : public Receiver{
 public:
 	RESTReceiver() = delete;
 	explicit RESTReceiver(std::shared_ptr<tcp::socket> socket, 
-		std::shared_ptr<std::vector<std::unique_ptr<Message>>> receivePool, 
+		std::shared_ptr<std::vector<std::unique_ptr<Response>>> receivePool, 
 		std::shared_ptr<boost::mutex> mutex)
 		:socket_(socket),receivePool_(receivePool),mutex_(mutex){}
 
@@ -54,7 +53,7 @@ public:
 private:
 	std::shared_ptr<tcp::socket> socket_;
 	std::shared_ptr<
-		std::vector<std::unique_ptr<Message>>> receivePool_;
+		std::vector<std::unique_ptr<Response>>> receivePool_;
 	std::shared_ptr<boost::mutex> mutex_;
 
 	/**
@@ -63,7 +62,7 @@ private:
 	 */
 	boost::beast::flat_buffer buffer_;
 	boost::beast::http::response<
-			boost::beast::http::dynamic_body> response_;
+			boost::beast::http::string_body> response_;
 
 	/**
 	 * Reception callback
@@ -72,11 +71,11 @@ private:
 	/**
 	 * Rebuild the message
 	 */
-	std::unique_ptr<Message> msgParse();
+	std::unique_ptr<Response> msgParse();
 	/**
 	 * Insert receiving message into the pool
 	 */
-	void poolInsert(std::unique_ptr<Message> msg);
+	void poolInsert(std::unique_ptr<Response> msg);
 
 };
 

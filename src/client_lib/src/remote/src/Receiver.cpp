@@ -6,6 +6,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
+#include <folly/io/IOBuf.h>
 
 /**
  * Internal lib
@@ -17,13 +18,44 @@ namespace http = boost::beast::http;
 
 namespace singaistorageipc{
 
-std::unique_ptr<Message>
+std::unique_ptr<Response>
 RESTReceiver::msgParse(){
-	return nullptr;
+	try{
+	  std::unique_ptr<Response> response(new Response(
+					std::stoul(response_.at(RESTHeadField::TRANSACTION_ID).data(),nullptr,10)
+					,Response::StateCode::SUCCESS));
+
+	response->data_ = folly::IOBuf::copyBuffer(response_.body().data(),response_.body().length());
+	
+	std::string contenttype = "";
+	try{
+	  contenttype = response_.at(http::field::content_type).data();
+	}
+	catch(std::out_of_range){
+	  contenttype = "";
+	}
+	if(contenttype.find("json") != std::string::npos){
+		response->msgEnc_ = Message::MessageEncoding::JSON_ENC;
+	}
+	else if(contenttype.find("ascii") != std::string::npos){
+		response->msgEnc_ = Message::MessageEncoding::ASCII_ENC;
+	}
+	else if(contenttype.find("bytes") != std::string::npos){
+	  	response->msgEnc_ = Message::MessageEncoding::BYTES_ENC;
+	}
+	else{
+		response->msgEnc_ = Message::MessageEncoding::NONE_ENC;
+	}
+
+	return response;
+	} // try
+	catch(std::out_of_range){
+	  return nullptr;
+	}
 }
 
 void
-RESTReceiver::poolInsert(std::unique_ptr<Message> msg){
+RESTReceiver::poolInsert(std::unique_ptr<Response> msg){
 	boost::mutex::scoped_lock lock(*mutex_);
 	receivePool_->push_back(std::move(msg));
 }
@@ -31,7 +63,7 @@ RESTReceiver::poolInsert(std::unique_ptr<Message> msg){
 void
 RESTReceiver::receive(){
 	boost::beast::http::response<
-			boost::beast::http::dynamic_body> newresponse;
+			boost::beast::http::string_body> newresponse;
 	response_ = std::move(newresponse);
 	http::async_read(*socket_,buffer_,response_,
 		boost::bind(&RESTReceiver::onRead,this,_1,_2));

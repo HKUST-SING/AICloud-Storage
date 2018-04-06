@@ -43,13 +43,12 @@ public:
     }; // enum MessageEncoding
 
 	Message() = default;
-	Message(uint32_t tranID, const std::string& userID)
-	:tranID_(tranID),userID_(userID)
+	Message(uint32_t tranID)
+	:tranID_(tranID)
 	,msgEnc_(MessageEncoding::NONE_ENC){}
 
 	MessageType                   type_;
 	uint32_t                      tranID_;
-	std::string                   userID_;  // user id or user name
     std::unique_ptr<folly::IOBuf> data_;    // message data to send  
     MessageEncoding               msgEnc_;  // data type encoding
 };
@@ -70,9 +69,10 @@ public:
 		const std::string& password,
 		const std::string& objectPath,
 		OpType opType)
-	:Message(tranID,userID),password_(password)
+	:Message(tranID),userID_(userID),password_(password)
 	,objectPath_(objectPath),opType_(opType){}
 
+	std::string userID_;  // user id or user name
 	std::string password_; // secret key or password
 	std::string objectPath_;
 	OpType      opType_;
@@ -87,8 +87,8 @@ public:
 	};
 
 	Response() = default;
-	Response(uint32_t tranID, const std::string& userID, StateCode stateCode)
-	:Message(tranID,userID),stateCode_(stateCode){}
+	Response(uint32_t tranID, StateCode stateCode)
+	:Message(tranID),stateCode_(stateCode){}
 
 	StateCode stateCode_;
 
