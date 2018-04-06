@@ -7,12 +7,6 @@ project(clientstorage VERSION 0.1 LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules/")
 
 
-# Change BOOST root
-set(BOOST_ROOT "/usr/local/include/boost_1_66_0")
-set(BOOST_INCLUDEDIR "/usr/local/include/boost_1_66_0/boost")
-set(BOOST_LIBRARYDIR "/usr/local/include/boost_1_66_0/boost")
-
-
 # Found it is useful to use GNUInstallDirs to install
 # libraries on all platforms
 
@@ -35,6 +29,7 @@ set_property(TARGET boost::boost PROPERTY
 # Build our targets
 add_subdirectory(cluster)
 add_subdirectory(remote)
+add_subdirectory(ipc)
 
 
 #Add executable
@@ -43,4 +38,5 @@ add_executable(rados_cli rados_client.cpp)
 # Link to all dependencies
 target_link_libraries(rados_cli PRIVATE 
                           singstorage::clusterlib 
-                          singstorage::remotelib)
+                          singstorage::remotelib
+                          singstorage::ipclib)

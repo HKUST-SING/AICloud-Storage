@@ -8,9 +8,8 @@
 #pragma once
 
 /**
- * Standar lib
+ * Standard lib
  */
-#include <functional>
 #include <map>
 
 /**

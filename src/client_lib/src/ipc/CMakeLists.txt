@@ -1,0 +1,45 @@
+# Define the submodule
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+project(ipcproj VERSION 0.1 LANGUAGES C CXX)
+
+
+
+# Define the library for linking with others
+
+add_library(ipclib 
+    src/IPCServer.cpp)
+
+
+add_library(singstorage::ipclib ALIAS ipclib)
+
+# Define include directories
+target_include_directories(ipclib INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    PRIVATE src
+    "${CMAKE_SOURCE_DIR}"
+    include
+  )
+
+
+
+target_compile_features(ipclib
+    PUBLIC 
+      cxx_nullptr
+      cxx_rvalue_references
+      cxx_decltype_auto
+      cxx_trailing_return_types
+      cxx_strong_enums
+    PRIVATE
+      cxx_decltype
+   )
+
+
+
+# Define a dependency on the librados and folly libraries
+target_link_libraries(ipclib
+    PUBLIC
+      singstorage::clusterlib
+      FacebookFolly::FacebookFolly
+    )
+    
