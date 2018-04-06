@@ -16,6 +16,7 @@ public:
 	static const std::string TRANSACTION_ID;
 	static const std::string USER_ID;
 	static const std::string PASSWD;
+/*
 	static const std::string PATH;
 	static const std::string OP_TYPE;
 	static const std::string COMMIT;	
@@ -24,6 +25,7 @@ public:
 	static const std::string METADATA;
 	static const std::string RADOSOBJECTS;
 	static const std::string FLAG;
+*/
 };
 
 class Message{
@@ -59,12 +61,20 @@ public:
 		READ   = 0,
 		WRITE  = 1,
 		DELETE = 2,
-        	COMMIT = 3,
+        COMMIT = 3,
 		AUTH   = 4
 	};
 
 
 	Request() = delete;
+
+	/**
+	 * If the `opType` is Request::OpType::AUTH,
+	 * Sender will not check the `objectPath`
+	 * according to the protocol.
+	 * In that case, please set `objectPath` as
+	 * arbitary value.
+	 */
 	Request(uint32_t tranID, const std::string& userID,
 		const std::string& password,
 		const std::string& objectPath,
