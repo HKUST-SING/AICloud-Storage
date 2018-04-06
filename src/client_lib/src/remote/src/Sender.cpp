@@ -8,9 +8,6 @@
 #include <boost/asio/ip/basic_endpoint.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/bind.hpp>
-#include <folly/dynamic.h>
-#include <folly/DynamicConverter.h>
-#include <folly/json.h>
 
 /**
  * Internal lib
@@ -22,16 +19,12 @@ using tcp = boost::asio::ip::tcp;
 namespace http = boost::beast::http;
 
 namespace singaistorageipc{
-/*
-const std::string MessageField::OP_TYPE;
-const std::string MessageField::PATH;
-const std::string MessageField::USER_ID;
-const std::string MessageField::PASSWD;
-*/
+
 int
-RESTSender::send(folly::dynamic map
-				,boost::function<void(boost::system::error_code const&
-								,std::size_t)> callback){
+RESTSender::send(std::share_ptr<Request> request
+		,boost::function<void(boost::system::error_code const&
+				     ,std::size_t)> callback)
+{
 	if(!socket_->is_open()){
 		return -2;
 	}
@@ -44,74 +37,80 @@ RESTSender::send(folly::dynamic map
 	int version = 11;
 
 	/**
-	 * Retrive op type
+ 	 * Set the target
 	 */
-	auto kv = map.find(MessageField::OP_TYPE);
-	if(kv == map.items().end()){
-		/**
-		 * Haven't set op type, authentication request
-		 */
+	target = request->objectPath_;
+
+	/**
+	 * Retrive op type
+	 */	
+	switch(request->opType_){
+	case Request::OpType::READ:
+		verb = http::verb::get;
+		break;
+	case Request::OpType::WRITE:
+		verb = http::verb::put;
+		break;
+	case Request::OpType::DELETE:
+		verb = http::verb::delete_;
+		break;
+	case Request::OpType::COMMIT:
+		verb = http::verb::post;
+		break;
+	case Request::OpType::AUTH:
 		verb = http::verb::get;
 		target = "/auth";
+		break;
+	default:
+		return -1;
 	}
-	else{
-		/**
-		 * Determine the type of request
-		 */
-		switch(folly::convertTo<uint8_t>(kv->second)){
-			case 0:
-				verb = http::verb::get; // READ
-				break;
-			case 1:
-				verb = http::verb::put; // WRITE/GET Path
-				break;
-			case 2:
-				verb = http::verb::delete_; // DELETE
-				break;
-            case 3:
-                verb = http::verb::post;    // POST/COMMIT
-			default:
-				/**
-				 * Unknown type
-				 */
-				return -1;
-		}
-		map.erase(MessageField::OP_TYPE);
-		/**
-		 * Retrive object path
-		 */
-		target = map[MessageField::PATH].asString();
-	}
-	map.erase(MessageField::PATH);
 	/**
 	 * Create HTTP request
 	 */
 	http::request<http::string_body> req{verb,target,version};
+	
+	// Host
 	std::string host = socket_->remote_endpoint().address().to_string();
 	host += ":";
 	host += std::to_string(socket_->remote_endpoint().port());
 	req.set(http::field::host,host);
+
+	// Standard head field
+	switch(request->opType_){
+	case Request::OpType::AUTH:
+		// TODO: set the time larger than heart beat
+		req.set(http::field::keep_alive,1000);
+		break;
+	case Request::OpType::COMMIT:
+		std::string type;
+		switch(request->msgEnc_){
+		case Message::MessageEncoding::JSON_ENC:
+			type = "application/json;charset=utf-8";
+			break;
+		case Message::MessageEncoding::ASCII_ENC:
+			type = "ascii;charset=utf-8";
+			break;
+		case Message::MessageEncoding::BYTES_ENC:
+			type = "btyes;charset=utf-8";
+			break;
+		default:
+			type = "charset=utf-8";
+			break;
+		}
+		req.set(http::field::content_type,type);
+		req.body() = (char*)request->data_->data();
+		break;
+	}
+
+	// Accept
 	req.set(http::field::accept,"application/json");
 	req.set(http::field::accept_charset,"utf-8");
 
-	if(verb == http::verb::get){
-		/**
-	 	* TODO: keep alive field
-	 	*/
-	 	//req.set(http::field::keep_alive,std::to_string(life_time));
-	}
+	// Customized field
+	req.set(RESTHeadField::USER_ID,request->userID_);
+	req.set(RESTHeadField::PASSWD,request->password_);
+	req.set(RESTHeadField::TRANSACTION_ID,request->tranID_);	
 
-	std::string authorization = "Basic ";
-	authorization += map[MessageField::USER_ID].asString() 
-				  + ":" + map[MessageField::PASSWD].asString();
-	req.set(http::field::authorization,authorization);
-	map.erase(MessageField::USER_ID);
-	map.erase(MessageField::PASSWD);
-
-	uint32_t tranID = folly::convertTo<uint32_t>(
-						map[MessageField::TRANSACTION_ID]);
-
-	req.body() = folly::toJson(std::move(map));
 	req.prepare_payload();
 
 	/**

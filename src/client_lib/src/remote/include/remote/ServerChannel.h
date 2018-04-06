@@ -93,9 +93,9 @@ class ServerChannel
       bool initChannel();	
       void closeChannel();
 
-      bool sendMessage(std::shared_ptr<Message> msg
+      bool sendMessage(std::shared_ptr<Request> msg
                       , folly::AsyncWriter::WriteCallback* callback);
-      std::vector<std::unique_ptr<Message> > pollReadMessage(); 
+      std::vector<std::unique_ptr<Response> > pollReadMessage(); 
  
     private:
       boost::asio::io_context ioc_;
@@ -115,7 +115,7 @@ class ServerChannel
        * message received by the receiver
        */
       std::shared_ptr<
-        std::vector<std::unique_ptr<Message>>> receivePool_;
+        std::vector<std::unique_ptr<Response>>> receivePool_;
       std::shared_ptr<boost::mutex> mutex_;
 
 
