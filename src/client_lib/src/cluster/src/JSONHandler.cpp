@@ -83,7 +83,7 @@ JSONResult::JSONIter
 JSONResult::JSONIter::begin() const
 {
   // return an iterator to children
-  return std::move(JSONIter(objTree_, true));
+  return JSONIter(objTree_, true);
 }
 
 

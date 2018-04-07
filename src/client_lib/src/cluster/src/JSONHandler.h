@@ -11,6 +11,7 @@
 // boost libraries
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/exceptions.hpp>
 
 
 // Project libraries
@@ -111,6 +112,49 @@ class JSONResult
          return objTree_->get<T>(key);
        }
 
+       
+      template<class T>
+      void putValue(const JSONTree::key_type& key, const T& value)
+      {
+        if(isLoop_)
+        {
+          const bool endItr = end();
+          if(!endItr)
+          { // update the current node
+            // find the child of the node
+            auto valItr = childItr_->second.find(key);
+            if(valItr != childItr_->second.not_found())
+            {
+              // just update the value
+              valItr->second.put_value<T>(value);
+            }
+            else
+            { // throw not found exception
+              throw std::exception();  
+            }// else
+            
+          }//if
+          else
+          {
+            throw std::exception(); /// iterator is empty
+          }
+        }
+        else
+        {
+          // means it's not a list iterator (not used in the loop)
+          // look for children first
+          auto valItr = objTree_->find(key);
+          if(valItr == objTree_->not_found())
+          { // update the node's data
+            objTree_->put_value<T>(value);
+          }
+          else // one of the children
+          {
+            valItr->second.put_value<T>(value);
+          }
+        }
+      }
+
 
 
       private:
@@ -204,7 +248,6 @@ class JSONDecoder
     JSONResult  decData_; 
    
 }; // class JSONDecoder
-
 
 
 } // namesapce singaistorageipc
