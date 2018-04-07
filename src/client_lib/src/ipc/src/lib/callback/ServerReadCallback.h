@@ -3,9 +3,6 @@
 //#include <iostream>
 #include <sys/mman.h>
 #include <unordered_map>
-#include <queue>
-#include <ctime> // ctime used in std::srand for testing
-                 // can be removed in future
 #include <cstdlib>
 
 #include <folly/io/async/AsyncTransport.h>
@@ -20,6 +17,8 @@
 #include "../message/IPCWriteRequestMessage.h"
 #include "../message/IPCStatusMessage.h"
 #include "../utils/BFCAllocator.h"
+#include "remote/Security.h"
+#include "remote/Message.h"
 
 
 namespace singaistorageipc{
@@ -34,7 +33,8 @@ public:
         uint64_t minAllocBuf,
         uint64_t newAllocSize,
         uint32_t readSMSize,
-        uint32_t writeSMSize)
+        uint32_t writeSMSize,
+        std::shared_ptr<Security> sec)
     : bufferSize_(buf),
       socket_(socket),
       wcb_(socket.get()->getFd()),
@@ -45,7 +45,8 @@ public:
       readSM_(nullptr),
       writeSM_(nullptr),
       readSMName_(nullptr),
-      writeSMName_(nullptr){std::srand(time(NULL));};
+      writeSMName_(nullptr),
+      sec_(sec){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -133,6 +134,7 @@ public:
 
 private:
     std::string username_;
+    std::shared_ptr<Security> sec_;
 
     size_t bufferSize_;
     uint64_t minAllocBuf_;
@@ -147,28 +149,28 @@ private:
 
     std::shared_ptr<folly::AsyncSocket> socket_;
     std::shared_ptr<BFCAllocator> readSMAllocator_;
-//    std::shared_ptr<BFCAllocator> writeSMAllocator_;
 
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
 
     std::unordered_map<std::string,ReadRequestContext> readContextMap_;
     std::unordered_map<std::string,WriteRequestContext> writeContextMap_;
-/*
-    std::unordered_map<std::string,
-        std::queue<IPCReadRequestMessage>> readRequest_;
-    std::unordered_map<std::string,
-        std::queue<IPCWriteRequestMessage>> writeRequest_;
 
-    std::unordered_map<std::string,IPCWriteRequestMessage> lastReadResponse_;
-    std::unordered_map<std::string,IPCReadRequestMessage> lastWriteResponse_;
-*/
-
+    /**
+     * Handle function of each operation
+     */
     void handleAuthenticationRequest(std::unique_ptr<folly::IOBuf> data);
     void handleReadRequest(std::unique_ptr<folly::IOBuf> data);
     void handleWriteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleDeleteRequest(std::unique_ptr<folly::IOBuf> data);
     void handleCloseRequest(std::unique_ptr<folly::IOBuf> data);
+
+    /**
+     * Future callback
+     */
+    void callbackAuthenticationRequest(Task);
+
+    std::unordered_map<uint32_t,folly::Future<Task>> futurePool_;
 
     void sendStatus(uint32_t id, IPCStatusMessage::StatusType type);
 

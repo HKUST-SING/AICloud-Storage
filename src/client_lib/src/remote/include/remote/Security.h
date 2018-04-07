@@ -69,7 +69,7 @@ class Security
      *          result of the request
      */
 
-     virtual folly::Future<Response> 
+     virtual folly::Future<Task> 
              clientConnect(const UserAuth& user) = 0;
 
      /**

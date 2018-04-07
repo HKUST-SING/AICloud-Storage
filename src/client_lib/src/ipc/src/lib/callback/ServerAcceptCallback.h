@@ -9,6 +9,7 @@
 
 #include "ipc/IPCContext.h"
 #include "ServerReadCallback.h"
+#include "remote/Security.h"
 
 
 namespace singaistorageipc{
@@ -23,7 +24,8 @@ public:
         uint64_t newAllocSize,uint32_t readsm,uint32_t writesm,
         const std::string& path,
         std::shared_ptr<std::unordered_map<
-        int,IPCContext::PersistentConnection>> map){
+        int,IPCContext::PersistentConnection>> map,
+        std::shared_ptr<Security> sec){
 
           bufferSize_ = bufferSize;
           minAllocBuf_ = minAllocBuf;
@@ -32,6 +34,7 @@ public:
           writesm_ = writesm;    
           unixPath_ = path;   
           socketsMap_ = map;   
+          sec_ = sec;
      }
 	/**
      * connectionAccepted() is called whenever a new client connection is
@@ -115,6 +118,7 @@ private:
      std::vector<std::shared_ptr<folly::AsyncSocket>> socketsPool_;
      std::vector<std::shared_ptr<ServerReadCallback>> readcallbacksPool_;
 */
+     std::shared_ptr<Security> sec_;
 };
 
 

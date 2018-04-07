@@ -7,6 +7,7 @@
 #include <folly/io/async/AsyncSocket.h>
 
 #include "lib/callback/ServerReadCallback.h"
+#include "remote/Security.h"
 
 namespace singaistorageipc{
 
@@ -59,6 +60,8 @@ public:
 
     std::shared_ptr<
     	std::unordered_map<int,PersistentConnection>> socketsMap_;
+
+	std::shared_ptr<Security> sec_{nullptr};    
 };
 
 }

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -11,10 +10,12 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncSocket.h>
+#include <folly/io/async/EventBaseManager.h>
+#include <folly/futures/Future.h>
 
 #include "ServerReadCallback.h"
 #include "ServerWriteCallback.h"
-#include "../message/Task.h"
+#include "include/Task.h"
 #include "../message/IPCMessage.h"
 #include "../message/IPCAuthenticationMessage.h"
 #include "../message/IPCConnectionReplyMessage.h"
@@ -25,11 +26,14 @@
 #include "../message/IPCCloseMessage.h"
 #include "../utils/Hash.h"
 #include "../utils/BFCAllocator.h"
+#include "remote/Security.h"
+#include "remote/Authentication.h"
 
 namespace singaistorageipc{
 
 void ServerReadCallback::sendStatus(
-	uint32_t id,IPCStatusMessage::StatusType type){
+	uint32_t id,IPCStatusMessage::StatusType type)
+{
 	IPCStatusMessage reply;
 	reply.setID(id);
 	reply.setStatusType(type);
@@ -37,12 +41,125 @@ void ServerReadCallback::sendStatus(
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
 }
 
+void ServerReadCallback::callbackAuthenticationRequest(Task task)
+{
+	/**
+	 * Erase future from the pool.
+	 */
+	futurePool_.erase(task.getTransctionID());
+
+	/**
+	 * Check result and send back to the client.
+	 *
+	 * Now we just send success.
+	 */
+
+	if(task.getOpCode() == Task::OpCode::OP_SUCCESS){
+
+		/**
+		 * Set the `username_`
+		 */
+		username_ = task.getUsername();
+
+		/**
+		 * Get share memory name.
+		 */
+		time_t t;
+		t = time(NULL);
+		char *readSMName = memName32(ctime(&t));
+		t = time(NULL);
+		char *writeSMName = memName32(ctime(&t));
+
+		/**
+		 * Create share memory.
+		 */
+		int readfd;
+		while((readfd = shm_open(readSMName,
+			O_CREAT|O_EXCL|O_RDWR,
+			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == EEXIST){
+			/*
+			 * The object already exists. Change another name.
+			 */
+			t = time(NULL);
+			delete(readSMName);
+			readSMName = memName32(ctime(&t));
+		}
+		readSMName_ = readSMName;
+
+		int writefd;
+		while((writefd = shm_open(writeSMName,
+			O_CREAT|O_EXCL|O_RDWR,
+			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == EEXIST){
+			/*
+			 * The object already exists. Change another name.
+			 */
+			t = time(NULL);
+			delete(writeSMName);
+			writeSMName = memName32(ctime(&t));
+		}
+		writeSMName_ = writeSMName;
+		//memcpy(writeSMName_,writeSMName,32*sizeof(char));
+		/**
+		 * Set the size of share memory.
+		 */
+		ftruncate(readfd,readSMSize_);
+		ftruncate(writefd,writeSMSize_);
+
+		/**
+		 * Map the share memory to the virtual address.
+		 */
+		readSM_ = mmap(NULL, readSMSize_, PROT_READ | PROT_WRITE,
+						MAP_SHARED, readfd, 0);
+		close(readfd);
+		writeSM_ = mmap(NULL, writeSMSize_, PROT_READ | PROT_WRITE,
+						MAP_SHARED, writefd, 0);
+		close(writefd);
+
+		/**
+		 * Register allocater for share memory.
+		 */
+		readSMAllocator_ = BFCAllocator::Create(0,readSMSize_);
+
+		/**
+		 * Send the reply.
+		 */
+		IPCConnectionReplyMessage reply;
+		reply.setWriteBufferAddress((uint64_t)writeSM_);
+		reply.setReadBufferAddress((uint64_t)readSM_);
+		reply.setWriteBufferSize(writeSMSize_);
+		reply.setReadBufferSize(readSMSize_);
+		reply.setWriteBufferName(writeSMName_);
+		reply.setReadBufferName(readSMName_);
+
+		// get transaction id from task.
+		reply.setID(task.getTransctionID());
+
+		auto send_iobuf = reply.createMsg();
+		socket_->writeChain(&wcb_,std::move(send_iobuf));
+	} // if(issuccess)
+	else if(task.getOpCode() == Task::OpCode::OP_ERR_USER){
+		sendStatus(task.getTransctionID()
+			,IPCStatusMessage::StatusType::STAT_AUTH_USER);
+	}
+	else if(task.getOpCode() == Task::OpCode::OP_ERR_USER){
+		sendStatus(task.getTransctionID()
+			,IPCStatusMessage::StatusType::STAT_AUTH_PASS);
+	}
+	else{
+		sendStatus(task.getTransctionID()
+			,IPCStatusMessage::StatusType::STAT_INTER);
+	}
+}
+
 void ServerReadCallback::handleAuthenticationRequest(
 	std::unique_ptr<folly::IOBuf> data){
 
 	IPCAuthenticationMessage auth_msg;
+
+	uint32_t tranID = auth_msg.getID();
 	// If parse fail, stop processing.
 	if(!auth_msg.parse(std::move(data))){
+		sendStatus(tranID,IPCStatusMessage::StatusType::STAT_AMBG);
 		return;
 	}
 
@@ -52,12 +169,12 @@ void ServerReadCallback::handleAuthenticationRequest(
 		 */
 
 		// Or we can send a STATUS message here.
-		sendStatus(auth_msg.getID(),IPCStatusMessage::StatusType::STAT_PROT);
+		sendStatus(tranID,IPCStatusMessage::StatusType::STAT_PROT);
 		return ;
 	}
 
 	/**
-	 * TODO: Send the user info to the authentication server.
+	 * Send the user info to the authentication server.
 	 *
 	 * Here we only grant each authentication.
 	 */
@@ -65,89 +182,15 @@ void ServerReadCallback::handleAuthenticationRequest(
 	char pw[32];
 	auth_msg.getPassword(pw);
 
-	/**
-	 * TODO: Check result and send back to the client.
-	 *
-	 * Now we just send success.
-	 */
-	username_ = username;
-
-	/**
-	 * Get share memory name.
-	 */
-	time_t t;
-	t = time(NULL);
-	char *readSMName = memName32(ctime(&t));
-	t = time(NULL);
-	char *writeSMName = memName32(ctime(&t));
-
-	/**
-	 * Create share memory.
-	 */
-	int readfd;
-	while((readfd = shm_open(readSMName,
-		O_CREAT|O_EXCL|O_RDWR,
-		S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == EEXIST){
-		/*
-		 * The object already exists. Change another name.
-		 */
-		t = time(NULL);
-		delete(readSMName);
-		readSMName = memName32(ctime(&t));
-	}
-	//memcpy(readSMName_,readSMName,32*sizeof(char));
-	readSMName_ = readSMName;
-
-	int writefd;
-	while((writefd = shm_open(writeSMName,
-		O_CREAT|O_EXCL|O_RDWR,
-		S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == EEXIST){
-		/*
-		 * The object already exists. Change another name.
-		 */
-		t = time(NULL);
-		delete(writeSMName);
-		writeSMName = memName32(ctime(&t));
-	}
-	writeSMName_ = writeSMName;
-	//memcpy(writeSMName_,writeSMName,32*sizeof(char));
-	/**
-	 * Set the size of share memory.
-	 */
-	ftruncate(readfd,readSMSize_);
-	ftruncate(writefd,writeSMSize_);
-
-	/**
-	 * Map the share memory to the virtual address.
-	 */
-	readSM_ = mmap(NULL, readSMSize_, PROT_READ | PROT_WRITE,
-					MAP_SHARED, readfd, 0);
-	close(readfd);
-	writeSM_ = mmap(NULL, writeSMSize_, PROT_READ | PROT_WRITE,
-					MAP_SHARED, writefd, 0);
-	close(writefd);
-
-	/**
-	 * Register allocater for share memory.
-	 */
-	readSMAllocator_ = BFCAllocator::Create(0,readSMSize_);
-	///writeSMAllocator_ = BFCAllocator::create(1,writeSMSize_);
-
-	/**
-	 * Send the reply.
-	 */
-	IPCConnectionReplyMessage reply;
-	reply.setWriteBufferAddress((uint64_t)writeSM_);
-	reply.setReadBufferAddress((uint64_t)readSM_);
-	reply.setWriteBufferSize(writeSMSize_);
-	reply.setReadBufferSize(readSMSize_);
-	reply.setWriteBufferName(writeSMName_);
-	reply.setReadBufferName(readSMName_);
-
-	reply.setID(auth_msg.getID());
-
-	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb_,std::move(send_iobuf));
+	UserAuth auth(username,pw);
+	folly::Future<Task> future = sec_->clientConnect(auth);
+	future.via(folly::EventBaseManager::get()->getEventBase())
+		  .then([=](Task t){
+		  		t.tranID_ = tranID;
+		  		this->callbackAuthenticationRequest(t);
+		  });
+	
+	futurePool_[tranID] = future;
 };
 
 void ServerReadCallback::handleReadRequest(
@@ -509,7 +552,6 @@ void ServerReadCallback::getReadBuffer(void** bufReturn, size_t* lenReturn){
 
 void ServerReadCallback::readDataAvailable(size_t len)noexcept{
 	readBuffer_.postallocate(len);
-	//std::cout << "read data available:"<< isBufferMovable() << std::endl;
 	/**
 	 * Get the message, now it still std::unique_ptr<folly::IOBuf>
 	 */
@@ -557,7 +599,7 @@ void ServerReadCallback::readEOF() noexcept{
     writeContextMap_.clear();
 
     /**
-	 * TODO: wait uutil all the pengding operation finish.
+	 * TODO: wait until all the pengding operation finish.
 	 */
 	/**
 	 * Release share memory.
@@ -582,9 +624,17 @@ void ServerReadCallback::readEOF() noexcept{
 	 * Unregister the allocator.
 	 */
 	readSMAllocator_ = nullptr;
-	//writeSMAllocator_ = nullptr;
 
 	username_.clear();
+	sec_ = nullptr;
+
+	/**
+	 * Cancel unfinished Future.
+	 */
+	for(auto kv : futurePool_){
+		kv->second.cancel();
+	}
+	futurePool_.clear();
 }
 
 }

@@ -49,6 +49,12 @@ public:
 	:tranID_(tranID)
 	,msgEnc_(MessageEncoding::NONE_ENC){}
 
+	Message(Message* msg)
+	:type_(msg->type_)
+	,tranID_(msg->tranID_)
+	,data_(std::move(msg->data_))
+	,msgEnc_(msg->msgEnc_){}
+
 	MessageType                   type_;
 	uint32_t                      tranID_;
     std::unique_ptr<folly::IOBuf> data_;    // message data to send  
@@ -82,6 +88,10 @@ public:
 	:Message(tranID),userID_(userID),password_(password)
 	,objectPath_(objectPath),opType_(opType){}
 
+	Request(Request* req)
+	:Message(req),userID_(req->userID_),password_(req->password_)
+	,objectPath_(req->objectPath_),opType_(req->opType_){}
+
 	std::string userID_;  // user id or user name
 	std::string password_; // secret key or password
 	std::string objectPath_;
@@ -99,6 +109,9 @@ public:
 	Response() = default;
 	Response(uint32_t tranID, StateCode stateCode)
 	:Message(tranID),stateCode_(stateCode){}
+
+	Response(Response* res)
+	:Message(res),stateCode_(res->stateCode_){}
 
 	StateCode stateCode_;
 

@@ -17,7 +17,8 @@ struct Task
 		READ   = 1,
 		WRITE  = 2,
 		DELETE = 3,
-        CLOSE  = 4
+        CLOSE  = 4,
+        AUTH   = 5
 	};
 
 	// result infomation
@@ -25,10 +26,11 @@ struct Task
 	{
 		OP_SUCCESS       =   0, // operation successful
 		OP_ERR_USER      =   1, // user is not authorized to access path
-		OP_ERR_PATH      =   2, // no path exists (for READ operations)
-		OP_ERR_QUOTA     =   3, // not enough available storage (not implemented yet)
-		OP_ERR_LOCK      =   4, // tried to acquire lock of data and failed multiple times 
-        OP_PARTIAL_READ  =   5, // sucessfully read part of the data
+		OP_ERR_PASSWD	 =	 2, // password is wrong
+		OP_ERR_PATH      =   3, // no path exists (for READ operations)
+		OP_ERR_QUOTA     =   4, // not enough available storage (not implemented yet)
+		OP_ERR_LOCK      =   5, // tried to acquire lock of data and failed multiple times 
+        OP_PARTIAL_READ  =   6, // sucessfully read part of the data
                                 // ==> issue another READ
 
 		OP_ERR_INTERNAL  = 255  // internal error (generic error)
@@ -48,6 +50,15 @@ struct Task
 	OpCode opCode_;
 
 
+	/**
+	 * Used for create a Task.
+	 * Dedicated for AUTH response
+	 */
+	Task(const std::string& username, OpCode opcode)
+		: username_(username),
+		  opType_(OpType::AUTH),
+		  opCode_(opcode)
+	{}
 
 	/**
 	 * Used for create a request.
