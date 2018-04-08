@@ -40,6 +40,8 @@ class Security
 
   public:
 
+     Security() = delete;
+
      Security(std::unique_ptr<ServerChannel>&& comm,
               std::unique_ptr<SecureKey>&& secretKey = nullptr,
               std::unique_ptr<Cache>&&     userCache = nullptr)
@@ -87,7 +89,7 @@ class Security
      *          result of the request
      */
 
-     virtual folly::Future<Response> 
+     virtual folly::Future<IOResponse> 
              checkPerm(const std::string& path,
                        const UserAuth& user,
                        const Task::OpType op,
@@ -118,7 +120,7 @@ class Security
       * @return: async interface for waiting reponse
       */
 
-     virtual folly::Future<Response>
+     virtual folly::Future<IOResponse>
              sendIOResult(const IOResult& res) = 0;
 
 
