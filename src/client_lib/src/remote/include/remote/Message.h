@@ -55,6 +55,18 @@ public:
 	,data_(std::move(msg.data_))
 	,msgEnc_(std::move(msg.msgEnc_)){}
 
+    Message& operator=(Message&& other)
+    {
+	  type_   = other.type_;
+      tranID_ = other.tranID_;
+      data_   = std::move(other.data_);
+	  msgEnc_ = other.msgEnc_;
+
+      return *this;
+    }
+
+
+
 	MessageType                   type_;
 	uint32_t                      tranID_;
     std::unique_ptr<folly::IOBuf> data_;    // message data to send  
@@ -100,6 +112,24 @@ public:
 	,opType_(std::move(req.opType_))
 	,Message(std::move(req)){}
 
+    
+    Request& operator=(Request&& req)
+    {
+      // copy Message part first
+      Message::type_   = req.type_;
+      Message::tranID_ = req.tranID_;
+      Message::data_   = std::move(req.data_);
+      Message::msgEnc_ = req.msgEnc_;
+
+      // copy specific fields
+	  userID_     = std::move(req.userID_);
+	  password_   = std::move(req.password_);
+      objectPath_ = std::move(req.objectPath_);
+	  opType_     = req.opType_;
+
+      return *this;
+	}
+
 	std::string 			userID_;  // user id or user name
 	std::string 			password_; // secret key or password
 	std::string 			objectPath_;
@@ -125,6 +155,23 @@ public:
 	Response(Response&& res)
 	:stateCode_(std::move(res.stateCode_))
 	,Message(std::move(res)){}
+
+
+    Response& operator=(Response&& res)
+    {
+      // copy Message part first
+      Message::type_   = res.type_;
+      Message::tranID_ = res.tranID_;
+      Message::data_   = std::move(res.data_);
+      Message::msgEnc_ = res.msgEnc_;
+      
+
+      // copy specific fields
+	  stateCode_ = res.stateCode_;
+
+      return *this;
+	}
+
 
 	CommonCode::IOStatus stateCode_;
 

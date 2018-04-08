@@ -10,8 +10,8 @@
 
 
 // Project lib
-#include "include/Task.h"
 #include "include/CommonCode.h"
+#include "include/Task.h"
 #include "Authentication.h"
 #include "Message.h"
 #include "SecureKey.h"
@@ -108,10 +108,10 @@ class Security
 	 * @param op  : IO operation to be performed on data
 	 */
 
-	virtual folly::Future<ObjectInfo> 
+	/*virtual folly::Future<ObjectInfo> 
 		lockAndRetrieveInfo(const std::string& path,
-							const CommonCode::IOOpCode op) = 0;
-
+							const Task::OpType op) = 0;
+     */
 
      /**
       * For sending an IO operation result.
@@ -122,7 +122,22 @@ class Security
       */
 
      virtual folly::Future<IOResponse>
-             sendIOResult(const IOResult& res) = 0;
+             sendIOResult( const std::string& path,
+                           const UserAuth& user,
+                           const CommonCode::IOOpCode op,
+                           const IOResult& res) = 0;
+
+
+     /**
+      * Same as obove method, only this one passes
+      * full control of the response to the  
+      * security module.
+      */
+     virtual folly::Future<IOResponse>
+             sendIOResult( std::string&& path,
+                           UserAuth&& user,
+                           const CommonCode::IOOpCode op,
+                           IOResult&& res) = 0;
 
 
     /**
