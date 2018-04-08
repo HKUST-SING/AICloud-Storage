@@ -11,6 +11,8 @@
 
 // Project lib
 #include "CommonCode.h"
+#include "remote/Message.h"
+#include "remote/Authentication.h"
 
 namespace singaistorageipc{
 
@@ -20,7 +22,7 @@ typedef struct Task
     // Task fields/atributes
 	std::string username_;  // global user id used internally within the storage system
 	std::string path_;
-	CommonCode::IOOpType opType_;
+	CommonCode::IOOpCode opType_;
 	uint64_t dataAddr_;
 	uint32_t dataSize_;
 	uint32_t tranID_;
@@ -34,10 +36,10 @@ typedef struct Task
 	 * Used for create a Task.
 	 * Dedicated for AUTH response
 	 */
-	Task(const std::string& username, const CommonCode::IOOpCode opcode)
+	Task(const std::string& username, const CommonCode::IOStatus opstat)
 		: username_(username),
-		  opType_(CommonCode:IOOpCode::OP_AUTH),
-		  opStat_(opcode)
+		  opType_(CommonCode::IOOpCode::OP_AUTH),
+		  opStat_(opstat)
 	{}
 
 	/**
@@ -63,13 +65,13 @@ typedef struct Task
 	 */
 	Task(const std::string& username, const std::string& path, 
          const uint32_t tranID, const uint32_t workerID,
-		 const uint64_t remSize, const CommonCode::IOOpCode opCode)
+		 const uint64_t remSize, const CommonCode::IOStatus opStat)
 		: username_(username),
           path_(path),
           tranID_(tranID),
 		  workerID_(workerID),
 		  objSize_(remSize),
-          opStat_(opCode)
+          opStat_(opStat)
      {}
 
 	/** 
@@ -81,7 +83,7 @@ typedef struct Task
       tranID_(other.tranID_),
       workerID_(other.workerID_),
 	  objSize_(other.objSize_),
-      opStat_(other.opCode_)
+      opStat_(other.opStat_)
     {}
 
 	/**
@@ -93,7 +95,7 @@ typedef struct Task
        tranID_(other.tranID_),
        workerID_(other.workerID_),
 	   objSize_(other.objSize_),
-       opStat_(other.opStatus_)
+       opStat_(other.opStat_)
      {}
 
 } Task; // struct Task
@@ -115,7 +117,7 @@ typedef struct IOResult
 
   CommonCode::IOOpCode opType_; // operation type
   UserAuth user_; // for authneticating user 
-  Requeste msg_; // encoded message for sending 
+  Request msg_; // encoded message for sending 
                  // to confirm completed WRITE operation
 
 } IOResult; // struct IOResult

@@ -14,6 +14,7 @@
  */
 #include "remote/Message.h"
 #include "remote/Sender.h"
+#include "include/CommonCode.h"
 
 using tcp = boost::asio::ip::tcp;
 namespace http = boost::beast::http;
@@ -45,19 +46,19 @@ RESTSender::send(std::shared_ptr<Request> request
 	 * Retrive op type
 	 */	
 	switch(request->opType_){
-	case Request::OpType::READ:
+	case CommonCode::IOOpCode::OP_READ:
 		verb = http::verb::get;
 		break;
-	case Request::OpType::WRITE:
+	case CommonCode::IOOpCode::OP_WRITE:
 		verb = http::verb::put;
 		break;
-	case Request::OpType::DELETE:
+	case CommonCode::IOOpCode::OP_DELETE:
 		verb = http::verb::delete_;
 		break;
-	case Request::OpType::COMMIT:
+	case CommonCode::IOOpCode::OP_COMMIT:
 		verb = http::verb::post;
 		break;
-	case Request::OpType::AUTH:
+	case CommonCode::IOOpCode::OP_AUTH:
 		verb = http::verb::get;
 		target = "/auth";
 		break;
@@ -77,11 +78,11 @@ RESTSender::send(std::shared_ptr<Request> request
 
 	// Standard head field
 	switch(request->opType_){
-	case Request::OpType::AUTH:
+	case CommonCode::IOOpCode::OP_AUTH:
 		// TODO: set the time larger than heart beat
 		req.set(http::field::keep_alive,1000);
 		break;
-	case Request::OpType::COMMIT:
+	case CommonCode::IOOpCode::OP_COMMIT:
 		std::string type;
 		switch(request->msgEnc_){
 		case Message::MessageEncoding::JSON_ENC:

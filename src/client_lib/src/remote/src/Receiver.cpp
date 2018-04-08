@@ -13,6 +13,7 @@
  */
 #include "remote/Receiver.h"
 #include "remote/Message.h"
+#include "include/CommonCode.h"
 
 namespace http = boost::beast::http;
 
@@ -21,33 +22,39 @@ namespace singaistorageipc{
 std::unique_ptr<Response>
 RESTReceiver::msgParse(){
 	try{
-	  std::unique_ptr<Response> response(new Response(
-					std::stoul(response_.at(RESTHeadField::TRANSACTION_ID).data(),nullptr,10)
-					,Response::StateCode::SUCCESS));
+		/**
+		 * TODO: check the status code in response message
+		 *       now, we just set SUCCESS here
+		 */
+		std::unique_ptr<Response> response(new Response(
+					std::stoul(response_.at(RESTHeadField::TRANSACTION_ID).data()
+							  ,nullptr,10)
+					,CommonCode::IOStatus::STAT_SUCCESS));
 
-	response->data_ = folly::IOBuf::copyBuffer(response_.body().data(),response_.body().length());
+		response->data_ = folly::IOBuf::copyBuffer(
+							response_.body().data(),response_.body().length());
 	
-	std::string contenttype = "";
-	try{
-	  contenttype = response_.at(http::field::content_type).data();
-	}
-	catch(std::out_of_range){
-	  contenttype = "";
-	}
-	if(contenttype.find("json") != std::string::npos){
-		response->msgEnc_ = Message::MessageEncoding::JSON_ENC;
-	}
-	else if(contenttype.find("ascii") != std::string::npos){
-		response->msgEnc_ = Message::MessageEncoding::ASCII_ENC;
-	}
-	else if(contenttype.find("bytes") != std::string::npos){
-	  	response->msgEnc_ = Message::MessageEncoding::BYTES_ENC;
-	}
-	else{
-		response->msgEnc_ = Message::MessageEncoding::NONE_ENC;
-	}
+		std::string contenttype = "";
+		try{
+		  contenttype = response_.at(http::field::content_type).data();
+		}
+		catch(std::out_of_range){
+		  contenttype = "";
+		}
+		if(contenttype.find("json") != std::string::npos){
+			response->msgEnc_ = Message::MessageEncoding::JSON_ENC;
+		}
+		else if(contenttype.find("ascii") != std::string::npos){
+			response->msgEnc_ = Message::MessageEncoding::ASCII_ENC;
+		}
+		else if(contenttype.find("bytes") != std::string::npos){
+		  	response->msgEnc_ = Message::MessageEncoding::BYTES_ENC;
+		}
+		else{
+			response->msgEnc_ = Message::MessageEncoding::NONE_ENC;
+		}
 
-	return response;
+		return response;
 	} // try
 	catch(std::out_of_range){
 	  return nullptr;

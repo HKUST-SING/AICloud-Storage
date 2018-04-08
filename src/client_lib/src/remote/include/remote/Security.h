@@ -11,6 +11,7 @@
 
 // Project lib
 #include "include/Task.h"
+#include "include/CommonCode.h"
 #include "Authentication.h"
 #include "Message.h"
 #include "SecureKey.h"
@@ -87,10 +88,10 @@ class Security
      *          result of the request
      */
 
-     virtual folly::Future<Response> 
+     virtual folly::Future<Task> 
              checkPerm(const std::string& path,
                        const UserAuth& user,
-                       const Task::OpType op,
+                       const CommonCode::IOOpCode op,
                        const uint64_t dataSize=0) = 0;  
 
 
@@ -107,7 +108,7 @@ class Security
 
 	virtual folly::Future<ObjectInfo> 
 		lockAndRetrieveInfo(const std::string& path,
-							const Task::OpType op) = 0;
+							const CommonCode::IOOpCode op) = 0;
 
 
      /**

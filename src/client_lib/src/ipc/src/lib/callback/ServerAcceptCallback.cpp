@@ -14,7 +14,7 @@ void ServerAcceptCallback::connectionAccepted(int fd,
 	auto s = folly::AsyncSocket::newSocket(folly::EventBaseManager::get()->getEventBase(),fd);
 	auto cb = std::shared_ptr<ServerReadCallback>(
 		new ServerReadCallback(bufferSize_,s,minAllocBuf_,newAllocSize_,
-			readsm_,writesm_,sec_));
+			readsm_,writesm_,sec_,worker_));
     s->setReadCB(cb.get());
     socketsMap_->insert({fd,{s,cb}});
 };

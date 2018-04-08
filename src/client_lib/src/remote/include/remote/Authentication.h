@@ -9,6 +9,7 @@
 
 // Project lib
 #include "include/Task.h"
+#include "include/CommonCode.h"
 
 namespace singaistorageipc
 {
@@ -276,7 +277,7 @@ typedef struct IOResult
 
   public:
     IOResult(const UserAuth& user, 
-             const IOResult::Status stat, Task::OpType ioType,
+             const IOResult::Status stat, CommonCode::IOOpCode ioType,
              const uint32_t id, const uint32_t remID=0)
     : user_(user),
       ioStat_(stat),
@@ -290,7 +291,7 @@ typedef struct IOResult
   public:
     UserAuth     user_; // user which has issues the opearation
     Status     ioStat_; // status of the Io operation
-    Task::OpType ioOp_; // IO operation type
+    CommonCode::IOOpCode ioOp_; // IO operation type
     uint32_t   tranID_; // transaction ID for async IO
     uint32_t    token_; // unique identifier for this user of the IO
       

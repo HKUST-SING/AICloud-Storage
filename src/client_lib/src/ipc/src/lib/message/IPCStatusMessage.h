@@ -10,24 +10,12 @@
 #include <folly/io/IOBuf.h>
 
 #include "IPCMessage.h"
+#include "include/CommonCode.h"
 
 namespace singaistorageipc{
 
 class IPCStatusMessage : public IPCMessage{
 public:
-
-	enum class StatusType : uint16_t{
-		STAT_SUCCESS     = 0,   // notifies success
-		STAT_CLOSE       = 1,   // require to close IPC and release resources
-		STAT_AUTH_USER   = 2,   // authentication problem (username)
-		STAT_AUTH_PASS   = 3,   // authentication problem (password)
-		STAT_PATH	     = 3,   // data path problem ('no such path')
-		STAT_DENY	     = 4,   // denied access to the data at 'path'
-		STAT_QUOTA       = 5,   // user has exceeded his/her data quota
-		STAT_PROT        = 6,   // the used protocol is not supported
-		STAT_AMBG        = 254, // cannot understand previously sent request
-		STAT_INTER       = 255 // internal system error (release resources)
-	};
 
 	IPCStatusMessage(){
 		msgType_ = IPCMessage::MessageType::STATUS;
@@ -48,7 +36,7 @@ public:
 			return false;
 		}
 
-		memcpy(&statusType_,data,sizeof(StatusType));
+		memcpy(&statusType_,data,sizeof(CommonCode::IOStatus));
 
 		return true;
 	};
@@ -59,27 +47,27 @@ public:
 
 		tmp = createMsgHead(tmp);
 
-		memcpy(tmp,&statusType_,sizeof(StatusType));
+		memcpy(tmp,&statusType_,sizeof(CommonCode::IOStatus));
 
 		auto iobuf = folly::IOBuf::copyBuffer(buffer,msgLength_);
 
 		return std::move(iobuf);
 	};
 
-	void setStatusType(StatusType type){
+	void setStatusType(CommonCode::IOStatus type){
 		statusType_ = type;
 	};
 
-	StatusType getStatusType(){
+	CommonCode::IOStatus getStatusType(){
 		return statusType_;
 	};
 
 private:
-	StatusType statusType_;
+	CommonCode::IOStatus statusType_;
 
 	uint32_t computeLength() override{
 		msgLength_ = computeHeadLength()
-					+ sizeof(StatusType);
+					+ sizeof(CommonCode::IOStatus);
 
 		return msgLength_;
 	};

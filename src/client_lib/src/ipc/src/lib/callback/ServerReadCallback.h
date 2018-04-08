@@ -3,6 +3,7 @@
 //#include <iostream>
 #include <sys/mman.h>
 #include <unordered_map>
+#include <map>
 #include <cstdlib>
 
 #include <folly/io/async/AsyncTransport.h>
@@ -13,12 +14,10 @@
 
 #include "ServerWriteCallback.h"
 #include "RequestContext.h"
-#include "../message/IPCReadRequestMessage.h"
-#include "../message/IPCWriteRequestMessage.h"
-#include "../message/IPCStatusMessage.h"
 #include "../utils/BFCAllocator.h"
 #include "remote/Security.h"
-#include "remote/Message.h"
+#include "include/CommonCode.h"
+#include "cluster/WorkerPool.h"
 
 
 namespace singaistorageipc{
@@ -34,7 +33,8 @@ public:
         uint64_t newAllocSize,
         uint32_t readSMSize,
         uint32_t writeSMSize,
-        std::shared_ptr<Security> sec)
+        std::shared_ptr<Security> sec,
+        std::shared_ptr<WorkerPool> worker)
     : bufferSize_(buf),
       socket_(socket),
       wcb_(socket.get()->getFd()),
@@ -46,7 +46,8 @@ public:
       writeSM_(nullptr),
       readSMName_(nullptr),
       writeSMName_(nullptr),
-      sec_(sec){};
+      sec_(sec),
+      worker_(worker){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -134,7 +135,9 @@ public:
 
 private:
     std::string username_;
+    std::string password_;
     std::shared_ptr<Security> sec_;
+    std::shared_ptr<WorkerPool> worker_;
 
     size_t bufferSize_;
     uint64_t minAllocBuf_;
@@ -149,6 +152,10 @@ private:
 
     std::shared_ptr<folly::AsyncSocket> socket_;
     std::shared_ptr<BFCAllocator> readSMAllocator_;
+
+    std::map<uint32_t,
+        const std::unordered_map<std::string,
+                        ReadRequestContext>::iterator> unallocatedRequest_;
 
     folly::IOBufQueue readBuffer_{folly::IOBufQueue::cacheChainLength()};
     ServerWriteCallback wcb_;
@@ -169,10 +176,16 @@ private:
      * Future callback
      */
     void callbackAuthenticationRequest(Task);
+    void callbackReadCredential(Task);
+    void callbackReadRequest(Task);
+    void callbackWriteCredential(Task);
+    void callbackWriteRequest(Task);  
+    void callbackDeleteCredential(Task);
+    void callbackDeleteRequest(Task);   
 
     std::unordered_map<uint32_t,folly::Future<Task>> futurePool_;
 
-    void sendStatus(uint32_t id, IPCStatusMessage::StatusType type);
+    void sendStatus(uint32_t id, CommonCode::IOStatus type);
 
 };
 

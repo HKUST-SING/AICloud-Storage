@@ -8,6 +8,10 @@
  */
 #include <folly/io/IOBuf.h>
 
+/**
+ * Internal lib
+ */
+#include "include/CommonCode.h"
 
 namespace singaistorageipc{
 
@@ -16,16 +20,6 @@ public:
 	static const std::string TRANSACTION_ID;
 	static const std::string USER_ID;
 	static const std::string PASSWD;
-/*
-	static const std::string PATH;
-	static const std::string OP_TYPE;
-	static const std::string COMMIT;	
-	static const std::string OBJ_SIZE;
-	static const std::string STATE_CODE;
-	static const std::string METADATA;
-	static const std::string RADOSOBJECTS;
-	static const std::string FLAG;
-*/
 };
 
 class Message{
@@ -63,6 +57,7 @@ public:
 
 class Request : public Message{
 public:
+	/*
 	enum class OpType : uint8_t{
 		READ   = 0,
 		WRITE  = 1,
@@ -70,12 +65,12 @@ public:
         COMMIT = 3,
 		AUTH   = 4
 	};
-
+*/
 
 	Request() = delete;
 
 	/**
-	 * If the `opType` is Request::OpType::AUTH,
+	 * If the `opType` is Request::CmmonCode::IOOpCode::AUTH,
 	 * Sender will not check the `objectPath`
 	 * according to the protocol.
 	 * In that case, please set `objectPath` as
@@ -84,7 +79,7 @@ public:
 	Request(uint32_t tranID, const std::string& userID,
 		const std::string& password,
 		const std::string& objectPath,
-		OpType opType)
+		CommonCode::IOOpCode opType)
 	:Message(tranID),userID_(userID),password_(password)
 	,objectPath_(objectPath),opType_(opType){}
 
@@ -92,28 +87,29 @@ public:
 	:Message(req),userID_(req->userID_),password_(req->password_)
 	,objectPath_(req->objectPath_),opType_(req->opType_){}
 
-	std::string userID_;  // user id or user name
-	std::string password_; // secret key or password
-	std::string objectPath_;
-	OpType      opType_;
+	std::string 			userID_;  // user id or user name
+	std::string 			password_; // secret key or password
+	std::string 			objectPath_;
+	CommonCode::IOOpCode    opType_;
 
 };
 
 class Response : public Message{
 public:
-	enum class StateCode : uint8_t{
+	/*
+	enum class Status : uint8_t{
 		SUCCESS      = 0, // successful request
 		INTERNAL_ERR = 1  // system internal error
 	};
-
+*/
 	Response() = default;
-	Response(uint32_t tranID, StateCode stateCode)
+	Response(uint32_t tranID, CommonCode::IOStatus stateCode)
 	:Message(tranID),stateCode_(stateCode){}
 
 	Response(Response* res)
 	:Message(res),stateCode_(res->stateCode_){}
 
-	StateCode stateCode_;
+	CommonCode::IOStatus stateCode_;
 
 };
 

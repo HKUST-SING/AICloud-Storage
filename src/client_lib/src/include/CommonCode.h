@@ -1,4 +1,8 @@
-final struct CommonCode
+#pragma once
+
+namespace singaistorageipc{
+
+struct CommonCode final
 {
 
   enum class IOOpCode : int
@@ -32,3 +36,5 @@ final struct CommonCode
 
 
 }; // struct CommonCode
+
+} // namespace singaistorageipc
