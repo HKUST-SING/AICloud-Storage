@@ -10,6 +10,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/system/system_error.hpp>
 
 
 // Facebook folly lib
@@ -118,6 +119,11 @@ class ServerChannel
         std::vector<std::unique_ptr<Response>>> receivePool_;
       std::shared_ptr<boost::mutex> mutex_;
 
+      /**
+       * Helper functions
+       */
+      folly::AsyncSocketException::AsyncSocketExceptionType 
+        fromBoostErrortoFollyException0(boost::system::error_code const& er);
 
 }; // class ServerChannel
 
