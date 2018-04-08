@@ -41,6 +41,8 @@ class Security
 
   public:
 
+     Security() = delete;
+
      Security(std::unique_ptr<ServerChannel>&& comm,
               std::unique_ptr<SecureKey>&& secretKey = nullptr,
               std::unique_ptr<Cache>&&     userCache = nullptr)
@@ -119,7 +121,7 @@ class Security
       * @return: async interface for waiting reponse
       */
 
-     virtual folly::Future<Response>
+     virtual folly::Future<IOResponse>
              sendIOResult(const IOResult& res) = 0;
 
 
