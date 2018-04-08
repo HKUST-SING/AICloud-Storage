@@ -177,14 +177,14 @@ StoreWorker::processTasks()
     // check the type of the task
     switch(tmpTask.second.opType_)
     {
-      case Task::OpType::READ: 
+      case CommonCode::IOOpCode::OP_READ: 
       {  // process read
          
          processReadOp(tmpTask);
          break; // one task has been completed
       }
       
-      case Task::OpType::WRITE:
+      case CommonCode::IOOpCode::OP_WRITE:
       { // process write
         
         processWriteOp(tmpTask);
@@ -193,7 +193,7 @@ StoreWorker::processTasks()
 
       }
       
-      case Task::OpType::DELETE:
+      case CommonCode::IOOpCode::OP_DELETE:
       { // process delete
 
         processDeleteOp(tmpTask);
@@ -201,7 +201,7 @@ StoreWorker::processTasks()
         break; // one task has been completed
       }      
 
-     case Task::OpType::CLOSE:
+     case CommonCode::IOOpCode::OP_CLOSE:
      default:
      {
        done_.store(true); // completed processing
@@ -287,13 +287,13 @@ StoreWorker::handlePendingRead(
   // check if I can still read more data
   if(itr->second.storeObjComplete())
   { // done reading the entire object
-    tmp.opCode_ = Task::OpCode::OP_SUCCESS;
+    tmp.opStat_ = CommonCode::IOStatus::STAT_SUCCESS;
     // remove the iterator from the map
     pendReads_.erase(itr);
   }
   else
   { // need to read more data
-    tmp.opCode_ = Task::OpCode::OP_PARTIAL_READ;
+    tmp.opStat_ = CommonCode::IOStatus::STAT_PARTIAL_READ;
   } 
   
   // a READ operation completed

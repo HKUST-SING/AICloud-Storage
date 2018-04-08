@@ -24,6 +24,8 @@
 #include "cluster/Worker.h"
 #include "cluster/CephContext.h"
 #include "include/ConcurrentQueue.h"
+#include "include/Task.h"
+#include "include/CommonCode.h"
 #include "StoreObj.h"
 
 

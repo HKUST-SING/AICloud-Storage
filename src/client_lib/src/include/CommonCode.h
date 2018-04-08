@@ -1,8 +1,9 @@
 #pragma once
 
-namespace singaistorageipc{
+namespace singaistorageipc
+{
 
-struct CommonCode final
+typedef struct CommonCode final
 {
 
   enum class IOOpCode : int
@@ -12,7 +13,8 @@ struct CommonCode final
     OP_DELETE = 3,
     OP_AUTH   = 4,
     OP_COMMIT = 5,
-    OP_CLOSE  = 6 
+    OP_CLOSE  = 6,
+    OP_NOP    = 255 // no operation (for default initialization)
 
   }; // enum IOOpCode
 
@@ -35,6 +37,5 @@ struct CommonCode final
 
 
 
-}; // struct CommonCode
-
-} // namespace singaistorageipc
+} ComonCode; // struct CommonCode
+} // namesapce singaistorageipc

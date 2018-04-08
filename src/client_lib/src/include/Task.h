@@ -10,9 +10,8 @@
 
 
 // Project lib
-#include "CommonCode.h"
 #include "remote/Message.h"
-#include "remote/Authentication.h"
+#include "CommonCode.h"
 
 namespace singaistorageipc{
 
@@ -36,10 +35,10 @@ typedef struct Task
 	 * Used for create a Task.
 	 * Dedicated for AUTH response
 	 */
-	Task(const std::string& username, const CommonCode::IOStatus opstat)
+	Task(const std::string& username, const CommonCode::IOStatus opStat)
 		: username_(username),
 		  opType_(CommonCode::IOOpCode::OP_AUTH),
-		  opStat_(opstat)
+		  opStat_(opStat)
 	{}
 
 	/**
@@ -65,12 +64,14 @@ typedef struct Task
 	 */
 	Task(const std::string& username, const std::string& path, 
          const uint32_t tranID, const uint32_t workerID,
-		 const uint64_t remSize, const CommonCode::IOStatus opStat)
+		 const uint64_t remSize, const CommonCode::IOOpCode opCode,
+         const CommonCode::IOStatus opStat)
 		: username_(username),
           path_(path),
           tranID_(tranID),
 		  workerID_(workerID),
 		  objSize_(remSize),
+          opType_(opCode),
           opStat_(opStat)
      {}
 
@@ -83,6 +84,7 @@ typedef struct Task
       tranID_(other.tranID_),
       workerID_(other.workerID_),
 	  objSize_(other.objSize_),
+      opType_(other.opType_),
       opStat_(other.opStat_)
     {}
 
@@ -95,6 +97,7 @@ typedef struct Task
        tranID_(other.tranID_),
        workerID_(other.workerID_),
 	   objSize_(other.objSize_),
+       opType_(other.opType_),
        opStat_(other.opStat_)
      {}
 
@@ -106,8 +109,8 @@ typedef struct IOResponse
   CommonCode::IOOpCode opType_; // operation type
   CommonCode::IOStatus opStat_; // operation status (error/success)
 
-  Message              msg_;   // message received from the 
-                               // remote server
+  Message              msg_;    // message received from the 
+                                // remote server
 
 } IOResponse; // response for IO operations
 
@@ -115,11 +118,9 @@ typedef struct IOResponse
 typedef struct IOResult
 {
 
-  CommonCode::IOOpCode opType_; // operation type
-  UserAuth user_; // for authneticating user 
-  Request msg_; // encoded message for sending 
-                 // to confirm completed WRITE operation
-
+  Request msg_;                 // encoded message for sending 
+                                // to confirm completed WRITE operation
+                                // (COMMIT Operation)
 } IOResult; // struct IOResult
 
 } // namesapce singaistorageipc
