@@ -19,7 +19,7 @@ public:
 class ReadRequestContext : public RequestContext{
 
 public:
-	uint32_t remainSize_;
+	uint64_t remainSize_;
 
 	IPCWriteRequestMessage lastResponse_;
 

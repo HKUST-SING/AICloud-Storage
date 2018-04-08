@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <map>
 #include <cstdlib>
+#include <cstdint>
 
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocket.h>
@@ -176,17 +177,21 @@ private:
      * Future callback
      */
     void callbackAuthenticationRequest(Task);
-    void callbackReadCredential(Task);
+//    void callbackReadCredential(Task);
     void callbackReadRequest(Task);
-    void callbackWriteCredential(Task);
+    void callbacWriteCredential(Task);
     void callbackWriteRequest(Task);  
-    void callbackDeleteCredential(Task);
+//    void callbackDeleteCredential(Task);
     void callbackDeleteRequest(Task);   
 
     std::unordered_map<uint32_t,folly::Future<Task>> futurePool_;
 
     void sendStatus(uint32_t id, CommonCode::IOStatus type);
 
+    /**
+     * Const default value
+     */
+    const size_t defaultAllocSize_{std::numeric_limits<uint16_t>::max()};
 };
 
 }

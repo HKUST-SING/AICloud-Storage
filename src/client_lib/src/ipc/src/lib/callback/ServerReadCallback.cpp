@@ -1,5 +1,6 @@
 #include <ctime>
 #include <cstring>
+#include <cstdint>
 #include <cstdlib>
 #include <fcntl.h>
 #include <errno.h>
@@ -194,9 +195,11 @@ void ServerReadCallback::handleAuthenticationRequest(
 
 //======================== Read ============================
 
-bool allocatSM(size_t &allocsize)
+// Declaration
+void doReadCredential(uint32_t tranID,const std::string &path);
+
+bool allocatSM(size_t &allocsize, BFCAllocator::Offset &memoryoffset)
 {
-	BFCAllocator::Offset memoryoffset;
 	while((memoryoffset = readSMAllocator_->Allocate(allocsize)) 
 		== BFCAllocator::k_invalid_offset)
 	{
@@ -209,38 +212,95 @@ bool allocatSM(size_t &allocsize)
 	return true;
 }
 
+bool finishThisReadRequest(const std::string& path)
+{
+	auto contextmap = readContextMap_.find(path);
+	auto readrequests = contextmap->second.pendingList_;
+
+	if(readrequests.empty()){
+		// No other more requests need to process.
+		readContextMap_.erase(path);
+		return true;
+	}
+	else{
+		// Get the next request.
+		IPCReadRequestMessage nextrequest = readrequests.front();
+		contextmap->second.pendingList_.pop();
+
+		/**
+	 	 * Get some info use for ceph.
+	 	 */
+	 	uint32_t pro = nextrequest.getProperties();	
+	 	uint32_t tranID = nextrequest.getID();
+
+		/**
+	 	 	 * Check user credentials and correctness of operation.
+	 	 	 * 		 update `objectSize`
+	 	 	 *
+	 	 	 * Here we only grant each operation.
+	 	 	 */
+	 	return doReadCredential(tranID,path);
+	}
+}
+
 void ServerReadCallback::callbackReadRequest(Task task)
 {
 	/**
 	 * Erase future from the pool.
 	 */
 	futurePool_.erase(task.tranID_);
-
-	/**
-	 * Then reply write message to client.
-	 */
-	IPCWriteRequestMessage reply;
-	reply.setPath(task.path_);
-
-	reply.setStartAddress(task.dataAddr_);
-	reply.setDataLength(task.dataSize_);
-
-	reply.setID(task.tranID_);
-
-	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb_,std::move(send_iobuf));
-
 	// Update the context
 	auto contextmap = readContextMap_.find(task.path_);
-	/**
-	 * the `remainSize` should retrive from ceph.
-	 */
-	contextmap->second.remainSize_ -= task.dataSize_;
-	contextmap->second.lastResponse_ = reply;
-	/**
-	 * the `workerID` should retrive from ceph.
-	 */
-	contextmap->second.workerID_ = task.workerID_;
+
+	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
+		/**
+		 * Then reply write message to client.
+		 */
+		IPCWriteRequestMessage reply;
+		reply.setPath(task.path_);
+
+		reply.setStartAddress(task.dataAddr_);
+		reply.setDataLength(task.dataSize_);
+
+		reply.setID(task.tranID_);
+
+		auto send_iobuf = reply.createMsg();
+		socket_->writeChain(&wcb_,std::move(send_iobuf));
+
+		/**
+		 * the `remainSize` should retrive from ceph.
+		 */
+		contextmap->second.remainSize_ = task.objSize_;
+		contextmap->second.lastResponse_ = reply;
+		/**
+		 * the `workerID` should retrive from ceph.
+		 */
+		contextmap->second.workerID_ = task.workerID_;
+	}
+	else{
+		sendStatus(task.tranID_,task.opStat_);
+
+		/**
+		 * Release memory.
+		 */
+		readSMAllocator_->Deallocate(task.dataAddr_-(uint64_t)readSM_);
+
+		/**
+		 * Keep sending read request to worker.
+		 *
+		 * If return true, meaning there may have extra memory.
+		 * Try to send unallocated request.
+		 */
+		if(finishThisReadRequest(task.path_)){
+			for(auto iterator = unallocatedRequest_.begin();
+				iterator != unallocatedRequest_.end();){
+				if(!passReadRequesttoTask(iterator->first,iterator->second)){
+					break;
+				}
+				unallocatedRequest_.erase(iterator++);
+			}
+		}
+	}
 }
 
 bool passReadRequesttoTask(
@@ -248,7 +308,7 @@ bool passReadRequesttoTask(
 	const std::unordered_map<std::string,
 					ReadRequestContext>::iterator contextmap)
 {
-	uint32_t objectSize = contextmap->second.remainSize_;
+	uint64_t objectSize = contextmap->second.remainSize_;
 	std::string path = contextmap->first;
 	if(objectSize == 0){
 		// This is the final write.
@@ -264,9 +324,17 @@ bool passReadRequesttoTask(
 		return true;
 	}
 
-	size_t allocsize = objectSize;
+	size_t allocsize
+	if(objectSize >= std::numeric_limits<uint32_t>::max()){
+		allocsize = defaultAllocSize_;
+	} 
+	else{
+		allocsize = objectSize;
+	}
 
-	if(!allocatSM(allocsize))
+	BFCAllocator::Offset memoryoffset;
+
+	if(!allocatSM(allocsize,memoryoffset))
 	{
 		/**
 		 * The share memory is totally full.
@@ -293,33 +361,17 @@ bool passReadRequesttoTask(
 	return true;
 }
 
-void ServerReadCallback::callbackReadCredential(Task task)
+bool doReadCredential(uint32_t tranID,const std::string &path)
 {
-
-	/**
-	 * Erase future from the pool.
-	 */
-	futurePool_.erase(task.tranID_);
-
-	/**
-	 * Check result and send back to the client.
-	 *
-	 * Now we just send success.
-	 */
-	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
-		auto contextmap = readContextMap_.find(path);
-		if(contextmap == readContextMap_.end()){
-			ReadRequestContext newcontext;
-			readContextMap_.emplace(path,newcontext);
-			contextmap = readContextMap_.find(path);
-		}
-		contextmap->second.workerID_ = 0;
-		contextmap->second.remainSize_ = task.dataSize_;
-		passReadRequesttoTask(task.tranID_,contextmap);
-	} // if(success)
-	else{
-		sendStatus(task.tranID_,task.opStat_);
+	auto contextmap = readContextMap_.find(path);
+	if(contextmap == readContextMap_.end()){
+		ReadRequestContext newcontext;
+		readContextMap_.emplace(path,newcontext);
+		contextmap = readContextMap_.find(path);
 	}
+	contextmap->second.workerID_ = 0;
+	contextmap->second.remainSize_ = std::numeric_limits<uint64_t>::max();
+	return passReadRequesttoTask(tranID,contextmap);
 }
 
 void ServerReadCallback::handleReadRequest(
@@ -345,7 +397,6 @@ void ServerReadCallback::handleReadRequest(
 	uint32_t tranID = read_msg.getID();
 	std::string path = read_msg.getPath();
 	uint32_t workerID = 0;
-	uint32_t objectSize;
 
 	auto contextmap = readContextMap_.find(path);
 	if(isnewcoming){
@@ -370,18 +421,7 @@ void ServerReadCallback::handleReadRequest(
 	 	 	 *
 	 	 	 * Here we only grant each operation.
 	 	 	 */
-	 	 	UserAuth auth(username_,password_);
-	 	 	folly::Future<Task> future = sec_->checkPerm(
-	 	 									path,auth,
-	 	 									CommonCode::IOOpCode::OP_READ);
-
-	 	 	future.via(folly::EventBaseManager::get()->getEventBase())
-	 	 		  .then([=](Task task){
-	 	 		  	task.tranID_ = tranID;
-	 	 		  	this->callbackReadCredential(task);
-	 	 		  });
-	
-			futurePool_[tranID] = future;
+			doReadCredential(tranID,path);
 		}
 	}
 	else{ // if(isnewcoming)
@@ -409,44 +449,7 @@ void ServerReadCallback::handleReadRequest(
 		}
 
 		if(isfinish){
-			// check the request queue size.
-			auto readrequests = contextmap->second.pendingList_;
-
-			if(readrequests.empty()){
-				// No other more requests need to process.
-				readContextMap_.erase(path);
-			}
-			else{
-				// Get the next request.
-				IPCReadRequestMessage nextrequest = readrequests.front();
-				contextmap->second.pendingList_.pop();
-
-				/**
-			 	 * Get some info use for ceph.
-			 	 */
-			 	pro = nextrequest.getProperties();	
-			 	tranID = nextrequest.getID();
-
-				/**
-	 	 	 	 * Check user credentials and correctness of operation.
-	 	 	 	 * 		 update `objectSize`
-	 	 	 	 *
-	 	 	 	 * Here we only grant each operation.
-	 	 	 	 */
-	 	 	 	UserAuth auth(username_,password_);
-	 	 		folly::Future<Task> future = sec_->checkPerm(
-	 	 										path,auth,
-	 	 										CommonCode::IOOpCode::OP_READ);
-
-	 	 		future.via(folly::EventBaseManager::get()->getEventBase())
-	 	 			  .then([=](Task task){
-	 	 		  		task.tranID_ = tranID;
-	 	 		  		this->callbackReadCredential(task);
-	 	 		  	});
-	
-				futurePool_[tranID] = future;
-			}
-
+			finishThisReadRequest(path);
 		}
 		else{ //if(isfinish)
 			/**
@@ -470,40 +473,13 @@ void ServerReadCallback::handleReadRequest(
 					unallocatedRequest_.erase(iterator++);
 				}
 			}
-
 		}
 	}	
 }
 
 //====================== Write =============================
 
-void ServerReadCallback::callbackWriteRequest(Task task)
-{
-	futurePool_.erase(task.tranID_);
-
-	IPCReadRequestMessage reply;
-	reply.setPath(task.path_);
-	reply.setID(task.tranID_);
-	reply.setProperties(0);
-
-	auto send_iobuf = reply.createMsg();
-	socket_->writeChain(&wcb_,std::move(send_iobuf));
-
-	/**
-	 * Update context.
-	 */
-	auto contextmap = writeContextMap_.find(task.path_);
-	contextmap->second.workerID_ = task.workerID_;
-	contextmap->second.lastResponse_ = reply;
-
-
-	if(task.dataAddr_ == 0 && task.dataSize_ == 0){
-		writeContextMap_.erase(task.path_);
-	}
-
-}
-
-void ServerReadCallback::callbackWriteCredential(Task task)
+void doWriteRequestCallback(Task task,uint32_t pro)
 {
 	futurePool_.erase(task.tranID_);
 
@@ -511,14 +487,37 @@ void ServerReadCallback::callbackWriteCredential(Task task)
 		IPCReadRequestMessage reply;
 		reply.setPath(task.path_);
 		reply.setID(task.tranID_);
-		reply.setProperties(1);
+		reply.setProperties(pro);
 
 		auto send_iobuf = reply.createMsg();
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
+
+		/**
+		 * Update context.
+		 */
+		auto contextmap = writeContextMap_.find(task.path_);
+		contextmap->second.workerID_ = task.workerID_;
+		contextmap->second.lastResponse_ = reply;
+
+
+		if(pro != 1 && task.dataAddr_ == 0 && task.dataSize_ == 0){
+			writeContextMap_.erase(task.path_);
+		}
 	}
 	else{
-		sendStatus(task.tranID_,task.opStat_);
+		writeContextMap_.erase(task.path_);
+		sendStatus(task.tranID_,task.opStat_);		
 	}
+}
+
+void ServerReadCallback::callbackWriteRequest(Task task)
+{
+	doWriteRequestCallback(task,0);
+}
+
+void ServerReadCallback::callbackWriteCredential(Task task)
+{
+	doWriteRequestCallback(task,1);
 }
 
 void ServerReadCallback::handleWriteRequest(
@@ -537,31 +536,6 @@ void ServerReadCallback::handleWriteRequest(
 	
 	std::string path = write_msg.getPath();
 	uint32_t tranID = write_msg.getID();
-
-	if(pro == 1){
-		/**
-		 *	The flag set. It means this is the first 
-		 *	message of a new request. We need authenticate 
-		 *	at the authentication server.
-		 *	The total size of written object is set in 
-		 *	`dataLength_`, while the `startAddress_` is 0.
-		 *	Here, we just grant every request.
-		 */
-		UserAuth auth(username_,password_);
- 	 	folly::Future<Task> future = sec_->checkPerm(
- 	 									path,auth,CommonCode::IOOpCode::OP_WRITE,
- 	 									write_msg.getDataLength());
-
- 	 	future.via(folly::EventBaseManager::get()->getEventBase())
- 	 		  .then([=](Task task){
- 	 		  	task.tranID_ = tranID;
- 	 		  	this->callbackWriteCredential(task);
- 	 		  });
-
-		futurePool_[tranID] = future;
-
-		return;
-	}
 
 	auto contextmap = writeContextMap_.find(path);
 
@@ -582,10 +556,24 @@ void ServerReadCallback::handleWriteRequest(
 		write_msg.getStartingAddress(),
 		write_msg.getDataLength(),tranID,contextmap->second.workerID_);
 	folly::Future<Task> future = worker_->sendTask(task);
-
- 	future.via(folly::EventBaseManager::get()->getEventBase())
- 		  .then(&ServerReadCallback::callbackWriteRequest,this);
- 	futurePool_[tranID] = future;
+	futurePool_[tranID] = future;
+	
+	if(pro == 1){
+		/**
+		 *	The flag set. It means this is the first 
+		 *	message of a new request. We need authenticate 
+		 *	at the authentication server.
+		 *	The total size of written object is set in 
+		 *	`dataLength_`, while the `startAddress_` is 0.
+		 *	Here, we just grant every request.
+		 */
+ 	 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 	 		  .then(&ServerReadCallback::callbackWriteCredential,this);
+	}
+	else{
+ 		future.via(folly::EventBaseManager::get()->getEventBase())
+ 		  	  .then(&ServerReadCallback::callbackWriteRequest,this);
+ 	}
 }
 
 
@@ -601,20 +589,6 @@ void ServerReadCallback::callbackDeleteRequest(Task task)
 	sendStatus(task.tranID_,task.opStat_);
 }
 
-void ServerReadCallback::callbackDeleteCredential(Task task)
-{
-	futurePool_.erase(task.tranID_);
-
-	Task task(username_,task.path_
-			 ,CommonCode::IOOpCode::OP_DELETE
-			 ,0,0,task.tranID_);
-
-	folly::Future<Task> future = worker_->sendTask(task);
-	future.via(folly::EventBaseManager::get()->getEventBase())
- 		  .then(&ServerReadCallback::callbackDeleteRequest,this);
- 	futurePool_[task.tranID_] = future;
-}
-
 void ServerReadCallback::handleDeleteRequest(
 	std::unique_ptr<folly::IOBuf> data)
 {
@@ -628,19 +602,16 @@ void ServerReadCallback::handleDeleteRequest(
 	uint32_t tranID = delete_msg.getID();
 
 	/**
-	 * Check whether this operation is vaild.
+	 * Send the request to the worker.
 	 */
-	UserAuth auth(username_,password_);
- 	folly::Future<Task> future = sec_->checkPerm(
- 									path,auth,CommonCode::IOOpCode::OP_DELETE);
+	Task task(username_,path
+			 ,CommonCode::IOOpCode::OP_DELETE
+			 ,0,0,tranID);
 
- 	future.via(folly::EventBaseManager::get()->getEventBase())
- 		  .then([=](Task task){
- 		  	task.tranID_ = tranID;
- 		  	this->callbackDeleteCredential(task);
- 		  });
-
-	futurePool_[tranID] = future;
+	folly::Future<Task> future = worker_->sendTask(task);
+	future.via(folly::EventBaseManager::get()->getEventBase())
+ 		  .then(&ServerReadCallback::callbackDeleteRequest,this);
+ 	futurePool_[task.tranID_] = future;
 }
 
 //===================== Close =======================

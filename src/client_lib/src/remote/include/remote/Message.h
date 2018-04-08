@@ -49,6 +49,12 @@ public:
 	,data_(std::move(msg->data_))
 	,msgEnc_(msg->msgEnc_){}
 
+	Message(Message&& msg)
+	:type_(std::move(msg.type_))
+	,tranID_(std::move(msg.tranID_))
+	,data_(std::move(msg.data_))
+	,msgEnc_(std::move(msg.msgEnc_)){}
+
 	MessageType                   type_;
 	uint32_t                      tranID_;
     std::unique_ptr<folly::IOBuf> data_;    // message data to send  
@@ -87,6 +93,13 @@ public:
 	:Message(req),userID_(req->userID_),password_(req->password_)
 	,objectPath_(req->objectPath_),opType_(req->opType_){}
 
+	Request(Request&& req)
+	:userID_(std::move(req.userID_))
+	,password_(std::move(req.password_))
+	,objectPath_(std::move(req.objectPath_))
+	,opType_(std::move(req.opType_))
+	,Message(std::move(req)){}
+
 	std::string 			userID_;  // user id or user name
 	std::string 			password_; // secret key or password
 	std::string 			objectPath_;
@@ -108,6 +121,10 @@ public:
 
 	Response(Response* res)
 	:Message(res),stateCode_(res->stateCode_){}
+
+	Response(Response&& res)
+	:stateCode_(std::move(res.stateCode_))
+	,Message(std::move(res)){}
 
 	CommonCode::IOStatus stateCode_;
 
