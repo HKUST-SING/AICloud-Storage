@@ -2,7 +2,10 @@
 
 // C++ std lib
 #include <map>
-#include <queue>
+#include <deque>
+#include <thread>
+#include <memory>
+#include <mutex>
 
 
 // Project lib
@@ -38,7 +41,7 @@ namespace singaistorageipc
 
       typedef struct TaskWrapper
       {
-       Request                     msg_;     // message
+       std::shared_ptr<Request>    msg_;     // message
        MessageSource               resType_; // response to use
        
        union TaskPtrs
@@ -94,6 +97,9 @@ namespace singaistorageipc
        // delete the active future
        ~TaskWrapper()
         {
+          // destroy the message
+          msg_ = nullptr;
+
           switch(resType_)
           {
             case MessageSource::MSG_SERVER:
@@ -120,10 +126,43 @@ namespace singaistorageipc
       } TaskWrapper; // struct TaskWrapper     
 
 
+      // Callback used by asyn socket for notigying about read/write
+      class FollySocketCallback : public folly::AsyncWriter::WriteCallback
+      {
+      
+        public:
+          FollySocketCallback() = delete;
+          
+          FollySocketCallback(SecurityModule* sec,
+                              const uint32_t tranID)
+          : secMod_(sec),
+            tranID_(tranID)
+          {}
+
+          void writeSuccess noexcept override
+          {/* do nothing */}
+
+    
+          void writeErr(size_t bytesWritten, 
+                        const folly::AsyncSocketException& exp)
+                            noexcept override 
+          {
+
+            // enqueue the failure to the failure queue
+            secMod_->socketError(trandID_);
+          }
+            
+
+          private:
+            SecurityModule* secMod_; // security module
+            const uint32_t  tranID_; // transaction ID (mesage id)
+
+      }; // class FollySocketCallback
+
+
     public:
-      SecurityModule(std::unique_ptr<ServerChannel>&& comm)
-      : Security(std::move(comm))
-      {}
+      SecurityModule() = delete; // no default constructor
+      SecurityModule(std::unique_ptr<ServerChannel>&& comm);
        
  
       ~SecurityModule() override;
@@ -162,14 +201,131 @@ namespace singaistorageipc
                      IOResult&& res) override;
 
 
+       /**
+        * Start processing the incoming requests.
+        */
+
+       virtual void startService() override;
+
+       /**
+        * The calling thread waits the security module
+        * to terminate/finish processing.
+        */
+       virtual void joinService() override;
+
+
+       
+       /** 
+        * It is possible that the write operation 
+        * on the socket failed; need to notify
+        * the taks issuer about it (INTERNAL ERROR).
+        */
+       void socketError(const uint32_t errTranID);
+
+
+    private: // private utility methods
+    
+      /** 
+       * Thread method for running the security service
+       * on a separate thread
+       */
+      void processRequests(); 
+
+
+      /**
+       * Get the reponse from the server channel.
+       * It may not return any new messages if there
+       * nothing to poll.
+       */ 
+      void queryServerChannel();
+
+      
+      /**
+       * Process newly dequeued requests/tasks.
+       */
+      void processNewTasks();
+
+
+      /** 
+       * Dequeue any failed socket operations.
+       * Method is called to check for writeErr callback() [Folly]
+       **/
+      void dequeueSocketErrors(std::vector<uint32_t>& errors);
+
+
+      /** 
+       * There is a possibility of having socket errors.
+       * Socket errors are handled with a low priority.
+       * (NOTE:  give higher priority in the future)
+       *
+       * @return : true if any socket error have been handled
+       */
+
+      bool tryHandleSocketErrors();
+
+
+      /**
+       * Update internal window so that the ID could
+       * keep growing.
+       *
+       * @param: tranID: id of a completed transaction
+       */ 
+      inline void completedTransaction(const uint32_t tranID);
+
+
+
+      /** 
+       * Basically, handles the socket related errors.
+       * Notifies the caller about an internal error.
+       */
+      void handleInternalError(TaskWrapper& errTask, 
+       const CommonCode::IOStatus errNo = CommonCode::ERR_INTERNAL) const;
+
+
+
+      /**
+       * Process a recieved request and send it to the IPC server.
+       *
+       * @param: taskRef : reference to the task wrapper that
+       *                   issued a request for the server
+       * @param: resValue : response from the server
+       */
+       void processServerResponse(TaskWrapper& taskRef, 
+                                  std::unique_ptr<Response>& resValue)
+
+      /**
+       * Process a recieved request and send it to one of the workers.
+       *
+       * @param: taskRef : reference to the task wrapper that
+       *                   issued a request for the server
+       * @param: resValue : response from the server
+       */
+       void processWorkerResponse(TaskWrapper& taskRef, 
+                                  std::unique_ptr<Response>& resValue)
+
+
+
     private:
+
+      std::thread                     workerThread_; // worker thread
       ConcurrentQueue<TaskWrapper>    tasks_; // queue of messages to send 
       std::map<uint32_t, TaskWrapper> responses_; // reponse futures
-           
+      std::deque<TaskWrapper>         recvTasks_; // for dequeueing
+        
  
       std::map<uint32_t, bool>        complTrans_; // completed transactions      
-      std::queue<TaskWrapper>         pendTrans_; // should never happen                                         
+      std::deque<TaskWrapper>         pendTrans_;  // should never happen                                         
       
+
+      /************** For locally failed write operations *************/
+      std::mutex                      errLock_;   // error lock
+      std::deque<uint32_t>            sockErrs_;  // failed write socket
+                                                  // messages
+
+      
+            
+
+
       uint32_t nextID_; // next transaction ID
       uint32_t backID_; // oldest transaction ID 
 

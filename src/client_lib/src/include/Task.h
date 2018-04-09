@@ -106,11 +106,11 @@ typedef struct Task
 
 typedef struct IOResponse
 {
-  CommonCode::IOOpCode opType_; // operation type
-  CommonCode::IOStatus opStat_; // operation status (error/success)
+  CommonCode::IOOpCode     opType_; // operation type
+  CommonCode::IOStatus     opStat_; // operation status (error/success)
 
-  Message              msg_;    // message received from the 
-                                // remote server
+  std::unique_ptr<Message> msg_;   // message received from the 
+                                   // remote server
 
 } IOResponse; // response for IO operations
 
@@ -118,7 +118,7 @@ typedef struct IOResponse
 typedef struct IOResult
 {
 
-  Request msg_;                 // encoded message for sending 
+  Request           msg_;       // encoded message for sending 
                                 // to confirm completed WRITE operation
                                 // (COMMIT Operation)
 } IOResult; // struct IOResult
