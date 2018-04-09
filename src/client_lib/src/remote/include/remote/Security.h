@@ -159,6 +159,19 @@ class Security
     }
 
 
+  /**
+   * For starting the service.
+   */
+   virtual void startService() = 0;
+
+  /** 
+   * For joining the service.
+   */ 
+  virtual void joinService()
+  {}
+  
+
+
 
   public:
     std::atomic<bool> done_;                 // if the service is done

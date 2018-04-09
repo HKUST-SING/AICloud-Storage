@@ -22,7 +22,7 @@ target_include_directories(jsonlib INTERFACE
 
 
 
-target_compile_features(clusterlib
+target_compile_features(jsonlib
     PUBLIC 
       cxx_nullptr
       cxx_rvalue_references

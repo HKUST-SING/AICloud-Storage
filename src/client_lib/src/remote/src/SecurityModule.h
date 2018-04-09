@@ -51,10 +51,8 @@ namespace singaistorageipc
        } futRes; // union
 
        TaskWrapper() 
-       : msg_(0, std::string(""), std::string(""), 
-                 std::string(""), CommonCode::IOOpCode::OP_NOP),
-         resType_(MessageSource::MSG_EMPTY),
-         futRes()
+       : msg_{nullptr},
+         resType_(MessageSource::MSG_EMPTY)
        {
          futRes.serverTask_ = nullptr;
          futRes.workerTask_ = nullptr;
@@ -93,6 +91,43 @@ namespace singaistorageipc
          other.futRes.workerTask_ = nullptr;
          other.resType_ = MessageSource::MSG_EMPTY;
        }
+
+       TaskWrapper& operator=(struct TaskWrapper&& other)
+       {
+         msg_     = std::move(other.msg_);
+         resType_ = other.resType_;
+
+         switch(other.resType_)
+         {
+           case MessageSource::MSG_SERVER:
+           {
+             futRes.workerTask_ = nullptr;
+             futRes.serverTask_ = other.futRes.serverTask_;
+             break;
+           }
+           case MessageSource::MSG_WORKER:
+           {
+             futRes.serverTask_ = nullptr;
+             futRes.workerTask_ = other.futRes.workerTask_;
+             break;
+           }
+           defualt:
+           {
+             futRes.serverTask_ = nullptr;
+             futRes.workerTask_ = nullptr;
+             break;
+           }    
+         } // switch
+
+         // reset the pointers of the other
+         other.futRes.serverTask_ = nullptr;
+         other.futRes.workerTask_ = nullptr;
+         other.resType_ = MessageSource::MSG_EMPTY;
+
+
+         *this; // return the same object
+       }
+
     
        // delete the active future
        ~TaskWrapper()
@@ -139,7 +174,7 @@ namespace singaistorageipc
             tranID_(tranID)
           {}
 
-          void writeSuccess noexcept override
+          void writeSuccess() noexcept override
           {/* do nothing */}
 
     
@@ -149,7 +184,7 @@ namespace singaistorageipc
           {
 
             // enqueue the failure to the failure queue
-            secMod_->socketError(trandID_);
+            secMod_->socketError(tranID_);
           }
             
 
@@ -286,7 +321,7 @@ namespace singaistorageipc
        * Notifies the caller about an internal error.
        */
       void handleInternalError(TaskWrapper& errTask, 
-       const CommonCode::IOStatus errNo = CommonCode::ERR_INTERNAL) const;
+       const CommonCode::IOStatus errNo = CommonCode::IOStatus::ERR_INTERNAL) const;
 
 
 
@@ -298,7 +333,7 @@ namespace singaistorageipc
        * @param: resValue : response from the server
        */
        void processServerResponse(TaskWrapper& taskRef, 
-                                  std::unique_ptr<Response>&& resValue)
+                                  std::unique_ptr<Response>&& resValue);
 
       /**
        * Process a recieved request and send it to one of the workers.
@@ -308,14 +343,21 @@ namespace singaistorageipc
        * @param: resValue : response from the server
        */
        void processWorkerResponse(TaskWrapper& taskRef, 
-                                  std::unique_ptr<Response>&& resValue)
+                                  std::unique_ptr<Response>&& resValue);
+
+
+
+      /** 
+       * Stop the module and clean up all tasks.
+       */
+       void closeSecurityModule();
 
 
 
     private:
 
       std::thread                     workerThread_; // worker thread
-      ConcurrentQueue<TaskWrapper>    tasks_; // queue of messages to send 
+      ConcurrentQueue<TaskWrapper, std::deque<TaskWrapper>> tasks_; // queue of messages to send 
       std::map<uint32_t, TaskWrapper> responses_; // reponse futures
       std::deque<TaskWrapper>         recvTasks_; // for dequeueing
         

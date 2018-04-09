@@ -220,7 +220,8 @@ class JSONDecoder
      decData_.clearContent();
 
      // reuse the same object
-     std::stringstream tmpStream(buffer); // initialize th stream
+     std::stringstream tmpStream; // initialize the stream
+     tmpStream << buffer;         // read the buffer in
  
      bool resOp = true;
 

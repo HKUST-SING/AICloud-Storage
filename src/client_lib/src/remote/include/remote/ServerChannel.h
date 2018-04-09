@@ -87,7 +87,7 @@ class ServerChannel
       }; // class ChannelWriteCallback
 	 
 
-	    ServerChannel() = default;
+	  ServerChannel() = default;
       ServerChannel(const ServerChannel&) = delete;
       ServerChannel(ServerChannel&& other);
       virtual ~ServerChannel();

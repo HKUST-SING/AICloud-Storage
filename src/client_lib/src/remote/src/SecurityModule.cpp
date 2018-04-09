@@ -48,9 +48,7 @@ SecurityModule::SecurityModule(std::unique_ptr<ServerChannel>&& comm)
 
 SecurityModule::~SecurityModule()
 {
-  // make sure that no pending task are left
   
-
 }
 
 
@@ -182,7 +180,7 @@ SecurityModule::processRequests()
 
 
         // wait for a newly incoming task
-        recvTasks_.push(std::move(tasks_.pop()));
+        recvTasks_.push_back(std::move(tasks_.pop()));
         // process the new task
         processNewTasks();
       
@@ -199,7 +197,45 @@ SecurityModule::processRequests()
 
   }// while
 
+
+  // terminate all incoming requests
+  closeSecurityModule();
+
 }
+
+
+void
+SecurityModule::closeSecurityModule()
+{
+
+
+  // go over all pending reqeusts firs and reply them
+  for(auto& pendTask : pendTrans_)
+  {
+    handleInternalError(pendTask, CommonCode::IOStatus::ERR_INTERNAL);
+  }
+
+  pendTrans_.clear(); // clear the pending transactions
+
+
+  // close the channel
+  channel_->closeChannel();
+
+
+  // now handle all error tasks
+  tryHandleSocketErrors();
+
+
+  // query the channel (last messages are returned)
+  queryServerChannel();
+
+  complTrans_.clear();
+  recvTasks_.clear();
+  responses_.clear();
+
+}
+
+
 
 void
 SecurityModule::processNewTasks()
@@ -249,15 +285,16 @@ SecurityModule::processNewTasks()
   // got some transactions to issue  
   bool sendRes = true;
 
-  while(windwoSize > U32_ZERO && !recvTasks_.empty())
+  while(windowSize > U32_ZERO && !recvTasks_.empty())
   { // keep issueing tasks
 
-    auto issTask = std::move(recvTask_.front); // get reference 
-                                               // to the first
-                                               // item
+    auto issTask = std::move(recvTasks_.front()); // get reference 
+                                                  // to the first
+                                                 // item
 
     // remove the front item 
-    recvTask_.pop_front();
+    recvTasks_.pop_front();
+
 
     // send simple signal to terminate the security module
     if(issTask.msg_->msgEnc_ == Message::MessageEncoding::ERR_ENC)
@@ -267,7 +304,7 @@ SecurityModule::processNewTasks()
 
 
     // enque the message
-    issTask.msg_.tranID_ = nextID_;
+    issTask.msg_->tranID_ = nextID_;
       
     sendRes = channel_->sendMessage(issTask.msg_, 
                           new FollySocketCallback(this, 
@@ -291,6 +328,10 @@ SecurityModule::processNewTasks()
     }// else
     
   }// while
+
+
+  // query the server
+  queryServerChannel();
 
 }
 
@@ -354,7 +395,7 @@ SecurityModule::queryServerChannel()
     {
       mapIter = responses_.find(recVal->tranID_);
        
-      if(mapIter == response_.end()) // log the event
+      if(mapIter == responses_.end()) // log the event
       {
         int a = 0; // need to log (logical error)
       }
@@ -444,7 +485,8 @@ SecurityModule::processWorkerResponse(TaskWrapper& taskRef,
   workerRes.opType_ = taskRef.msg_->opType_;
   workerRes.opStat_ = resValue->stateCode_;
   Response* tmp = resValue.release();
-  workerRes.msg_.swap(std::make_unique<Response>(std::move(*tmp)));
+  std::unique_ptr<Message> tmpPtr = std::make_unique<Response>(std::move(*tmp));
+  workerRes.msg_.swap(tmpPtr);
   delete tmp; // nothing left
    
 
@@ -490,7 +532,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
 
       try
       {
-        auto resIter =  jsonObj.getOvject("Result");
+        auto resIter =  jsonObj.getObject("Result");
 
         // now need to try to find either 'Account'
         // or 'Error_Type'
@@ -512,13 +554,13 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
       {
         try
         {
-          auto errType = resIter->getValue<uint64_t("Error_Type");
+          auto errType = resIter->getValue<uint64_t>("Error_Type");
 
           // try to convert server error type into
           // local error type          
 
           serverRes.opStat_   = static_cast<CommonCode::IOStatus>(errType);
-          intenalErr = false;  // no errors
+          internalErr = false;  // no errors
         }
         catch(std::exception& exp)
         {
@@ -539,6 +581,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
 
      if(internalErr)
      { // some internal error occured
+       int a = 0; // log this
        serverRes.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
      }
 
@@ -555,7 +598,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
 void
 SecurityModule::socketError(const uint32_t errTranID)
 {
-  std::lock_guard<std::mutex>(errLock_);
+  std::lock_guard<std::mutex> tmpLock(errLock_);
   // just append the transaction to the failed operations
   sockErrs_.push_back(errTranID);
 
@@ -588,7 +631,7 @@ SecurityModule::tryHandleSocketErrors()
   {
     mapIter = responses_.find(failID);
     
-    if(mapIter == respones_.end())
+    if(mapIter == responses_.end())
     {
       // need to log this case
       int a = 0;  
@@ -597,7 +640,7 @@ SecurityModule::tryHandleSocketErrors()
    else
    {
      // handle the failure
-     handleInternalError(mapIter->second, CommonCode::ERR_INTERNAL);
+     handleInternalError(mapIter->second, CommonCode::IOStatus::ERR_INTERNAL);
      responses_.erase(mapIter);
 
      // mark the transaction ID as completed
@@ -616,7 +659,7 @@ SecurityModule::tryHandleSocketErrors()
 void
 SecurityModule::dequeueSocketErrors(std::vector<uint32_t>& errors)
 {
-  std::lock_guard<std::mutex>(errLock_);
+  std::lock_guard<std::mutex> tmpLock(errLock_);
 
   // dequeue all socket errors
   if(sockErrs_.empty())
@@ -651,8 +694,12 @@ void
 SecurityModule::joinService()
 {
 
+  
   workerThread_.join(); // wait the worker thread to
                         // terminate
+
+  channel_->closeChannel(); // stop the channel
+
 }
 
 

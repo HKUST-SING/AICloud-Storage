@@ -1,15 +1,17 @@
 #pragma once
 
 
-#include <mutex>
+#include <vector>
 #include <queue>
+#include <mutex>
 #include <condition_variable>
+
 
 namespace singaistorageipc
 {
 
 
-template <class T>
+template <class T, class Container=std::vector<T>>
 class ConcurrentQueue
 {
 
@@ -24,6 +26,16 @@ class ConcurrentQueue
     ~ConcurrentQueue();
     ConcurrentQueue(const ConcurrentQueue&) = delete;
     ConcurrentQueue& operator=(const ConcurrentQueue&) = delete;
+
+
+
+    /** 
+     * Dequeue more than one item (Taks).
+     *
+     * @param: items : a container to store all items 
+     */
+    void dequeue(Container& items);
+
 
 
     T pop();
@@ -67,15 +79,15 @@ namespace singaistorageipc
 
 // template class implementation
 
-template <class T>
-ConcurrentQueue<T>::ConcurrentQueue()
+template <class T, class Container>
+ConcurrentQueue<T, Container>::ConcurrentQueue()
 {
   
 }
 
 
-template <class T>
-T ConcurrentQueue<T>::pop()
+template <class T, class Container>
+T ConcurrentQueue<T, Container>::pop()
 {
   std::unique_lock<std::mutex> tmp(mutex_);
 
@@ -91,8 +103,29 @@ T ConcurrentQueue<T>::pop()
 }
 
 
-template <class T>
-bool ConcurrentQueue<T>::push(const T& item)
+template<class T, class Container>
+void ConcurrentQueue<T, Container>::dequeue(Container& items)
+{
+  std::lock_guard<std::mutex> tmpLock(mutex_);
+
+  if(empty())
+  {
+    return;
+  }
+
+  // deque all possible queue items
+  
+  while(!queue_.empty())
+  {
+    items.push_back(std::move(queue_.front()));
+    queue_.pop();
+  }
+
+}
+
+
+template <class T, class Container>
+bool ConcurrentQueue<T, Container>::push(const T& item)
 {
   std::unique_lock<std::mutex> tmp(mutex_);
   queue_.push(item);
@@ -105,8 +138,8 @@ bool ConcurrentQueue<T>::push(const T& item)
 }
 
 
-template <class T>
-bool ConcurrentQueue<T>::push(T&& item)
+template <class T, class Container>
+bool ConcurrentQueue<T, Container>::push(T&& item)
 {
   std::unique_lock<std::mutex> tmp(mutex_);
   queue_.push(std::move(item));
@@ -118,8 +151,8 @@ bool ConcurrentQueue<T>::push(T&& item)
 }
 
 
-template <class T>
-bool ConcurrentQueue<T>::empty() const
+template <class T, class Container>
+bool ConcurrentQueue<T, Container>::empty() const
 {
   // not thread-safe. 
   // Trying to access the queue without locking it.

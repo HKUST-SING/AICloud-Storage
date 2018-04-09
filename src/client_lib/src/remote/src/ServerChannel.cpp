@@ -110,8 +110,8 @@ std::vector<std::unique_ptr<Response>>
 ServerChannel::pollReadMessage()
 {
 	boost::mutex::scoped_lock lock(*mutex_);
-	std::vector<std::unique_ptr<Response>> res(std::move(receivePool_));
-	receivePool_.clear();
+	std::vector<std::unique_ptr<Response>> res(std::move(*receivePool_.get()));
+	receivePool_.get()->clear();
 	return std::move(res);
 }
 

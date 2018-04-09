@@ -27,6 +27,7 @@ set_property(TARGET boost::boost PROPERTY
              INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
 
 # Build our targets
+add_subdirectory(include)
 add_subdirectory(cluster)
 add_subdirectory(remote)
 add_subdirectory(ipc)
