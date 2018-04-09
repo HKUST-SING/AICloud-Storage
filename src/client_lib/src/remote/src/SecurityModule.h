@@ -166,12 +166,19 @@ namespace singaistorageipc
        
  
       ~SecurityModule() override;
-       
-       virtual folly::Future<Task>
+
+
+      bool initialize() override
+      {
+        return channel_->initChannel();
+      }      
+
+ 
+      virtual folly::Future<Task>
            clientConnect(const UserAuth& user) override;
 
 
-       virtual folly::Future<IOResponse>
+      virtual folly::Future<IOResponse>
          checkPerm(const std::string& path,
                    const UserAuth& user,
                    const CommonCode::IOOpCode op,
@@ -291,7 +298,7 @@ namespace singaistorageipc
        * @param: resValue : response from the server
        */
        void processServerResponse(TaskWrapper& taskRef, 
-                                  std::unique_ptr<Response>& resValue)
+                                  std::unique_ptr<Response>&& resValue)
 
       /**
        * Process a recieved request and send it to one of the workers.
@@ -301,7 +308,7 @@ namespace singaistorageipc
        * @param: resValue : response from the server
        */
        void processWorkerResponse(TaskWrapper& taskRef, 
-                                  std::unique_ptr<Response>& resValue)
+                                  std::unique_ptr<Response>&& resValue)
 
 
 

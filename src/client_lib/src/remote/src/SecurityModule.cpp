@@ -2,8 +2,10 @@
 
 // C++ std lib
 #include <limits>
+#include <exception>
 
 // Project lib
+#include "include/JSONHandler.h"
 #include "SecurityModule.h"
 
 
@@ -434,7 +436,7 @@ SecurityModule::completedTransaction(const uint32_t tranID)
 
 void
 SecurityModule::processWorkerResponse(TaskWrapper& taskRef,
-                           std::unique_ptr<Response>& resValue)
+                           std::unique_ptr<Response>&& resValue)
 {
 
   // pass the content to a worker
@@ -453,20 +455,99 @@ SecurityModule::processWorkerResponse(TaskWrapper& taskRef,
 
 void
 SecurityModule::processServerResponse(TaskWrapper& taskRef, 
-                             std::unique_ptr<Response>& resValue)
+                             std::unique_ptr<Response>&& resValue)
 {
 
+   if(resValue->msgEnc_ != Message::MessageEncoding::JSON_ENC)
+   {
+     int a = 0; // need to log this
+     return;
+   }
+
+
   // pass the content to a worker
-  IOResponse workerRes;
-  workerRes.opType_ = taskRef.msg_->opType_;
-  workerRes.opStat_ = resValue->stateCode_;
-  Response* tmp = resValue.release();
-  workerRes.msg_.swap(std::make_unique<Response>(std::move(*tmp)));
-  delete tmp; // nothing left
-   
+  Task serverRes(taskRef.msg_->userID_, resValue->stateCode_);
+  if(resValue->stateCode_ != CommonCode::IOStatus::ERR_INTERNAL)
+  {
+    // need to decode the received content of the message
+    JSONDecoder<const uint8_t*> jsonDec;
+
+    // try to decode the content
+    const bool decRes = jsonDec.decode(resValue->data_->data());
+    if(!decRes)
+    { // set to internal error
+      // need to log this
+      int a = 0;
+      serverRes.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+    }//if
+    else
+    {
+      bool internalErr = false;
+      // try to retrieve the results
+      auto& jsonObj = jsonDec.getResult();
+ 
+
+      try
+      {
+        auto resIter =  jsonObj.getOvject("Result");
+
+        // now need to try to find either 'Account'
+        // or 'Error_Type'
+        try
+        {
+          auto accName = resIter->getValue<std::string>("Account");
+          
+          // found account
+          serverRes.username_ = std::move(accName);
+          serverRes.opStat_   = CommonCode::IOStatus::STAT_SUCCESS;
+          
+        }catch(std::exception& exp)
+        {
+          internalErr = true;
+        }
+
+      if(internalErr) // means could not find Account
+                      // try to find error code
+      {
+        try
+        {
+          auto errType = resIter->getValue<uint64_t("Error_Type");
+
+          // try to convert server error type into
+          // local error type          
+
+          serverRes.opStat_   = static_cast<CommonCode::IOStatus>(errType);
+          intenalErr = false;  // no errors
+        }
+        catch(std::exception& exp)
+        {
+          //final error
+          internalErr = true;
+        }
+        
+     
+      }// if
+
+       
+
+      }catch(std::exception& exp)
+      {
+        int a = 0; // log this
+        internalErr = true; // some error occured
+      }
+
+     if(internalErr)
+     { // some internal error occured
+       serverRes.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+     }
+
+    }//else  
+
+  }//if   
 
   // notify a worker about the received reponse
-  taskRef.futRes.workerTask_->setValue(std::move(workerRes));
+  taskRef.futRes.serverTask_->setValue(std::move(serverRes));
 
 }
 

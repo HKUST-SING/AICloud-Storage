@@ -43,6 +43,7 @@ target_compile_features(clusterlib
 # Define a dependency on the librados and folly libraries
 target_link_libraries(clusterlib
     PUBLIC
+      singstorage::jsonlib
       singstorage::remotelib
       FacebookFolly::FacebookFolly
       CephRados::CephRados

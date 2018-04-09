@@ -10,7 +10,8 @@ add_library(remotelib
     src/Message.cpp
     src/Sender.cpp
     src/ServerChannel.cpp
-    src/Receiver.cpp)
+    src/Receiver.cpp
+    src/SecurityModule.cpp)
 
 add_library(singstorage::remotelib ALIAS remotelib)
 
@@ -46,6 +47,7 @@ target_compile_features(remotelib
 # Define a dependency on the librados and folly libraries
 target_link_libraries(remotelib
     PUBLIC
+      singstorage::jsonlib
       FacebookFolly::FacebookFolly
       boost::boost
     )

@@ -22,15 +22,18 @@ typedef struct CommonCode final
   enum class IOStatus : uint8_t
   {
     STAT_SUCCESS      = 0,  // IO operation successfully completed
-    STAT_CLOSE        = 1,  // close op succeeded
-    ERR_USER          = 2,  // wrong username
-    ERR_PASS          = 3,  // wrong password
-    ERR_PATH          = 4,  // wrong obejct path
-    ERR_DENY          = 5,  // deny access to data at 'path'
-    ERR_QUOTA         = 6,  // cannot write more (quota exceeded)
-    ERR_PROT          = 7,  // wrong protocol used
-    ERR_LOCK          = 8,  // cannot acquire lock on data
-    STAT_PARTIAL_READ = 9,  // there is more data to read
+    ERR_USER          = 1,  // wrong username
+    ERR_PASS          = 2,  // wrong password
+    ERR_PATH          = 3,  // wrong obejct path
+    ERR_DENY          = 4,  // deny access to data at 'path'
+    ERR_QUOTA         = 5,  // cannot write more (quota exceeded)
+    ERR_OBJ_LARGE     = 6,  // object too big to write
+    ERR_OBJ_SMALL     = 7,  // object too small to write
+    ERR_CONTENT       = 8,  // sent message conntent not understood
+    ERR_PROT          = 9,  // wrong protocol used
+    ERR_LOCK          = 10,  // cannot acquire lock on data
+    STAT_PARTIAL_READ = 11,  // there is more data to read
+    STAT_CLOSE        = 12,  // close op succeeded    
 
     ERR_INTERNAL      = 255 // internal error
   }; // enum IOStatus
