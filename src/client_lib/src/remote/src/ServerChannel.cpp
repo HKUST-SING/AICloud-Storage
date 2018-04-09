@@ -103,6 +103,7 @@ ServerChannel::sendMessage(std::shared_ptr<Request> msg
 			}
 		  };
 	restSender_.send(msg,f);
+	return true;
 }
 
 std::vector<std::unique_ptr<Response>>
