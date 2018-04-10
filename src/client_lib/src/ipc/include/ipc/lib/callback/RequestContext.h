@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../message/IPCWriteRequestMessage.h"
-#include "../message/IPCReadRequestMessage.h"
+#include "ipc/lib/message/IPCWriteRequestMessage.h"
+#include "ipc/lib/message/IPCReadRequestMessage.h"
 
 namespace singaistorageipc{
 

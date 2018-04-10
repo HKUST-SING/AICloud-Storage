@@ -7,7 +7,11 @@ project(ipcproj VERSION 0.1 LANGUAGES C CXX)
 # Define the library for linking with others
 
 add_library(ipclib 
-    src/IPCServer.cpp)
+    src/IPCServer.cpp
+    src/lib/callback/ServerAcceptCallback.cpp
+    src/lib/callback/ServerReadCallback.cpp
+    src/lib/callback/ServerWriteCallback.cpp
+    src/lib/utils/BFCAllocator.cpp)
 
 
 add_library(singstorage::ipclib ALIAS ipclib)

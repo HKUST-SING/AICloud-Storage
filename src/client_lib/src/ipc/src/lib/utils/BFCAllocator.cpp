@@ -1,7 +1,7 @@
 /**
  * Copyright 2017 Junxue Zhang, Jingrong Chen
  */
-#include "BFCAllocator.h"
+#include "ipc/lib/utils/BFCAllocator.h"
 
 #include <cassert>
 #include <iostream>

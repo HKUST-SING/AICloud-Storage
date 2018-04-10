@@ -15,7 +15,7 @@
 
 #include "ServerWriteCallback.h"
 #include "RequestContext.h"
-#include "../utils/BFCAllocator.h"
+#include "ipc/lib/utils/BFCAllocator.h"
 #include "remote/Security.h"
 #include "include/CommonCode.h"
 #include "cluster/WorkerPool.h"
