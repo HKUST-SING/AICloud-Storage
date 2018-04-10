@@ -179,10 +179,20 @@ private:
     void callbackAuthenticationRequest(Task);
 //    void callbackReadCredential(Task);
     void callbackReadRequest(Task);
-    void callbacWriteCredential(Task);
+    void callbackWriteCredential(Task);
     void callbackWriteRequest(Task);  
 //    void callbackDeleteCredential(Task);
     void callbackDeleteRequest(Task);   
+
+    /**
+     * Helper functions
+     */
+    bool allocatSM(size_t &,BFCAllocator::Offset &);
+    bool finishThisReadRequest(const std::string&);
+    bool passReadRequesttoTask(uint32_t, const std::unordered_map
+				<std::string,ReadRequestContext>::iterator);
+    bool doReadCredential(uint32_t,const std::string&);
+    void doWriteRequestCallback(Task,uint32_t);
 
     std::unordered_map<uint32_t,folly::Future<Task>> futurePool_;
 

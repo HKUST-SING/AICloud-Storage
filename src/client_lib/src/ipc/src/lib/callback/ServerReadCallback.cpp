@@ -185,22 +185,20 @@ void ServerReadCallback::handleAuthenticationRequest(
 	password_ = password;
 
 	UserAuth auth(username,password);
-	folly::Future<Task> future = sec_->clientConnect(auth);
+	folly::Future<Task> future = std::move(sec_->clientConnect(auth));
 	future.via(folly::EventBaseManager::get()->getEventBase())
 		  .then([=](Task t){
 		  		t.tranID_ = tranID;
 		  		this->callbackAuthenticationRequest(t);
 		  });
 	
-	futurePool_[tranID] = future;
+	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
+//	futurePool_[tranID] = std::move(future);
 };
 
 //======================== Read ============================
 
-// Declaration
-void doReadCredential(uint32_t tranID,const std::string &path);
-
-bool allocatSM(size_t &allocsize, BFCAllocator::Offset &memoryoffset)
+bool ServerReadCallback::allocatSM(size_t &allocsize, BFCAllocator::Offset &memoryoffset)
 {
 	while((memoryoffset = readSMAllocator_->Allocate(allocsize)) 
 		== BFCAllocator::k_invalid_offset)
@@ -214,7 +212,7 @@ bool allocatSM(size_t &allocsize, BFCAllocator::Offset &memoryoffset)
 	return true;
 }
 
-bool finishThisReadRequest(const std::string& path)
+bool ServerReadCallback::finishThisReadRequest(const std::string& path)
 {
 	auto contextmap = readContextMap_.find(path);
 	auto readrequests = contextmap->second.pendingList_;
@@ -307,7 +305,7 @@ void ServerReadCallback::callbackReadRequest(Task task)
 	}
 }
 
-bool passReadRequesttoTask(
+bool ServerReadCallback::passReadRequesttoTask(
 	uint32_t tranID,
 	const std::unordered_map<std::string,
 					ReadRequestContext>::iterator contextmap)
@@ -328,7 +326,7 @@ bool passReadRequesttoTask(
 		return true;
 	}
 
-	size_t allocsize
+	size_t allocsize;
 	if(objectSize >= std::numeric_limits<uint32_t>::max()){
 		allocsize = defaultAllocSize_;
 	} 
@@ -345,7 +343,7 @@ bool passReadRequesttoTask(
 		 * Store the request and allocat it 
 		 * again when there is memory release.
 		 */
-		unallocatedRequest_[tranID] = contextmap;
+		unallocatedRequest_.emplace(tranID,contextmap);
 		return false;
 	}
 
@@ -356,16 +354,16 @@ bool passReadRequesttoTask(
 	/**
 	 * TODO: call worker to do the task
 	 */
-	folly::Future<Task> future = worker_->sendTask(task);
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
 
  	future.via(folly::EventBaseManager::get()->getEventBase())
  		  .then(&ServerReadCallback::callbackReadRequest,this);
- 	futurePool_[tranID] = future;
-
+ 	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
+//	futurePool_[tranID] = std::move(future);
 	return true;
 }
 
-bool doReadCredential(uint32_t tranID,const std::string &path)
+bool ServerReadCallback::doReadCredential(uint32_t tranID,const std::string &path)
 {
 	auto contextmap = readContextMap_.find(path);
 	if(contextmap == readContextMap_.end()){
@@ -484,7 +482,7 @@ void ServerReadCallback::handleReadRequest(
 
 //====================== Write =============================
 
-void doWriteRequestCallback(Task task,uint32_t pro)
+void ServerReadCallback::doWriteRequestCallback(Task task,uint32_t pro)
 {
 	futurePool_.erase(task.tranID_);
 
@@ -563,9 +561,7 @@ void ServerReadCallback::handleWriteRequest(
 	Task task(username_,path,CommonCode::IOOpCode::OP_WRITE,
 		write_msg.getStartingAddress(),
 		write_msg.getDataLength(),tranID,contextmap->second.workerID_);
-	folly::Future<Task> future = worker_->sendTask(task);
-	futurePool_[tranID] = future;
-	
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	if(pro == 1){
 		/**
 		 *	The flag set. It means this is the first 
@@ -582,6 +578,7 @@ void ServerReadCallback::handleWriteRequest(
  		future.via(folly::EventBaseManager::get()->getEventBase())
  		  	  .then(&ServerReadCallback::callbackWriteRequest,this);
  	}
+	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
 }
 
 
@@ -617,10 +614,11 @@ void ServerReadCallback::handleDeleteRequest(
 			 ,CommonCode::IOOpCode::OP_DELETE
 			 ,0,0,tranID);
 
-	folly::Future<Task> future = worker_->sendTask(task);
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	future.via(folly::EventBaseManager::get()->getEventBase())
  		  .then(&ServerReadCallback::callbackDeleteRequest,this);
- 	futurePool_[task.tranID_] = future;
+ 	futurePool_.emplace(std::make_pair(task.tranID_,std::move(future)));
+//	futurePool_[task.tranID_] = std::move(future);
 }
 
 //===================== Close =======================
@@ -672,12 +670,12 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept
 			break;
 
 		case IPCMessage::MessageType::WRITE :
-			DLOG(INFO) << "process WRITE request"
+			DLOG(INFO) << "process WRITE request";
 			handleWriteRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::DELETE :
-			DLOG(INFO) << "process DELETE request"
+			DLOG(INFO) << "process DELETE request";
 			handleDeleteRequest(std::move(rec_iobuf));
 			break;
 
@@ -737,8 +735,8 @@ void ServerReadCallback::readEOF() noexcept
 	/**
 	 * Cancel unfinished Future.
 	 */
-	for(auto kv : futurePool_){
-		kv.second.cancel();
+	for(auto kv = futurePool_.begin(); kv != futurePool_.end(); kv++){
+		kv->second.cancel();
 	}
 	futurePool_.clear();
 
