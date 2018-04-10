@@ -21,16 +21,24 @@ namespace singaistorageipc{
 
 std::unique_ptr<Response>
 RESTReceiver::msgParse(){
+	std::unique_ptr<Response> response = nullptr;
 	try{
 		/**
 		 * TODO: check the status code in response message
 		 *       now, we just set SUCCESS here
 		 */
-		std::unique_ptr<Response> response(new Response(
+		if(response_.result() == http::status::ok){
+			response.reset(new Response(
 					std::stoul(response_.at(RESTHeadField::TRANSACTION_ID).data()
-							  ,nullptr,10)
+					  ,nullptr,10)
 					,CommonCode::IOStatus::STAT_SUCCESS));
-
+		}
+		else{
+			response.reset(new Response(	
+					std::stoul(response_.at(RESTHeadField::TRANSACTION_ID).data()
+					  ,nullptr,10)
+					,CommonCode::IOStatus::ERR_INTERNAL));
+		}
 		response->data_ = folly::IOBuf::copyBuffer(
 							response_.body().data(),response_.body().length());
 	
