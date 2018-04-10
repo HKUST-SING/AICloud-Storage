@@ -4,6 +4,10 @@ project(clusterproj VERSION 0.1 LANGUAGES C CXX)
 
 
 
+# Need  to link to Threads
+find_package(Threads REQUIRED)
+
+
 # Define the library for linking with others
 
 add_library(clusterlib 
@@ -18,6 +22,7 @@ add_library(singstorage::clusterlib ALIAS clusterlib)
 # Define include directories
 target_include_directories(clusterlib INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
     PRIVATE src
     "${CMAKE_SOURCE_DIR}"
@@ -47,5 +52,6 @@ target_link_libraries(clusterlib
       singstorage::remotelib
       FacebookFolly::FacebookFolly
       CephRados::CephRados
+      ${CMAKE_THREAD_LIBS_INIT}
     )
     

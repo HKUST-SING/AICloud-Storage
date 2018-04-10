@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 project(clientstorage VERSION 0.1 LANGUAGES C CXX)
 
-# add find modlues
+# add find modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules/")
 
 
@@ -22,8 +22,8 @@ find_package(CephRados REQUIRED)
 
 # Boost library required
 find_package(Boost 1.66 REQUIRED)
-add_library(boost::boost INTERFACE IMPORTED)
-set_property(TARGET boost::boost PROPERTY
+add_library(Boost::boost INTERFACE IMPORTED)
+set_property(TARGET Boost::boost PROPERTY
              INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
 
 # Build our targets

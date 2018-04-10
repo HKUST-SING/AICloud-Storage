@@ -12,7 +12,7 @@ namespace singaistorageipc
 
 
 Worker*
-Worker::createRadosWorker(const std::string& type,
+Worker::createRadosWorker(const char* type,
                     const CephContext& ctx,
                     const unsigned int id,
                     std::shared_ptr<Security> sec)

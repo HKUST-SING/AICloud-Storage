@@ -18,6 +18,7 @@
 #include "ServerChannel.h"
 #include "Cache.h"
 
+
 namespace singaistorageipc
 {
 
@@ -170,6 +171,21 @@ class Security
   virtual void joinService()
   {}
   
+
+
+  /** 
+   * For creating a security module chosen by the client.
+   * 
+   * @return : unique pointer to a security module 
+   */
+
+   static std::shared_ptr<Security> createSecurityModule(
+        const char* secType,
+        std::unique_ptr<ServerChannel>&& channel,
+        std::unique_ptr<SecureKey>&& secKey = nullptr,
+        std::unique_ptr<Cache>&& cache = nullptr);
+
+
 
 
 

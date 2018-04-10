@@ -4,10 +4,19 @@ project(remoteproj VERSION 0.1 LANGUAGES C CXX)
 
 
 
+# Find extra boost coponents
+find_package(Boost 1.66 REQUIRED COMPONENTS
+             system)
+
+
+# required by GCC
+find_package(Threads REQUIRED)
+
 # Define the library for linking with others
 
 add_library(remotelib 
     src/Message.cpp
+    src/Security.cpp
     src/Sender.cpp
     src/ServerChannel.cpp
     src/Receiver.cpp
@@ -49,5 +58,7 @@ target_link_libraries(remotelib
     PUBLIC
       singstorage::jsonlib
       FacebookFolly::FacebookFolly
-      boost::boost
+      Boost::boost
+      ${Boost_SYSTEM_LIBRARY}
+      ${CMAKE_THREAD_LIBS_INIT}
     )

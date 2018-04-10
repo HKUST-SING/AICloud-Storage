@@ -171,7 +171,7 @@ class Worker
      *
      * @return : worker
      */
-    static Worker* createRadosWorker(const std::string& type,
+    static Worker* createRadosWorker(const char* type,
                                      const CephContext& ctx,
                                      const unsigned int id,
                                      std::shared_ptr<Security> sec);

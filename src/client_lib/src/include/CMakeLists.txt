@@ -38,6 +38,6 @@ target_compile_features(jsonlib
 # Define a dependency on the librados and folly libraries
 target_link_libraries(jsonlib
     PUBLIC
-      boost::boost
+      Boost::boost
     )
     
