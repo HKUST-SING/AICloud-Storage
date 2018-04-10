@@ -59,7 +59,9 @@ namespace singaistorageipc
        }
 
        TaskWrapper(const struct TaskWrapper&) = delete;
-       
+       TaskWrapper& operator=(const struct TaskWrapper&) = delete;
+      
+ 
        TaskWrapper(struct TaskWrapper&& other)
        : msg_(std::move(other.msg_)),
          resType_(other.resType_)
@@ -78,7 +80,7 @@ namespace singaistorageipc
              futRes.workerTask_ = other.futRes.workerTask_;
              break;
            }
-           defualt:
+           default:
            {
              futRes.serverTask_ = nullptr;
              futRes.workerTask_ = nullptr;
@@ -94,38 +96,43 @@ namespace singaistorageipc
 
        TaskWrapper& operator=(struct TaskWrapper&& other)
        {
-         msg_     = std::move(other.msg_);
-         resType_ = other.resType_;
 
-         switch(other.resType_)
+         if(this != &other)
          {
-           case MessageSource::MSG_SERVER:
-           {
-             futRes.workerTask_ = nullptr;
-             futRes.serverTask_ = other.futRes.serverTask_;
-             break;
-           }
-           case MessageSource::MSG_WORKER:
-           {
-             futRes.serverTask_ = nullptr;
-             futRes.workerTask_ = other.futRes.workerTask_;
-             break;
-           }
-           defualt:
-           {
-             futRes.serverTask_ = nullptr;
-             futRes.workerTask_ = nullptr;
-             break;
-           }    
-         } // switch
+    
+           msg_     = std::move(other.msg_);
+           resType_ = other.resType_;
 
-         // reset the pointers of the other
-         other.futRes.serverTask_ = nullptr;
-         other.futRes.workerTask_ = nullptr;
-         other.resType_ = MessageSource::MSG_EMPTY;
+           switch(other.resType_)
+           {
+             case MessageSource::MSG_SERVER:
+             {
+               futRes.workerTask_ = nullptr;
+               futRes.serverTask_ = other.futRes.serverTask_;
+               break;
+             }
+             case MessageSource::MSG_WORKER:
+             {
+               futRes.serverTask_ = nullptr;
+               futRes.workerTask_ = other.futRes.workerTask_;
+               break;
+             }
+             default:
+             {
+               futRes.serverTask_ = nullptr;
+               futRes.workerTask_ = nullptr;
+               break;
+             }    
+           } // switch
 
+           // reset the pointers of the other
+           other.futRes.serverTask_ = nullptr;
+           other.futRes.workerTask_ = nullptr;
+           other.resType_ = MessageSource::MSG_EMPTY;
 
-         *this; // return the same object
+         } //if
+
+         return *this; // return the same object
        }
 
     
@@ -147,7 +154,7 @@ namespace singaistorageipc
               delete futRes.workerTask_;
               break;
             }
-            defualt:
+            default:
             {
               break;
             }    

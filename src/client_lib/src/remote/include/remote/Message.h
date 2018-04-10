@@ -109,11 +109,12 @@ public:
 	,objectPath_(req->objectPath_),opType_(req->opType_){}
 
 	Request(Request&& req)
-	:userID_(std::move(req.userID_))
-	,password_(std::move(req.password_))
-	,objectPath_(std::move(req.objectPath_))
-	,opType_(std::move(req.opType_))
-	,Message(std::move(req)){}
+	: Message(std::move(req)),
+      userID_(std::move(req.userID_)),
+      password_(std::move(req.password_)),
+      objectPath_(std::move(req.objectPath_)),
+      opType_(std::move(req.opType_))
+      {}
 
     
     Request& operator=(Request&& req)
@@ -156,8 +157,9 @@ public:
 	:Message(res),stateCode_(res->stateCode_){}
 
 	Response(Response&& res)
-	:stateCode_(std::move(res.stateCode_))
-	,Message(std::move(res)){}
+	: Message(std::move(res)),
+      stateCode_(std::move(res.stateCode_))
+	  {}
 
 
     Response& operator=(Response&& res)

@@ -32,7 +32,20 @@ typedef struct Task
 
 
 
-    Task() = default;
+    /**
+     * Default constructor.
+     */
+    Task()
+    : username_(std::string("")),
+      path_(std::string("")),
+      opType_(CommonCode::IOOpCode::OP_NOP),
+      dataAddr_(0),
+      dataSize_(0),
+      tranID_(0),
+      workerID_(0),
+      objSize_(0),
+      opStat_(CommonCode::IOStatus::ERR_INTERNAL)
+    {}
 
 
 	/**
@@ -41,7 +54,13 @@ typedef struct Task
 	 */
 	Task(const std::string& username, const CommonCode::IOStatus opStat)
 		: username_(username),
+          path_(std::string("")),
 		  opType_(CommonCode::IOOpCode::OP_AUTH),
+          dataAddr_(0),
+          dataSize_(0),
+          tranID_(0),
+          workerID_(0),
+          objSize_(0),
 		  opStat_(opStat)
 	{}
 
@@ -58,8 +77,9 @@ typedef struct Task
 		  dataAddr_(dataAddr),
           dataSize_(dataSize),
           tranID_(tranID),
+          workerID_(workerID),
 		  objSize_(0),
-		  workerID_(workerID)
+          opStat_(CommonCode::IOStatus::ERR_INTERNAL)
 
     {}
 
@@ -72,10 +92,12 @@ typedef struct Task
          const CommonCode::IOStatus opStat)
 		: username_(username),
           path_(path),
+          opType_(opCode),
+          dataAddr_(0),
+          dataSize_(0),
           tranID_(tranID),
 		  workerID_(workerID),
 		  objSize_(remSize),
-          opType_(opCode),
           opStat_(opStat)
      {}
 

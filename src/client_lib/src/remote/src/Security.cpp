@@ -37,7 +37,7 @@ Security::createSecurityModule(const char* secType,
      std::unique_ptr<Cache>&&         cache)
 {
   // now only one type is supported
-  std::make_shared<SecurityModule>(std::move(channel));
+  return std::make_shared<SecurityModule>(std::move(channel));
 
 }
 
