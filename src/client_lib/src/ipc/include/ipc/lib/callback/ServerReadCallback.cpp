@@ -41,6 +41,7 @@ void ServerReadCallback::sendStatus(
 	reply.setStatusType(type);
 	auto send_iobuf = reply.createMsg();
 	socket_->writeChain(&wcb_,std::move(send_iobuf));
+	DLOG(INFO) << "send a status message";
 }
 
 //======================== Authentication ======================
@@ -59,7 +60,7 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 	 */
 
 	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
-
+		DLOG(INFO) << "permit authentication";
 		/**
 		 * Set the `username_`
 		 */
@@ -123,7 +124,7 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 		 * Register allocater for share memory.
 		 */
 		readSMAllocator_ = BFCAllocator::Create(0,readSMSize_);
-
+		DLOG(INFO) << "initialize share memory successfully";
 		/**
 		 * Send the reply.
 		 */
@@ -142,6 +143,7 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 		socket_->writeChain(&wcb_,std::move(send_iobuf));
 	} // if(issuccess)
 	else{
+		DLOG(INFO) << "deny authentication";
 		sendStatus(task.tranID_,task.opStat_);
 	}
 }
@@ -154,7 +156,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 
 	// If parse fail, stop processing.
 	if(!auth_msg.parse(std::move(data))){
-		//sendStatus(tranID,IPCStatusMessage::StatusType::STAT_AMBG);
+		LOG(WARNING) << "fail to parse authentication request";
 		return;
 	}
 
@@ -164,7 +166,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 		/**
 		 * The user has authenticated before.
 		 */
-
+		LOG(WARNING) << "user has double authentication";
 		// Or we can send a STATUS message here.
 		sendStatus(tranID,CommonCode::IOStatus::ERR_PROT);
 		return ;
@@ -253,6 +255,7 @@ void ServerReadCallback::callbackReadRequest(Task task)
 	auto contextmap = readContextMap_.find(task.path_);
 
 	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
+		DLOG(INFO) << "permit READ request";
 		/**
 		 * Then reply write message to client.
 		 */
@@ -278,6 +281,7 @@ void ServerReadCallback::callbackReadRequest(Task task)
 		contextmap->second.workerID_ = task.workerID_;
 	}
 	else{
+		DLOG(INFO) << "deny READ request";
 		sendStatus(task.tranID_,task.opStat_);
 
 		/**
@@ -380,6 +384,7 @@ void ServerReadCallback::handleReadRequest(
 	IPCReadRequestMessage read_msg;
 	// If parse fail, stop processing.
 	if(!read_msg.parse(std::move(data))){
+		LOG(WARNING) << "fail to parse read request";
 		return;
 	}
 
@@ -484,6 +489,7 @@ void doWriteRequestCallback(Task task,uint32_t pro)
 	futurePool_.erase(task.tranID_);
 
 	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
+		DLOG(INFO) << "permit WRITE request";
 		IPCReadRequestMessage reply;
 		reply.setPath(task.path_);
 		reply.setID(task.tranID_);
@@ -505,6 +511,7 @@ void doWriteRequestCallback(Task task,uint32_t pro)
 		}
 	}
 	else{
+		DLOG(INFO) << "deny WRITE request";
 		writeContextMap_.erase(task.path_);
 		sendStatus(task.tranID_,task.opStat_);		
 	}
@@ -526,6 +533,7 @@ void ServerReadCallback::handleWriteRequest(
 	IPCWriteRequestMessage write_msg;
 	// If parse fail, stop processing.
 	if(!write_msg.parse(std::move(data))){
+		LOG(WARNING) << "fail to parse WRITE request";
 		return;
 	}
 
@@ -595,6 +603,7 @@ void ServerReadCallback::handleDeleteRequest(
 	IPCDeleteRequestMessage delete_msg;
 	// If parse fail, stop processing.
 	if(!delete_msg.parse(std::move(data))){
+		LOG(WARNING) << "fail to parse DELETE request";
 		return;
 	}
 
@@ -622,6 +631,7 @@ void ServerReadCallback::handleCloseRequest(
 	IPCCloseMessage close_msg;
 	// If parse fail, stop processing.
 	if(!close_msg.parse(std::move(data))){
+		LOG(WARNING) << "fail to parse CLOSE request";
 		return;
 	}
 	sendStatus(close_msg.getID(),
@@ -651,23 +661,28 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept
 	 */
 	IPCMessage::MessageType *type = (IPCMessage::MessageType *)data;
 	switch(*type){
-		case IPCMessage::MessageType::AUTH : 
+		case IPCMessage::MessageType::AUTH :
+			DLOG(INFO) << "process AUTH request";
 			handleAuthenticationRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::READ :
+			DLOG(INFO) << "process READ request";
 			handleReadRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::WRITE :
+			DLOG(INFO) << "process WRITE request"
 			handleWriteRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::DELETE :
+			DLOG(INFO) << "process DELETE request"
 			handleDeleteRequest(std::move(rec_iobuf));
 			break;
 
 		case IPCMessage::MessageType::CLOSE :
+			DLOG(INFO) << "process CLOSE request";
 			handleCloseRequest(std::move(rec_iobuf));
 			break;
 
@@ -676,12 +691,14 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept
 			 * Except for the types above,
 			 * Server should not receive any other type.
 			 */
+			DLOG(WARNING) << "receive unknown request";
 			return;
 	}	
 }
 
 void ServerReadCallback::readEOF() noexcept
 {
+	DLOG(INFO) << "start to close ServerReadCallback";
 	readBuffer_.clear();
     readContextMap_.clear();
     writeContextMap_.clear();
@@ -726,6 +743,8 @@ void ServerReadCallback::readEOF() noexcept
 	futurePool_.clear();
 
 	unallocatedRequest_.clear();
+
+	DLOG(INFO) << "closed ServerReadCallback";
 }
 
 }

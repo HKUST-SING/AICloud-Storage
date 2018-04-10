@@ -30,7 +30,7 @@ public:
      */
     void onConnectionDropped(const int socket,
             const folly::SocketAddress& addr) noexcept override{
-        
+        LOG(WARNING) << "drop a connection";
         auto search = socketsMap_->find(socket);
         if(search != socketsMap_->end()){
             socketsMap_->erase(socket);
@@ -50,7 +50,7 @@ public:
     void onConnectionDequeuedByAcceptorCallback(
         const int socket,
         const folly::SocketAddress& addr) noexcept override{
-        
+        LOG(INFO) << "dequeue a connection";
         auto search = socketsMap_->find(socket);
         if(search != socketsMap_->end()){
             socketsMap_->erase(socket);

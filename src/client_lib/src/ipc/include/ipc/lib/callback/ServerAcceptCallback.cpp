@@ -20,6 +20,7 @@ void ServerAcceptCallback::connectionAccepted(int fd,
 };
 
 void ServerAcceptCallback::acceptStopped() noexcept{
+    DLOG(INFO) << "start to stop accepting";
     for(auto socket : (*socketsMap_)){
     	socket.second.socket_->closeNow();
     }
@@ -27,6 +28,7 @@ void ServerAcceptCallback::acceptStopped() noexcept{
     std::remove(unixPath_.c_str());
     socketsMap_ = nullptr;
     sec_ = nullptr;
+    DLOG(INFO) << "stopped accepting";
 };
 
 }
