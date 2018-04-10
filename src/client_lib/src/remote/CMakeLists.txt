@@ -59,6 +59,7 @@ target_link_libraries(remotelib
       singstorage::jsonlib
       FacebookFolly::FacebookFolly
       Boost::boost
+      glog::glog
       ${Boost_SYSTEM_LIBRARY}
       ${CMAKE_THREAD_LIBS_INIT}
     )

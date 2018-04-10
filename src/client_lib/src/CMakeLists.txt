@@ -19,6 +19,14 @@ find_package(FacebookFolly REQUIRED)
 #Ceph librados has to be included as well
 find_package(CephRados REQUIRED)
 
+# Google logging library
+find_package(Glog REQUIRED)
+add_library(glog::glog UNKNOWN IMPORTED)
+set_target_properties(glog::glog PROPERTIES
+             INTERFACE_INCLUDE_DIRECTORIES 
+             ${GLOG_INCLUDE_DIRS}
+             IMPORTED_LOCATION
+             ${GLOG_LIBRARIES})
 
 # Boost library required
 find_package(Boost 1.66 REQUIRED)

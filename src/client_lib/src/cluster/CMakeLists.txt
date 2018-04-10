@@ -52,6 +52,7 @@ target_link_libraries(clusterlib
       singstorage::remotelib
       FacebookFolly::FacebookFolly
       CephRados::CephRados
+      glog::glog
       ${CMAKE_THREAD_LIBS_INIT}
     )
     

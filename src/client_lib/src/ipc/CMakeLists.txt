@@ -45,5 +45,6 @@ target_link_libraries(ipclib
     PUBLIC
       singstorage::clusterlib
       FacebookFolly::FacebookFolly
+      glog::glog
     )
     

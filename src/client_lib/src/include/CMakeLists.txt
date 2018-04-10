@@ -39,5 +39,6 @@ target_compile_features(jsonlib
 target_link_libraries(jsonlib
     PUBLIC
       Boost::boost
+      glog::glog
     )
     
