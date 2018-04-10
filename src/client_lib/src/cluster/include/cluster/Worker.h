@@ -26,9 +26,6 @@ namespace singaistorageipc
 class Security;
 
 
-// Facebook folly Future
-using folly::Future;
-
 class Worker
 {
 
@@ -73,20 +70,20 @@ class Worker
      } 
               
   
-    virtual Future<Task> writeStoreObj(const Task& task) = 0;
+    virtual folly::Future<Task> writeStoreObj(const Task& task) = 0;
     /**
      * Method for writing data to the Ceph cluster.
      * Task encapsulates the data to write and also a result.
      */
 
-    virtual Future<Task> readStoreObj(const Task& task) = 0;
+    virtual folly::Future<Task> readStoreObj(const Task& task) = 0;
     /**
      * Interface for reading an object from the storage system.
      * The passed task encapsulates the task (data to read) and
      * also provides an interface for retrieving result.
      */ 
 
-    virtual Future<Task> deleteStoreObj(const Task& task) = 0;
+    virtual folly::Future<Task> deleteStoreObj(const Task& task) = 0;
     /**
      * Interface for deleting an object from the storage system.
      * Since an object may contains multiple Rados objects,
@@ -96,7 +93,7 @@ class Worker
 
 
 
-    virtual Future<Task> completeReadStoreObj(const Task& task) = 0;
+    virtual folly::Future<Task> completeReadStoreObj(const Task& task) = 0;
     /**
      * Interface for read completion. Since storage system objects
      * may be extremely large, they may not fit into shared memory
@@ -160,13 +157,32 @@ class Worker
     }
 
 
-    /** 
-     * The running method of the worker. The method is the core
-     * of the worker since it defines the work. Implementations
-     * choose how to handle the tasks.
-     *
+    /**
+     * Wait for the worker to complete and shutdown itself
      */
-    virtual void processTasks() = 0;   
+    inline void joinWorker() const
+    {
+      std::unique_lock<std::mutex> tmpLock(initLock_);
+      
+      while(init_) // wait for the worker to finish
+      {
+        initCond_.wait(tmpLock);
+      }     
+
+    }
+
+
+
+
+    /**
+     * Method which starts the worker
+     * and which may run in a different thread.
+     */
+    inline void startWorker()
+    {
+      processTasks(); 
+    }
+
 
 
     std::atomic<bool> done_; // if the worker has completed its work
@@ -186,6 +202,18 @@ class Worker
                                      const CephContext& ctx,
                                      const uint32_t id,
                                      std::shared_ptr<Security> sec);
+
+
+  protected:
+     /** 
+     * The running method of the worker. The method is the core
+     * of the worker since it defines the work. Implementations
+     * choose how to handle the tasks.
+     *
+     */
+    virtual void processTasks() = 0; 
+
+
 
   protected:
     mutable std::mutex initLock_;

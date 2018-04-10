@@ -82,28 +82,80 @@ typedef struct Task
 	/** 
 	* Copy constructor.
 	*/
-	Task(const Task& other)
+	Task(const struct Task& other)
     : username_(other.username_),
       path_(other.path_),
+      opType_(other.opType_),
+      dataAddr_(other.dataAddr_),
+      dataSize_(other.dataSize_),
       tranID_(other.tranID_),
       workerID_(other.workerID_),
 	  objSize_(other.objSize_),
-      opType_(other.opType_),
       opStat_(other.opStat_)
     {}
 
 	/**
      * Move constructor.
      */
-     Task(Task&& other)
+     Task(struct Task&& other)
      : username_(std::move(other.username_)),
        path_(std::move(other.path_)),
+       opType_(other.opType_),
+       dataAddr_(other.dataAddr_),
+       dataSize_(other.dataSize_),
        tranID_(other.tranID_),
        workerID_(other.workerID_),
 	   objSize_(other.objSize_),
-       opType_(other.opType_),
        opStat_(other.opStat_)
      {}
+
+
+
+   /** 
+    * Copy assignment
+    */
+
+    Task& operator=(const struct Task& other)
+    {
+      if(this != &other)
+      {
+        username_ = other.username_;
+        path_     = other.path_;
+        opType_   = other.opType_;
+        dataAddr_ = other.dataAddr_;
+        dataSize_ = other.dataSize_;
+        tranID_   = other.tranID_;
+        workerID_ = other.workerID_;
+        objSize_  = other.objSize_;
+        opStat_   = other.opStat_;
+      }
+
+      return *this;
+
+    }
+
+
+   /** 
+    * Move assignment
+    */
+    Task& operator=(struct Task&& other)
+    {
+      if(this != &other)
+      {
+        username_ = std::move(other.username_);
+        path_     = std::move(other.path_);
+        opType_   = other.opType_;
+        dataAddr_ = other.dataAddr_;
+        dataSize_ = other.dataSize_;
+        tranID_   = other.tranID_;
+        workerID_ = other.workerID_;
+        objSize_  = other.objSize_;
+        opStat_   = other.opStat_;
+      }
+
+      return *this;
+
+    }
 
 } Task; // struct Task
 
