@@ -197,8 +197,15 @@ namespace singaistorageipc
 
     public:
       SecurityModule() = delete; // no default constructor
+      SecurityModule(const SecurityModule&) = delete;
+      SecurityModule& operator=(const SecurityModule&) = delete; 
+      SecurityModule(SecurityModule&&) = delete;
+      SecurityModule& operator=(SecurityModule&&) = delete;
+  
+
+      // supported constructors
       SecurityModule(std::unique_ptr<ServerChannel>&& comm);
-       
+
  
       ~SecurityModule() override;
 

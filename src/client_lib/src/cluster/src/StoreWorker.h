@@ -46,18 +46,22 @@ class StoreWorker: public Worker
      */
 
     StoreWorker()=delete;   // no default constructor
-    StoreWorker(const Worker&) = delete; // no copy constructor
-    StoreWorker& operator=(const Worker&) = delete; // no assigment
-
+    StoreWorker(const StoreWorker&) = delete; // no copy constructor
+    StoreWorker& operator=(const StoreWorker&) = delete; // no assigment
+    StoreWorker(StoreWorker&&) = delete; // cannot move
+    StoreWorker& operator=(StoreWorker&&) = delete; // cannot move
     
-    StoreWorker(const CephContext& ctx, const unsigned int id, 
-                std::shared_ptr<Security> sec);
 
-    virtual ~StoreWorker(); // destructor shall be virtual
+   StoreWorker(const CephContext& ctx, const uint32_t& id, 
+                std::shared_ptr<Security>&& sec);
+
+
+
+    ~StoreWorker() override; // override the destrctor
 
 
     virtual bool initialize() override; // initialize the worker
-    virtual void stop() override;       // stop the worker
+
   
     virtual Future<Task> writeStoreObj(const Task& task) override;
     /**

@@ -57,10 +57,13 @@ public:
 
     Message& operator=(Message&& other)
     {
-	  type_   = other.type_;
-      tranID_ = other.tranID_;
-      data_   = std::move(other.data_);
-	  msgEnc_ = other.msgEnc_;
+      if(this != &other)
+      {
+	    type_   = other.type_;
+        tranID_ = other.tranID_;
+        data_   = std::move(other.data_);
+	    msgEnc_ = other.msgEnc_;
+      }
 
       return *this;
     }
@@ -115,17 +118,17 @@ public:
     
     Request& operator=(Request&& req)
     {
-      // copy Message part first
-      Message::type_   = req.type_;
-      Message::tranID_ = req.tranID_;
-      Message::data_   = std::move(req.data_);
-      Message::msgEnc_ = req.msgEnc_;
+      if(this != &req)
+      {
+        // copy Message part first
+        Message::operator=(std::move(req));
 
-      // copy specific fields
-	  userID_     = std::move(req.userID_);
-	  password_   = std::move(req.password_);
-      objectPath_ = std::move(req.objectPath_);
-	  opType_     = req.opType_;
+        // copy specific fields
+	    userID_     = std::move(req.userID_);
+	    password_   = std::move(req.password_);
+        objectPath_ = std::move(req.objectPath_);
+	    opType_     = req.opType_;
+      }
 
       return *this;
 	}
@@ -159,15 +162,16 @@ public:
 
     Response& operator=(Response&& res)
     {
-      // copy Message part first
-      Message::type_   = res.type_;
-      Message::tranID_ = res.tranID_;
-      Message::data_   = std::move(res.data_);
-      Message::msgEnc_ = res.msgEnc_;
+
+      if(this != &res)
+      {
+        // copy Message part first
+        Message::operator=(std::move(res));
       
 
-      // copy specific fields
-	  stateCode_ = res.stateCode_;
+        // copy specific fields
+	    stateCode_ = res.stateCode_;
+      }
 
       return *this;
 	}

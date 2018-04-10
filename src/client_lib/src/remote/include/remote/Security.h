@@ -43,6 +43,8 @@ class Security
   public:
 
      Security() = delete;
+     Security(const Security&) = delete;
+     Security& operator=(const Security&) = delete;
 
      Security(std::unique_ptr<ServerChannel>&& comm,
               std::unique_ptr<SecureKey>&& secretKey = nullptr,
@@ -53,6 +55,9 @@ class Security
        cache_(std::move(userCache))
      {}
 
+     Security(Security&&); // support move constructor
+     Security& operator=(Security&&); // support assignment
+     
     
      virtual ~Security() // shall be virtual
      {

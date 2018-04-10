@@ -44,12 +44,14 @@ class Worker
     Worker()=delete;   // no default constructor
     Worker(const Worker&) = delete; // no copy constructor
     Worker& operator=(const Worker&) = delete; // no assigment
-
+    Worker(Worker&&) = delete;          // no  move constructor 
+    Worker& operator=(Worker&&)=delete; // no move assignment
     
-    Worker(const uint32_t id, std::shared_ptr<Security> sec)
+
+    Worker(const uint32_t id, std::shared_ptr<Security>&& sec)
     : done_(false),
       id_(id),
-      secure_(sec)
+      secure_(std::move(sec))
     {}
     
 
@@ -59,8 +61,17 @@ class Worker
     } 
 
 
-    virtual bool initialize() {return true;} // initialize the worker
-    virtual void stop() {}                   // stop the worker
+    virtual bool initialize() 
+    {
+      return true;
+    } // initialize the worker
+
+
+    inline void stopWorker() 
+     {
+      done_.store(true); // stop the worker
+     } 
+              
   
     virtual Future<Task> writeStoreObj(const Task& task) = 0;
     /**
@@ -171,9 +182,9 @@ class Worker
      *
      * @return : worker
      */
-    static Worker* createRadosWorker(const char* type,
+    static std::shared_ptr<Worker> createRadosWorker(const char* type,
                                      const CephContext& ctx,
-                                     const unsigned int id,
+                                     const uint32_t id,
                                      std::shared_ptr<Security> sec);
 
   protected:

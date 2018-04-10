@@ -18,11 +18,12 @@ using folly::Future;
 using folly::Promise;
 
   
-StoreWorker::StoreWorker(const CephContext& ctx, const unsigned int id, 
-                std::shared_ptr<Security> sec)
-: Worker(id, sec),
+StoreWorker::StoreWorker(const CephContext& ctx, const uint32_t& id, 
+                std::shared_ptr<Security>&& sec)
+: Worker(id, std::move(sec)),
   cephCtx_(ctx)
  {}
+
 
 
 StoreWorker::~StoreWorker()
@@ -57,13 +58,6 @@ StoreWorker::initialize()
   }
 
   return res;
-}
-
-void
-StoreWorker::stop()
-{
-  // signal to finish
-  Worker::done_.store(true);
 }
 
 

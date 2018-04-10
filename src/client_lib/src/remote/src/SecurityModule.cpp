@@ -46,6 +46,8 @@ SecurityModule::SecurityModule(std::unique_ptr<ServerChannel>&& comm)
   backID_(0)
 {}
 
+
+
 SecurityModule::~SecurityModule()
 {
   
