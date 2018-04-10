@@ -85,11 +85,13 @@ RESTReceiver::receive(){
 
 void
 RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
+	DLOG(INFO) << "receive a response from remote server";
 	if(er.value() == 0){
 		/**
 		 * successful reception
 		 */
 		poolInsert(std::move(msgParse()));	
+		DLOG(INFO) << "insert the response into the pool";
 	}
 
 	receive();

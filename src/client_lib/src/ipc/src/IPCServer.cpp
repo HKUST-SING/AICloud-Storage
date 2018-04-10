@@ -1,4 +1,4 @@
-/* Can test
+/*
  * IPC server object.
  */
 
@@ -29,17 +29,17 @@ void IPCServer::start(){
     socket_->listen(context_.backlog_);
     socket_->startAccepting();
     
-    std::cout << "server starting......" << std::endl;
+    LOG(INFO) << "server starting......";
     evb_->loopForever();
 
 }
 
 void IPCServer::stop(){
-    std::cout << "server stopping......" << std::endl;
+    LOG(INFO) << "server stopping......";
     socket_->stopAccepting();
     socket_ = nullptr;
     evb_->loopOnce();
-    std::cout << "server stop" << std::endl;
+    LOG(INFO) << "server stopped";
 }
 
 }

@@ -30,10 +30,12 @@ bool
 ServerChannel::initChannel(){
 	tcp::endpoint ep(boost::asio::ip::address::from_string(
 							cxt_.remoteServerAddress_.c_str()), cxt_.port_);	
+	LOG(INFO) << "start to initial channel";
 	try{
 		socket_->connect(ep);
 	}
 	catch(boost::system::system_error & err){
+		LOG(WARNING) << "fail to initial channel due to error in socket connection";
 		return false;
 	}
 
@@ -46,7 +48,7 @@ ServerChannel::initChannel(){
 			restReceiver_.startReceive();
 			ioc_.run();});
 	socketThread_ = std::move(tmpthread);
-
+	LOG(INFO) << "initial channel successfully";
 	return true;
 }
 
@@ -103,6 +105,7 @@ ServerChannel::sendMessage(std::shared_ptr<Request> msg
 			}
 		  };
 	restSender_.send(msg,f);
+	DLOG(INFO) << "send a message";
 	return true;
 }
 
@@ -110,6 +113,7 @@ std::vector<std::unique_ptr<Response>>
 ServerChannel::pollReadMessage()
 {
 	boost::mutex::scoped_lock lock(*mutex_);
+	DLOG(INFO) << "poll the message";
 	std::vector<std::unique_ptr<Response>> res(std::move(*receivePool_.get()));
 	receivePool_.get()->clear();
 	return std::move(res);

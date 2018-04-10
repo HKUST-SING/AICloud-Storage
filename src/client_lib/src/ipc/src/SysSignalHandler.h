@@ -26,6 +26,7 @@ public:
 			 */
 			return;
 		}
+		LOG(INFO) << "receive SIGINT signal, processing termination";
 		auto evb = getEventBase();
 		evb->terminateLoopSoon();
 	}
