@@ -286,6 +286,7 @@ SecurityModule::processNewTasks()
 
   // got some transactions to issue  
   bool sendRes = true;
+  decltype(responses_.emplace()) resPair; // resouce pair
 
   while(windowSize > U32_ZERO && !recvTasks_.empty())
   { // keep issueing tasks
@@ -305,17 +306,22 @@ SecurityModule::processNewTasks()
     }
 
 
-    // enque the message
+    // enqueue the message
     issTask.msg_->tranID_ = nextID_;
       
     sendRes = channel_->sendMessage(issTask.msg_, 
                           new FollySocketCallback(this, 
                                                   nextID_));
-
+  
     if(sendRes)
     {
      // enqueue the request
-     responses_[nextID_] = std::move(issTask);
+     resPair = responses_.emplace(std::make_pair(nextID_, std::move(issTask)));
+
+     if(!resPair.second)
+     {
+       int a = 0; // log this
+     }
 
      ++nextID_;    // update transaction ID
      --windowSize; // update the window size       
@@ -470,7 +476,11 @@ SecurityModule::completedTransaction(const uint32_t tranID)
   else
   {
     // just mark the transaction as a completed one
-    complTrans_[tranID] = true;
+    auto resPair = complTrans_.emplace(std::make_pair(tranID, true));
+    if(!resPair.second) // didn't suceed to insert
+    {
+      int a = 0; // shall never happen (log this)
+    }
   }// else
   
 }

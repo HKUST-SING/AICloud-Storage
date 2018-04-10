@@ -26,6 +26,7 @@
 #include "include/ConcurrentQueue.h"
 #include "include/Task.h"
 #include "include/CommonCode.h"
+#include "include/JSONHandler.h"
 #include "StoreObj.h"
 
 
@@ -93,50 +94,16 @@ class StoreWorker: public Worker
      * or in the machine's memory at all. Due to this, multiple
      * object read operations should be issued.
      */
-     
+    
 
 
-    inline uint32_t getWorkerId() const
-    /** Return a unique worker ID within the same program.
-     *
-     */    
-
-    {
-      return Worker::id_;
-    }
-
-
-
-    /** These methods should not be used by direct instantiations
-     *  of the StoreWorker class. The user should use Worker pointers
-     *  since these methods are not virtual an only applicable to 
-     *  Workers.
-     */
-    inline void releaseWorker()
-    {
-      Worker::releaseWorker();
-    }
-
-
-    inline void initDone()
-    {
-      Worker::initDone();
-    }   
-
-
-    inline bool isInit() const
-    {
-      return Worker::isInit();
-    }
-
-
-    inline void waitForInit()
-    {
-      Worker::waitForInit();
-    }
-
-
-    virtual void processTasks() override;
+  protected:   
+    /**
+     * Method which starts the worker. This method is called
+     * once the initialized worker has to start processing 
+     * tasks.
+     */ 
+    void processTasks() override;
 
 
 
@@ -149,7 +116,7 @@ class StoreWorker: public Worker
      * @param: task: IO to perform and promise to fulfill
      */
      void processReadOp(
-          std::pair<folly::Promise<Task>, const Task&>& task);
+          std::pair<folly::Promise<Task>, Task>& task);
 
 
     /**
@@ -159,7 +126,7 @@ class StoreWorker: public Worker
      * @param: task: IO to perform and promise to fulfill
      */
      void processWriteOp(
-          std::pair<folly::Promise<Task>, const Task&>& task);
+          std::pair<folly::Promise<Task>, Task>& task);
 
     /**
      * Process a DELTE operation. The method informs the caller
@@ -168,7 +135,7 @@ class StoreWorker: public Worker
      * @param: task: IO to perform and promise to fulfill
      */
      void processDeleteOp(
-          std::pair<folly::Promise<Task>, const Task&>& task);
+          std::pair<folly::Promise<Task>, Task>& task);
 
 
      /** 
@@ -176,12 +143,19 @@ class StoreWorker: public Worker
       * (write into the shared memory) from local memory
       */
      void handlePendingRead(
-          std::map<uint32_t, StoreObj>::iterator&,
-          std::pair<folly::Promise<Task>, const Task&>&);
+          std::map<uint32_t, StoreObj>::iterator& mapItr,
+          std::pair<folly::Promise<Task>, Task>&  task);
+
+
+    /** 
+     * Terminate the worker. Worker cleans itslef up
+     * and terminates
+     */
+    void closeStoreWorker();
 
 
   private:
-    ConcurrentQueue<std::pair<folly::Promise<Task>, const Task&> > tasks_; 
+    ConcurrentQueue<std::pair<folly::Promise<Task>, Task> > tasks_; 
                              // the queue is accessed 
                              // by two threads
                              // as the producer provides tasks, 
@@ -193,7 +167,6 @@ class StoreWorker: public Worker
                                              // further processing
                                              // locally
 
-    //std::map<const std::string, > pendOps_; // active ops for seq
 
     uint32_t                     tranID_;    // unique key that 
                                              // allows to identify

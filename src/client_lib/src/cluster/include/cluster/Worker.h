@@ -26,6 +26,9 @@ namespace singaistorageipc
 class Security;
 
 
+// Facebook folly Future
+using folly::Future;
+
 class Worker
 {
 
@@ -157,32 +160,13 @@ class Worker
     }
 
 
-    /**
-     * Wait for the worker to complete and shutdown itself
+    /** 
+     * The running method of the worker. The method is the core
+     * of the worker since it defines the work. Implementations
+     * choose how to handle the tasks.
+     *
      */
-    inline void joinWorker() const
-    {
-      std::unique_lock<std::mutex> tmpLock(initLock_);
-      
-      while(init_) // wait for the worker to finish
-      {
-        initCond_.wait(tmpLock);
-      }     
-
-    }
-
-
-
-
-    /**
-     * Method which starts the worker
-     * and which may run in a different thread.
-     */
-    inline void startWorker()
-    {
-      processTasks(); 
-    }
-
+    virtual void processTasks() = 0;   
 
 
     std::atomic<bool> done_; // if the worker has completed its work
@@ -202,18 +186,6 @@ class Worker
                                      const CephContext& ctx,
                                      const uint32_t id,
                                      std::shared_ptr<Security> sec);
-
-
-  protected:
-     /** 
-     * The running method of the worker. The method is the core
-     * of the worker since it defines the work. Implementations
-     * choose how to handle the tasks.
-     *
-     */
-    virtual void processTasks() = 0; 
-
-
 
   protected:
     mutable std::mutex initLock_;

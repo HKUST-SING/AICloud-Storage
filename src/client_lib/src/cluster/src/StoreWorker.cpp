@@ -28,6 +28,14 @@ StoreWorker::StoreWorker(const CephContext& ctx, const uint32_t& id,
 
 StoreWorker::~StoreWorker()
 {
+ 
+}
+
+
+void 
+StoreWorker::closeStoreWorker()
+{
+ 
   // close the ceph context
   cephCtx_.closeCephContext();
 
@@ -37,13 +45,40 @@ StoreWorker::~StoreWorker()
   pendReads_.clear();
 
 
-  while(!tasks_.empty()) // since the worker is being destroyed,
-  {                      // check for emptyness without a lock
+  std::vector<std::pair<Promise<Task>, Task>> cancelTasks;
 
-    tasks_.pop();
+  tasks_.dequeue(cancelTasks);
+  
+  // notify about an erorr
+  for(auto& canTsk : cancelTasks)
+  {
+    Task tmpTask;
+    tmpTask = std::move(canTsk.second);
+    tmpTask.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+    // notify the server that there was an error
+    canTsk.first.setValue(std::move(tmpTask));
   }
 
+  // clear all tasks
+  cancelTasks.clear();
+  
+
+
+  // once everything has been cleaned up
+  // notify the caller
+  
+  {
+    std::lock_guard<std::mutex> tmpLock(initLock_);
+    init_ = false; // has been closed
+    
+    initCond_.notify_all();
+
+  } // lock scope
+
 }
+
+
 
 
 bool 
@@ -213,7 +248,7 @@ StoreWorker::processTasks()
 
 void
 StoreWorker::processReadOp(
-        std::pair<folly::Promise<Task>, const Task&>& task)
+        std::pair<folly::Promise<Task>, Task>& task)
 {
   // first test if the operation is a pending one
   auto checkRead = pendReads_.find(task.second.tranID_);
@@ -240,14 +275,14 @@ StoreWorker::processReadOp(
 
 void
 StoreWorker::processWriteOp(
-        std::pair<folly::Promise<Task>, const Task&>& task)
+        std::pair<folly::Promise<Task>, Task>& task)
 {
 }
 
 
 void
 StoreWorker::processDeleteOp(
-        std::pair<folly::Promise<Task>, const Task&>& task)
+        std::pair<folly::Promise<Task>, Task>& task)
 {
 }
 
@@ -258,7 +293,7 @@ StoreWorker::processDeleteOp(
 void 
 StoreWorker::handlePendingRead(
        std::map<uint32_t, StoreObj>::iterator& itr, 
-       std::pair<folly::Promise<Task>, const Task&>& task)
+       std::pair<folly::Promise<Task>, Task>& task)
 {
  
   // check if the Task path mathes the unique ID
