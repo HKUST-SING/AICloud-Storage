@@ -24,8 +24,7 @@ RESTReceiver::msgParse(){
 	std::unique_ptr<Response> response = nullptr;
 	try{
 		/**
-		 * TODO: check the status code in response message
-		 *       now, we just set SUCCESS here
+		 * Check the status code in response message
 		 */
 		if(response_.result() == http::status::ok){
 			response.reset(new Response(
