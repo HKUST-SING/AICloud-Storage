@@ -82,7 +82,7 @@ RESTSender::send(std::shared_ptr<Request> request
 		// TODO: set the time larger than heart beat
 		req.set(http::field::keep_alive,1000);
 		break;
-	case CommonCode::IOOpCode::OP_COMMIT:
+	case CommonCode::IOOpCode::OP_COMMIT:{
 		std::string type;
 		switch(request->msgEnc_){
 		case Message::MessageEncoding::JSON_ENC:
@@ -100,6 +100,9 @@ RESTSender::send(std::shared_ptr<Request> request
 		}
 		req.set(http::field::content_type,type);
 		req.body() = (char*)request->data_->data();
+		break;
+		}
+	default:
 		break;
 	}
 

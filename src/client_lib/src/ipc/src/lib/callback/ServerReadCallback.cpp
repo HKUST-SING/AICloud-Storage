@@ -230,7 +230,7 @@ bool ServerReadCallback::finishThisReadRequest(const std::string& path)
 		/**
 	 	 * Get some info use for ceph.
 	 	 */
-	 	uint32_t pro = nextrequest.getProperties();	
+	 	//uint32_t pro = nextrequest.getProperties();	
 	 	uint32_t tranID = nextrequest.getID();
 
 		/**
@@ -399,7 +399,7 @@ void ServerReadCallback::handleReadRequest(
 
 	uint32_t tranID = read_msg.getID();
 	std::string path = read_msg.getPath();
-	uint32_t workerID = 0;
+	//uint32_t workerID = 0;
 
 	auto contextmap = readContextMap_.find(path);
 	if(isnewcoming){

@@ -36,19 +36,19 @@ public:
         uint32_t writeSMSize,
         std::shared_ptr<Security> sec,
         std::shared_ptr<WorkerPool> worker)
-    : bufferSize_(buf),
-      socket_(socket),
-      wcb_(socket.get()->getFd()),
+    : sec_(sec),
+      worker_(worker),
+      bufferSize_(buf),
       minAllocBuf_(minAllocBuf),
       newAllocSize_(newAllocSize),
       readSMSize_(readSMSize),
       writeSMSize_(writeSMSize),
-      readSM_(nullptr),
-      writeSM_(nullptr),
       readSMName_(nullptr),
       writeSMName_(nullptr),
-      sec_(sec),
-      worker_(worker){};
+      readSM_(nullptr),
+      writeSM_(nullptr),
+      socket_(socket),
+      wcb_(socket.get()->getFd()){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the

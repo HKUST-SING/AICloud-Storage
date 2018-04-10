@@ -28,8 +28,8 @@ class IPCServer final{
 public:
 	IPCServer() = delete;
 	IPCServer(IPCContext context)
-	:evb_(folly::EventBaseManager::get()->getEventBase()),
-	context_(context),
+	:context_(context),
+	evb_(folly::EventBaseManager::get()->getEventBase()),
 	scb_(context_.bufferSize_,context_.minAllocBuf_,
 	    context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
