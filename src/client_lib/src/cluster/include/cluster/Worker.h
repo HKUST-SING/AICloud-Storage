@@ -15,19 +15,17 @@
 
 
 // Project lib
+#include "remote/Security.h"
 #include "include/Task.h"
 #include "CephContext.h"
+
+
+// forward declaration
+class CephContext;
 
 namespace singaistorageipc
 {
 
-
-// Forward delcaration
-class Security;
-
-
-// Facebook folly Future
-using folly::Future;
 
 class Worker
 {
@@ -183,9 +181,27 @@ class Worker
      * @return : worker
      */
     static std::shared_ptr<Worker> createRadosWorker(const char* type,
-                                     const CephContext& ctx,
+                                     std::unique_ptr<CephContext>&& ctx,
                                      const uint32_t id,
                                      std::shared_ptr<Security> sec);
+
+
+    /**
+     * The factory method creates a worker per request.
+     * 
+     * @param type : worker type
+     * @param ctx  : CephContext for the worker to use
+     * @param id   : unique worker id
+     * @param sec  : a reference to a Security module 
+     *
+     * @return : worker
+     */
+    static std::shared_ptr<Worker> createRadosWorker(
+                                     const std::string& type,
+                                     std::unique_ptr<CephContext>&& ctx,
+                                     const uint32_t id,
+                                     std::shared_ptr<Security> sec);
+
 
   protected:
     mutable std::mutex initLock_;

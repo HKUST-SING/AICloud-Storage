@@ -4,8 +4,11 @@ project(clusterproj VERSION 0.1 LANGUAGES C CXX)
 
 
 
-# Need  to link to Threads
+# Need to link to Threads
 find_package(Threads REQUIRED)
+
+# Need to link to OpenSSL
+find_package(OpenSSL REQUIRED)
 
 
 # Define the library for linking with others
@@ -53,6 +56,7 @@ target_link_libraries(clusterlib
       FacebookFolly::FacebookFolly
       CephRados::CephRados
       glog::glog
+      OpenSSL::Crypto
       ${CMAKE_THREAD_LIBS_INIT}
     )
     

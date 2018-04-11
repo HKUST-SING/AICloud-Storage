@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(ipcproj VERSION 0.1 LANGUAGES C CXX)
 
 
+# Need to link to OpenSSL
+find_package(OpenSSL REQUIRED)
+
 
 # Define the library for linking with others
 
@@ -46,5 +49,6 @@ target_link_libraries(ipclib
       singstorage::clusterlib
       FacebookFolly::FacebookFolly
       glog::glog
+      OpenSSL::Crypto
     )
     

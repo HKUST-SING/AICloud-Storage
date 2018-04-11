@@ -10,9 +10,6 @@
 #include <rados/librados.hpp>
 
 
-
-#define GLOBAL_ID_LENGTH  256
-
 namespace singaistorageipc
 {
 
@@ -118,7 +115,7 @@ class StoreObj
      return containData_;
    }
 
-   inline uint64_t storeObjComplete() const
+   inline bool storeObjComplete() const
    /** 
     * Check if the entire object has already been read.
     *

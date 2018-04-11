@@ -1,33 +1,47 @@
 // C++ std
 #include <cassert>
 #include <cstring>
-// Facebook folly
 
+
+// Facebook folly
 
 
 
 // Project
 #include "StoreWorker.h"
+#include "remote/Authentication.h"
 
-
-
-namespace singaistorageipc
-{
+#define WORKER_SHARED_SECRET "workersharedsecretpassword"
 
 using folly::Future;
 using folly::Promise;
 
+namespace singaistorageipc
+{
+
   
 StoreWorker::StoreWorker(const CephContext& ctx, const uint32_t& id, 
                 std::shared_ptr<Security>&& sec)
-: Worker(id, std::move(sec)),
-  cephCtx_(ctx)
- {}
+: Worker(id, std::move(sec))
+ {
+   // create a unique pointer
+   cephCtx_ = std::make_unique<CephContext>(ctx);
+ }
 
+
+StoreWorker::StoreWorker(std::unique_ptr<CephContext>&& ctx,
+                         const uint32_t id,
+                         std::shared_ptr<Security>&& sec)
+: Worker(id, std::move(sec)),
+  cephCtx_(std::move(ctx))
+{}
 
 
 StoreWorker::~StoreWorker()
 {
+
+  // destroy the Ceph Context Object
+  cephCtx_ = nullptr;
  
 }
 
@@ -37,7 +51,7 @@ StoreWorker::closeStoreWorker()
 {
  
   // close the ceph context
-  cephCtx_.closeCephContext();
+  cephCtx_->closeCephContext();
 
   // release all the retrieved objects 
   // and enqueued tasks
@@ -45,7 +59,7 @@ StoreWorker::closeStoreWorker()
   pendReads_.clear();
 
 
-  std::vector<std::pair<Promise<Task>, Task>> cancelTasks;
+  std::deque<UpperRequest> cancelTasks;
 
   tasks_.dequeue(cancelTasks);
   
@@ -85,14 +99,44 @@ bool
 StoreWorker::initialize()
 {
   // initialize the ceph context
-  const bool res = cephCtx_.initAndConnect();
+  const bool initCeph = cephCtx_->initAndConnect();
 
-  if(res)
+  if(!initCeph) // do not process further
   {
-    Worker::initDone(); // done initializing
+    return false;
   }
 
-  return res;
+  // create a hash of the shared secret
+  SHA256_CTX shaCtx;
+  int initSha = SHA256_Init(&shaCtx);
+  
+  if(!initSha)
+  {
+    return false;
+  }
+  
+  // compute the SHA-256 digest
+  initSha = SHA256_Update(&shaCtx, (unsigned char*)WORKER_SHARED_SECRET, 
+                          std::strlen(WORKER_SHARED_SECRET));
+
+  if(!initSha)
+  {
+    return false;
+  } 
+
+  // compute the digest
+  initSha = SHA256_Final(workerSecret, &shaCtx);
+  
+  if(!initSha)
+  {
+    return false; // cannot compute the digest
+  }
+
+  
+  Worker::initDone(); // done initializing
+ 
+
+  return true; // the worker has been initialized
 }
 
 
@@ -197,65 +241,77 @@ void
 StoreWorker::processTasks()
 {
 
+  std::deque<UpperRequest> passedTasks;
+
   // process tasks from the concurretn queue
-  while(!Worker::done_.load())
+  while(!Worker::done_.load(std::memory_order_relaxed))
   {
-    // wait for a task 
-    auto tmpTask = std::move(tasks_.pop());
-
-    // check the type of the task
-    switch(tmpTask.second.opType_)
+    // wait for a few tasks
+    tasks_.dequeue(passedTasks);
+    
+    // process any new tasks
+    for(auto&& tmpTask : passedTasks)
     {
-      case CommonCode::IOOpCode::OP_READ: 
-      {  // process read
+
+      // check the type of the task
+      switch(tmpTask.second.opType_)
+      {
+        case CommonCode::IOOpCode::OP_READ: 
+        {  // process read
          
-         processReadOp(tmpTask);
-         break; // one task has been completed
-      }
+           processReadOp(std::move(tmpTask));
+           break; // one task has been completed
+        }
       
-      case CommonCode::IOOpCode::OP_WRITE:
-      { // process write
+        case CommonCode::IOOpCode::OP_WRITE:
+        { // process write
         
-        processWriteOp(tmpTask);
+          processWriteOp(std::move(tmpTask));
 
-        break; // one task has been completed
+          break; // one task has been completed
 
-      }
+        }
       
-      case CommonCode::IOOpCode::OP_DELETE:
-      { // process delete
+        case CommonCode::IOOpCode::OP_DELETE:
+        { // process delete
 
-        processDeleteOp(tmpTask);
+          processDeleteOp(std::move(tmpTask));
 
-        break; // one task has been completed
-      }      
+          break; // one task has been completed
+        }      
 
-     case CommonCode::IOOpCode::OP_CLOSE:
-     default:
-     {
-       done_.store(true); // completed processing
-     }
-   } // switch
+        default:
+        {
+          Worker::done_.store(true); // completed processing
+        }
+      } // switch
+
+    } // for (new tasks)
+
+
+    /* after issueing all new requests */
+    /* process data operations */
+    executeRadosOps();
 
 
   } // while
 
   /* closing procedures come here */
-
+  closeStoreWorker();
 
 }
 
 
 void
-StoreWorker::processReadOp(
-        std::pair<folly::Promise<Task>, Task>& task)
+StoreWorker::processReadOp(UpperRequest&& task)
 {
   // first test if the operation is a pending one
   auto checkRead = pendReads_.find(task.second.tranID_);
   
   if(checkRead == pendReads_.end())
   { 
-    // new READ operation
+    // new READ operation (read new object)
+    issueNewReadOp(std::move(task));
   }
   else
   { // pending READ operation
@@ -273,20 +329,74 @@ StoreWorker::processReadOp(
 }
 
 
+
 void
-StoreWorker::processWriteOp(
-        std::pair<folly::Promise<Task>, Task>& task)
+StoreWorker::issueNewReadOp(UpperRequest&& task)
 {
+
+  // issue a READ request to the security module
+  // and enqueue it 
+  Task resTask(task.second); // copy the tast
+
+  StoreWorker::WorkerContext readTmpCtx(
+                               std::move(task),
+                               std::move(
+                                 secure_->checkPerm(
+                                 resTask.path_, 
+                             UserAuth(resTask.username_, 
+                             reinterpret_cast<const char*>(workerSecret)),
+                             CommonCode::IOOpCode::OP_READ)));
+
+
+  // append to the list
+  responses_.push_back(std::move(readTmpCtx));
+}
+
+
+
+void
+StoreWorker::processWriteOp(UpperRequest&& task)
+{
+  // issue a WRITE request to the security module
+  // and enqueue it 
+  Task resTask(task.second); // copy the tast
+
+  StoreWorker::WorkerContext writeTmpCtx(
+                               std::move(task),
+                               std::move(
+                                 secure_->checkPerm(
+                                 resTask.path_, 
+                             UserAuth(resTask.username_, 
+                             reinterpret_cast<const char*>(workerSecret)),
+                             CommonCode::IOOpCode::OP_WRITE)));
+
+
+  // appned to the list
+  responses_.push_back(std::move(writeTmpCtx));
 }
 
 
 void
-StoreWorker::processDeleteOp(
-        std::pair<folly::Promise<Task>, Task>& task)
+StoreWorker::processDeleteOp(UpperRequest&& task)
 {
+  // issue a DELETE request to the security module
+  // and enqueue it 
+  Task resTask(task.second); // copy the tast
+
+  StoreWorker::WorkerContext delTmpCtx(
+                               std::move(task),
+                               std::move(
+                                 secure_->checkPerm(
+                                 resTask.path_, 
+                             UserAuth(resTask.username_, 
+                             reinterpret_cast<const char*>(workerSecret)),
+                             CommonCode::IOOpCode::OP_DELETE)));
+
+
+  // append the request to the list
+  responses_.push_back(std::move(delTmpCtx));
+
 }
-
-
 
 
 
@@ -299,36 +409,63 @@ StoreWorker::handlePendingRead(
   // check if the Task path mathes the unique ID
   assert(itr->second.getGlobalObjectId().compare(task.second.path_));
   
-  uint64_t dataRead = static_cast<uint64_t>(task.second.dataSize_);
+  // create the resulting task
+  Task resTask(task.second);
+
+  uint64_t dataRead = static_cast<uint64_t>(resTask.dataSize_);
   char* rawData = itr->second.getRawBytes(dataRead);
   assert(rawData); // ensure that there is data
 
   // write to the data to the shared memory
   // (use C-type casting since C++ complains)
-  char* ptr = (char*) task.second.dataAddr_;
+  char* ptr = reinterpret_cast<char*>(resTask.dataAddr_);
 
   std::memcpy(ptr, rawData, dataRead); // write data to the memory
   
-  // notify the user about it
-  Task tmp(task.second); // copy constructor
-  tmp.dataSize_ = static_cast<uint32_t>(dataRead);
+  // notify the user about written data
+  resTask.dataSize_ = static_cast<uint32_t>(dataRead);
   
   // check if I can still read more data
   if(itr->second.storeObjComplete())
   { // done reading the entire object
-    tmp.opStat_ = CommonCode::IOStatus::STAT_SUCCESS;
+    resTask.opStat_ = CommonCode::IOStatus::STAT_SUCCESS;
     // remove the iterator from the map
     pendReads_.erase(itr);
   }
   else
   { // need to read more data
-    tmp.opStat_ = CommonCode::IOStatus::STAT_PARTIAL_READ;
+    resTask.opStat_ = CommonCode::IOStatus::STAT_PARTIAL_READ;
   } 
   
   // a READ operation completed
   // notify the future
-  task.first.setValue(std::move(tmp));
+  task.first.setValue(std::move(resTask));
 
+}
+
+
+
+void
+StoreWorker::executeRadosOps()
+{
+  auto opIter = responses_.begin();       // for erasing
+  decltype(responses_.begin()) prevIter;  // an item
+  
+  while(opIter != responses_.end())
+  {
+    // check if the operation is completed
+    if(opIter->secRes->isReady())
+    { // handle the request and delete this item
+     
+      // prepare deleting the current item
+      prevIter = opIter; 
+      ++opIter;
+      responses_.erase(prevIter);
+    }// if
+
+    
+  }// while
+  
 }
 
 } // namesapce singaistorageaipc

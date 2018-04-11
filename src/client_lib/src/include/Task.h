@@ -195,8 +195,8 @@ typedef struct IOResponse
    * Default/Custom constructor for any type of simple
    * initialization.
    */
-  IOResponse(std::unique_ptr<Message>&& msgContent,
-             const CommonCode::IOOpCode::IOOpCode opCode = 
+  IOResponse(std::unique_ptr<Message>&& msgContent = nullptr,
+             const CommonCode::IOOpCode opCode = 
                    CommonCode::IOOpCode::OP_NOP,
              const CommonCode::IOStatus opStat =
                    CommonCode::IOStatus::ERR_INTERNAL)
@@ -212,7 +212,7 @@ typedef struct IOResponse
 
 
   // Support move semantics
-  IOResonse(struct IOResponse&& other)
+  IOResponse(struct IOResponse&& other)
   : opType_(other.opType_),
     opStat_(other.opStat_),
     msg_(std::move(other.msg_))
@@ -259,7 +259,7 @@ typedef struct IOResult
 
   // Don't support copy semantics.
   IOResult(const struct IOResult&) = delete;
-  IOresult& operator=(const struct IOResult&) = delete;
+  IOResult& operator=(const struct IOResult&) = delete;
 
  
   // Support move semantics
