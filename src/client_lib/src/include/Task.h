@@ -190,15 +190,99 @@ typedef struct IOResponse
   std::unique_ptr<Message> msg_;    // message received from the 
                                     // remote server
 
+
+  /**
+   * Default/Custom constructor for any type of simple
+   * initialization.
+   */
+  IOResponse(std::unique_ptr<Message>&& msgContent,
+             const CommonCode::IOOpCode::IOOpCode opCode = 
+                   CommonCode::IOOpCode::OP_NOP,
+             const CommonCode::IOStatus opStat =
+                   CommonCode::IOStatus::ERR_INTERNAL)
+  : opType_(opCode),
+    opStat_(opStat),
+    msg_(std::move(msgContent))
+  {}
+
+
+  // No copy constructors or copy assignemnts 
+  IOResponse(const struct IOResponse&) = delete;
+  IOResponse& operator=(const struct IOResponse&) = delete;
+
+
+  // Support move semantics
+  IOResonse(struct IOResponse&& other)
+  : opType_(other.opType_),
+    opStat_(other.opStat_),
+    msg_(std::move(other.msg_))
+  {}
+
+
+  IOResponse& operator=(struct IOResponse&& other)
+  {
+    if(this != &other)
+    {
+      // destroy the current message
+      msg_.reset(nullptr);
+
+      // move the corresponding values
+      opType_ = other.opType_;
+      opStat_ = other.opStat_;
+      msg_    = std::move(other.msg_);
+
+    }
+
+   
+    return *this;
+  }
+
+
+
 } IOResponse; // response for IO operations
 
 
 typedef struct IOResult
 {
 
-  Request msg_;                 // encoded message for sending 
-                                // to confirm completed WRITE operation
-                                // (COMMIT Operation)
+  std::unique_ptr<Request> msg_;  // encoded message for sending 
+                                  // to confirm completed WRITE operation
+                                  // (COMMIT Operation)
+
+  /**
+   * Support simple default constructor.
+   */
+  IOResult(std::unique_ptr<Request>&& reqMsg = nullptr)
+  : msg_(std::move(reqMsg))
+  {}
+
+
+  // Don't support copy semantics.
+  IOResult(const struct IOResult&) = delete;
+  IOresult& operator=(const struct IOResult&) = delete;
+
+ 
+  // Support move semantics
+  IOResult(struct IOResult&& other)
+  : msg_(std::move(other.msg_))
+  {
+    other.msg_.reset(nullptr); // ensure clean destruction
+  }
+
+  IOResult& operator=(struct IOResult&& other)
+  {
+    if(this != &other)
+    {
+      // destroy current message
+      msg_.reset(nullptr);
+
+      // move values
+      msg_ = std::move(other.msg_);
+    }
+
+    return *this;
+  }
+
 } IOResult; // struct IOResult
 
 } // namesapce singaistorageipc

@@ -118,10 +118,9 @@ SecurityModule::sendIOResult(const std::string& dataPath,
                              const CommonCode::IOOpCode op,
                              const IOResult&  res)
 {
-
-  Promise<IOResponse> prom;
-  
-  return std::move(prom.getFuture());
+  // do not support currently since it involves a 
+  // lot of copying (need to copy data)
+  throw std::exception(); // throw an exception
 }
 
 
@@ -132,7 +131,8 @@ SecurityModule::sendIOResult(std::string&& dataPath,
                              IOResult&&  res)
 {
 
-  std::shared_ptr<Request> dataMsg = std::make_shared<Request>(std::move(res.msg_));
+  // convert a unique pointer into a shared one
+  std::shared_ptr<Request> dataMsg = std::move(res.msg_);
     
   // reinitialize some values
   dataMsg->userID_     = std::move(user.username_);
