@@ -20,28 +20,26 @@ namespace singaistorageipc
 {
 
   
-StoreWorker::StoreWorker(const CephContext& ctx, const uint32_t& id, 
-                std::shared_ptr<Security>&& sec)
-: Worker(id, std::move(sec))
- {
-   // create a unique pointer
-   cephCtx_ = std::make_unique<CephContext>(ctx);
- }
-
-
-StoreWorker::StoreWorker(std::unique_ptr<CephContext>&& ctx,
+StoreWorker::StoreWorker(std::unique_ptr<CephContext>&&    ctx,
+                         std::unique_ptr<RemoteProtocol>&& prot,
                          const uint32_t id,
-                         std::shared_ptr<Security>&& sec)
-: Worker(id, std::move(sec)),
-  cephCtx_(std::move(ctx))
-{}
+                         std::shared_ptr<Security> sec)
+: Worker(id, sec),
+  cephCtx_(ctx.release()),
+  remProt_(prot.release()),
+  protCall_(std::bind(&StoreWorker::handleProtocol, this,
+                std::placeholders::_1, std::placeholders::_2))
+{
+}
 
 
 StoreWorker::~StoreWorker()
 {
 
-  // destroy the Ceph Context Object
-  cephCtx_ = nullptr;
+  // destroy the Ceph Context Object and the Protocol
+  delete cephCtx_;
+  delete remProt_;
+  
  
 }
 
@@ -52,6 +50,9 @@ StoreWorker::closeStoreWorker()
  
   // close the ceph context
   cephCtx_->closeCephContext();
+
+  // stop the protocol
+  remProt_->stopProtocol();
 
   // release all the retrieved objects 
   // and enqueued tasks
@@ -456,7 +457,21 @@ StoreWorker::executeRadosOps()
     // check if the operation is completed
     if(opIter->secRes->isReady())
     { // handle the request and delete this item
-     
+   
+      // enqueue to the protocol to decipher it
+      // and provide a result
+      assert(opIter->uppReq); // must not be nullptr
+      assert(opIter->secRes); 
+
+      remProt_->handleMessage(
+         std::make_shared<IOResponse>(std::move(opIter->secRes->value())),
+         protCall_, /*Callback object*/
+         reinterpret_cast<void*>(opIter->uppReq));
+
+      // 
+      opIter->uppReq = nullptr; // ensures it's not deleted
+      
+ 
       // prepare deleting the current item
       prevIter = opIter; 
       ++opIter;
@@ -467,5 +482,21 @@ StoreWorker::executeRadosOps()
   }// while
   
 }
+
+
+void
+StoreWorker::handleProtocol(
+    std::unique_ptr<RemoteProtocol::Result>&& protRes,
+    RemoteProtocol::CallbackContext context)
+{
+  // cast the context into a pointer
+  WorkerContext* tmp = reinterpret_cast<WorkerContext*>(context);
+  assert(tmp); // make sure casted correctly
+
+  protRes_.push_back(std::move(std::make_pair(
+                     std::move(protRes), tmp)));
+
+}
+
 
 } // namesapce singaistorageaipc

@@ -12,6 +12,7 @@
 #include <memory>
 #include <deque>
 #include <list>
+#include <functional>
 
 
 // Facebook folly
@@ -29,11 +30,12 @@
 
 #include "cluster/Worker.h"
 #include "cluster/CephContext.h"
+#include "cluster/RemoteProtocol.h"
 #include "include/ConcurrentQueue.h"
 #include "include/Task.h"
 #include "include/CommonCode.h"
-#include "include/JSONHandler.h"
 #include "StoreObj.h"
+
 
 
 namespace singaistorageipc
@@ -45,8 +47,11 @@ class StoreWorker: public Worker
 
   private:
   
+
+    /*useful definitions*/
     using UpperRequest = std::pair<folly::Promise<Task>, Task>;
     using SecResponse  = folly::Future<IOResponse>;
+
 
     /**
      * A wrapper for storing a contex of a pending task.
@@ -56,25 +61,37 @@ class StoreWorker: public Worker
      */
     typedef struct WorkerContext
     {
-      UpperRequest  uppReq;   // request context     
-      SecResponse*  secRes;   // response context
+      UpperRequest*  uppReq;   // request context     
+      SecResponse*   secRes;   // response context
 
-      WorkerContext() = delete;
+
+      // no copying supported
       WorkerContext(const struct WorkerContext&) = delete;
+      WorkerContext& operator=(const struct WorkerContext&) = delete;
+
+
+      /**
+       * Default Constructor.
+       */
+      WorkerContext()
+      : uppReq(nullptr),
+        secRes(nullptr)
+      {}
 
       WorkerContext(UpperRequest&& passReq,
                     SecResponse&&  recvRes)
-      : uppReq(std::move(passReq)),
+      : uppReq(new UpperRequest(std::move(passReq))),
         secRes(new SecResponse(std::move(recvRes)))
         {}
 
       // support move operations
       WorkerContext(struct WorkerContext&& other)
-      : uppReq(std::move(other.uppReq)),
+      : uppReq(other.uppReq),
         secRes(other.secRes)
         {
           // set the pointer of the 'other' object 
           // to nullptr
+          other.uppReq = nullptr;
           other.secRes = nullptr;
         }
 
@@ -82,15 +99,25 @@ class StoreWorker: public Worker
       {
         if(this != &other)
         {
-          // move data
-          uppReq = std::move(other.uppReq);
-          
-          // delete my current content
-          delete secRes;        
 
-          // swap the pointers
+          // delete current content
+          if(secRes)
+          {
+            delete secRes;
+          }
+
+          if(uppReq)
+          {
+            delete uppReq;
+          }  
+
+          // steal pointers
+          uppReq  = other.uppReq;
           secRes = other.secRes;
-          other.secRes = nullptr; // reset content to nullptr
+
+          // reset the pointers of 'other'
+          other.uppReq = nullptr;
+          other.secRes = nullptr;
           
         }
 
@@ -103,13 +130,23 @@ class StoreWorker: public Worker
         if(secRes)
         {
           delete secRes; // delete the response context
+          secRes = nullptr;
+        }
+
+        if(uppReq)
+        {
+          delete uppReq; // delete the upper request
+          uppReq = nullptr;
         }
       }
-         
-      
- 
+          
     } WorkerContext; // struct WorkerContext
 
+
+
+    using ProtocolRes  =\
+        std::pair<std::unique_ptr<RemoteProtocol::Result>,\
+                                  WorkerContext*>;
 
 
   public:
@@ -128,12 +165,10 @@ class StoreWorker: public Worker
     StoreWorker& operator=(StoreWorker&&) = delete; // cannot move
     
 
-   StoreWorker(const CephContext& ctx, const uint32_t& id, 
-                std::shared_ptr<Security>&& sec);
-
-   StoreWorker(std::unique_ptr<CephContext>&& ctx, 
-               const uint32_t id,
-               std::shared_ptr<Security>&& sec);
+    StoreWorker(std::unique_ptr<CephContext>&&    ctx,
+                std::unique_ptr<RemoteProtocol>&& prot, 
+                const uint32_t id,
+                std::shared_ptr<Security> sec);
 
 
 
@@ -238,6 +273,11 @@ class StoreWorker: public Worker
      */
     void executeRadosOps();
 
+
+    void handleProtocol(std::unique_ptr<RemoteProtocol::Result>&&,
+                        RemoteProtocol::CallbackContext context); 
+
+
     /** 
      * Terminate the worker. Worker cleans itslef up
      * and terminates
@@ -254,7 +294,11 @@ class StoreWorker: public Worker
 
 
     // Map of sent requests
-    std::list<WorkerContext> responses_;     // issued requests
+    std::list<WorkerContext>    responses_;     // issued requests
+    std::vector<ProtocolRes>    protRes_;       // protocol responses
+
+    
+
 
     std::map<uint32_t, StoreObj> pendReads_; // completed remotely 
                                              // tasks, pending for 
@@ -270,8 +314,12 @@ class StoreWorker: public Worker
                                                       // the auth server
                                              
 
-    std::unique_ptr<CephContext> cephCtx_;  // for ceph communication  
-                                            // (accesing the Cluster)
+    CephContext* cephCtx_;     // for ceph communication  
+                               // (accesing the Cluster)
+
+    RemoteProtocol* remProt_;  // remote protocol
+
+    const std::function<void(std::unique_ptr<RemoteProtocol::Result>&&, RemoteProtocol::CallbackContext)>       protCall_;   // protocol callback
 }; // class StoreWorker
 
 

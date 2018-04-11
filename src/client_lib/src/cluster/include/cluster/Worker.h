@@ -17,6 +17,7 @@
 // Project lib
 #include "remote/Security.h"
 #include "include/Task.h"
+#include "RemoteProtocol.h"
 #include "CephContext.h"
 
 
@@ -50,6 +51,12 @@ class Worker
     : done_(false),
       id_(id),
       secure_(std::move(sec))
+    {}
+
+    Worker(const uint32_t id, std::shared_ptr<Security> sec)
+    : done_(false),
+      id_(id),
+      secure_(sec)
     {}
     
 
@@ -182,6 +189,7 @@ class Worker
      */
     static std::shared_ptr<Worker> createRadosWorker(const char* type,
                                      std::unique_ptr<CephContext>&& ctx,
+                                     std::unique_ptr<RemoteProtocol>&& prot,
                                      const uint32_t id,
                                      std::shared_ptr<Security> sec);
 
@@ -199,6 +207,7 @@ class Worker
     static std::shared_ptr<Worker> createRadosWorker(
                                      const std::string& type,
                                      std::unique_ptr<CephContext>&& ctx,
+                                     std::unique_ptr<RemoteProtocol>&& prot,
                                      const uint32_t id,
                                      std::shared_ptr<Security> sec);
 
