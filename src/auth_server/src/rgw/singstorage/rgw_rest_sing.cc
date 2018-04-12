@@ -583,6 +583,10 @@ RGWGetObjLayout_SING::send_response()
        // some inernal error
        s->formatter->dump_unsigned("Error_Type", 
           rgw::singstorage::SINGErrorCode::INTERNAL_ERR);
+      
+       // Send an error code 
+       s->formatter->close_section(); // close JSON object
+       end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
 
        return; 
     }
