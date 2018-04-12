@@ -91,6 +91,12 @@ CephContext::~CephContext()
     init_ = false;
   }
 
+  // delete the handler
+  if(opHandler_)
+  {
+    delete opHandler_;
+  }
+
   // reset the configuration file
   confFile_ = nullptr; 
 
@@ -160,11 +166,7 @@ CephContext::closeCephContext()
 
 
   // close/terminate the Rados Op Handler
-  opHandler_->stopRadosOpHandler(); // wait/terminate current IOs 
-  // delete the handler
-  delete opHandler_;
-  opHandler_ = nullptr;
-
+  opHandler_->stopRadosOpHandler(); // wait/terminate current IOs  
 
   // first close all rados context instances
   for(const auto& value : ioOps_)
@@ -252,8 +254,159 @@ CephContext::RadosOpHandler::RadosOpHandler(librados::Rados* rados) noexcept
 }
 
 
+
+
+size_t
+CephContext::readObject(const std::string& oid,
+                        const std::string& poolName,
+                        const size_t readBytes,
+                        const uint64_t offset,
+                        void* userCtx)
+{
+
+  if(!init_)
+  {
+    return 0; // not connected or already closed
+  }
+
+  // already exists?
+  if(!checkPoolExists(poolName))
+  { // if the pool has not been accessed before
+    // try to connect to it
+    auto addRes = addRadosContext(poolName);
+    
+    if(!addRes)
+    { // something went wrong
+      int a = 5; // log this
+ 
+      return 0;
+    }
+ 
+  } //if
+
+  // have an active IO Context
+  // issue a read operation
+  auto& ioRadCtx = getPoolRadosContext(poolName);
+
+  // try to read
+  auto readOpSize = opHandler_->readRadosObject(&ioRadCtx, oid, readBytes, 
+                                                offset, userCtx);
+
+  if(!readOpSize)
+  {
+    int a = 5; // need to log if there is any problem
+  }
+
+  return readOpSize;
+}
+
+
+
+size_t
+CephContext::writeObject(const std::string& oid, const std::string& poolName,
+                         const char* buffer, const size_t writeBytes,
+                         const uint64_t offset, void* userCtx)
+{
+
+  if(!init_) // either not connected yet or has already been closed
+  {
+    return 0;
+  }
+
+  
+  // check if the data pool already exists
+  if(!checkPoolExists(poolName))
+  { // if the pool has not been accessed before
+    // try to connect to it
+    auto addRes = addRadosContext(poolName);
+    
+    if(!addRes)
+    { // something went wrong
+      int a = 5; // log this
+ 
+      return 0;
+    }
+ 
+  } //if
+
+  // have an active IO Context
+  // issue a write operation
+  auto& ioRadCtx = getPoolRadosContext(poolName);
+
+  // try to write
+  auto writeOpSize = opHandler_->writeRadosObject(&ioRadCtx, oid, 
+                                                 buffer, writeBytes, 
+                                                 offset, true,
+                                                 userCtx);
+
+  if(!writeOpSize)
+  {
+    int a = 5; // need to log if there is any problem
+  }
+
+  return writeOpSize;
+
+
+
+}
+
+
+CephContext::PollSize
+CephContext::getCompletedOps(std::deque<CephContext::RadosOpCtx*>& ops)
+{
+
+  if(!opHandler_) // not connected yet
+  {
+    return 0;
+  }
+
+  auto oldSize = ops.size(); // get the current number of ops stored
+
+  // try to retrieve some new ops
+  opHandler_->pollAsyncIOs(ops);
+
+  return (ops.size() - oldSize);
+}
+
+
+
 CephContext::RadosOpHandler::~RadosOpHandler()
-{}
+{
+
+  if(!done_.load(std::memory_order_relaxed))
+  { // need to stop the handler
+    stopRadosOpHandler();
+  }
+
+  // Try to dequeue all the remaining contexts and destroy
+  // them
+  clearPendingAIOs();
+}
+
+
+
+void
+CephContext::RadosOpHandler::clearPendingAIOs()
+{
+
+  // We can test for length since no more active operations 
+  if(!asyncOps_.empty())
+  {  
+    std::deque<CephContext::RadosOpCtx*> completedIOs;
+    asyncOps_.dequeue(completedIOs); 
+
+    // go over all the contexts and delete them
+    for(auto& ctx : completedIOs)
+    {
+      ctx->userCtx = nullptr;
+      assert(ctx->release());
+    }// for
+ 
+    completedIOs.clear(); // done deeleting
+ }//if
+
+}
+
 
 
 void
@@ -280,22 +433,6 @@ CephContext::RadosOpHandler::stopRadosOpHandler()
 
   } // lock scope
   
-
-  // done waiting for IO completions
-  // release all the memory allocated to the 
-  // currently enqueued operations
-  std::deque<CephContext::RadosOpCtx*> completedIOs;
-  asyncOps_.dequeue(completedIOs); 
-
-  // go over all the contexts and delete them
-  for(auto& ctx : completedIOs)
-  {
-    ctx->userCtx = nullptr;
-    assert(ctx->release());
-  }
- 
-  completedIOs.clear(); // done deeleting
-
 }
 
 

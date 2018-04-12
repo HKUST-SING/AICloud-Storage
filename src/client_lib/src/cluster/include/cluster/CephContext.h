@@ -261,6 +261,12 @@ class CephContext
           */
           void radosAsyncCompletionCallback(librados::completion_t cb,
                                             void* args);
+
+
+         /** 
+          * Clear any pending AIOs
+          */
+          void clearPendingAIOs();
       
       
 
@@ -290,6 +296,11 @@ class CephContext
 
 
   public:
+    
+     // Public return size definition
+     using PollSize = std::deque<CephContext::RadosOpCtx*>::size_type;
+
+
     CephContext() = delete; // no dfault constructor
     ~CephContext();
     CephContext& operator=(const CephContext&) = delete;
@@ -377,6 +388,67 @@ class CephContext
    *
    */
     
+
+
+  /** 
+   * Read data from the underlying data cluster (Ceph).
+   * Data is returned by polling the context and asking
+   * for any completed operations.
+   * 
+   * @param: oid       : Rados object unique id
+   * @param: poolName  : Ceph pool name
+   * @param: readBytes : number of bytes to read
+   * @param: offset    : where to start reading the object
+   * @param: userCtx   : user context which will be returned 
+   *                     when poll for responses
+   *
+   * @return: returns number of bytes to be read (0 on failure)
+   */
+  size_t readObject(const std::string& oid,  
+                    const std::string& poolName,
+                    const size_t readBytes, 
+                    const uint64_t offset=0,
+                    void* userCtx = nullptr);
+
+
+
+
+  /** 
+   * Write data to the underlying data cluster (Ceph).
+   * Result is returned by polling the context and asking
+   * for any completed operations.
+   * 
+   * @param: oid        : Rados object unique id
+   * @param: poolName   : Ceph pool name
+   * @param: buffer     : data to write to the cluster
+   * @param: writeBytes : number of bytes to write
+   * @param: offset     : at which offset of the object to write to
+   * @param: userCtx    : user context which will be returned 
+   *                      when poll for responses
+   *
+   * @return: number of bytes to be written to the cluster
+   *          (0 on failure)
+   */
+    size_t writeObject(const std::string& oid, 
+                       const std::string& poolName,
+                       const char* buffer, 
+                       const size_t writeBytes, 
+                       const uint64_t offset=0, 
+                       void* userCtx = nullptr);
+
+
+  /**
+   * Poll for any completed previously issued IO operations.
+   * The return structures keep references to the client
+   * contexts (userCtx).
+   *
+   * @param: ops : a deque for storing completed ops
+   * 
+   * @return: returns the number of retrieved completed ops
+   */
+    PollSize getCompletedOps(
+       std::deque<CephContext::RadosOpCtx*>& ops);
+
 
 
   private:
