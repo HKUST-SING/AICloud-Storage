@@ -9,7 +9,6 @@
 // Boost lib
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/io_context.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/system/system_error.hpp>
 
 
@@ -22,6 +21,7 @@
 #include "Sender.h"
 #include "Receiver.h"
 #include "ChannelContext.h"
+#include "Message.h"
 
 namespace singaistorageipc
 {
@@ -85,9 +85,8 @@ class ServerChannel
 
           
       }; // class ChannelWriteCallback
-	 
 
-	  ServerChannel() = default;
+      ServerChannel() = default;
       ServerChannel(const ServerChannel&) = delete;
       ServerChannel(ServerChannel&& other);
       virtual ~ServerChannel();
@@ -115,9 +114,7 @@ class ServerChannel
       /**
        * message received by the receiver
        */
-      std::shared_ptr<
-        std::vector<std::unique_ptr<Response>>> receivePool_;
-      std::shared_ptr<boost::mutex> mutex_;
+      std::shared_ptr<ReceivePool> receivePool_;
 
       /**
        * Helper functions

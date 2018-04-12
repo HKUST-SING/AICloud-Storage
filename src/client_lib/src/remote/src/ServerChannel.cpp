@@ -112,11 +112,7 @@ ServerChannel::sendMessage(std::shared_ptr<Request> msg
 std::vector<std::unique_ptr<Response>>
 ServerChannel::pollReadMessage()
 {
-	boost::mutex::scoped_lock lock(*mutex_);
-	DLOG(INFO) << "poll the message";
-	std::vector<std::unique_ptr<Response>> res(std::move(*receivePool_.get()));
-	receivePool_.get()->clear();
-	return std::move(res);
+	return std::move(receivePool_->poll());
 }
 
 } //namespace

@@ -7,6 +7,7 @@
  * External lib
  */
 #include <folly/io/IOBuf.h>
+#include <boost/thread/mutex.hpp>
 
 /**
  * Internal lib
@@ -182,5 +183,34 @@ public:
 	CommonCode::IOStatus stateCode_;
 
 };
+
+/**
+* Interface that store and retrive response.
+*/
+class ReceivePool{
+public:
+  explicit ReceivePool() = default;
+  ~ReceivePool(){
+    pool_.clear();
+  }
+
+  void insert(std::unique_ptr<Response> res){
+    boost::mutex::scoped_lock lock(mutex_);
+    pool_.push_back(std::move(res));
+  }
+
+  std::vector<std::unique_ptr<Response>> poll(){
+    boost::mutex::scoped_lock lock(mutex_);
+    DLOG(INFO) << "poll the message";
+    std::vector<std::unique_ptr<Response>> res(std::move(pool_));
+    pool_.clear();
+    return std::move(res);
+  }
+
+private:
+  std::vector<std::unique_ptr<Response>> pool_;
+  boost::mutex mutex_;
+}; // class ReceivePool
+
 
 } // namespace

@@ -38,9 +38,8 @@ class RESTReceiver : public Receiver{
 public:
 	RESTReceiver() = delete;
 	explicit RESTReceiver(std::shared_ptr<tcp::socket> socket, 
-		std::shared_ptr<std::vector<std::unique_ptr<Response>>> receivePool, 
-		std::shared_ptr<boost::mutex> mutex)
-		:socket_(socket),receivePool_(receivePool),mutex_(mutex){}
+		std::shared_ptr<ReceivePool> receivePool)
+		:socket_(socket),receivePool_(receivePool){}
 
 	~RESTReceiver() = default;
 
@@ -52,9 +51,8 @@ public:
 
 private:
 	std::shared_ptr<tcp::socket> socket_;
-	std::shared_ptr<
-		std::vector<std::unique_ptr<Response>>> receivePool_;
-	std::shared_ptr<boost::mutex> mutex_;
+
+	std::shared_ptr<ReceivePool> receivePool_;
 
 	/**
 	 * `buffer_`, `response_` and `readHandler_`

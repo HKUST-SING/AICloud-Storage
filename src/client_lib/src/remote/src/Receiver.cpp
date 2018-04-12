@@ -70,8 +70,7 @@ RESTReceiver::msgParse(){
 
 void
 RESTReceiver::poolInsert(std::unique_ptr<Response> msg){
-	boost::mutex::scoped_lock lock(*mutex_);
-	receivePool_->push_back(std::move(msg));
+	receivePool_->insert(std::move(msg));
 }
 
 void
