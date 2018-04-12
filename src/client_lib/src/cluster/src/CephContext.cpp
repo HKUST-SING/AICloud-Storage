@@ -1,8 +1,8 @@
 // C++ std lib
 #include <utility>
 #include <cassert>
-#include <chrono>
-#include <thread>
+#include <limits>
+
 
 
 // Project lib
@@ -10,11 +10,43 @@
 
 #define SING_RADOS_SECONDS_TO_SLEEP 5
 
+
+
+// sizes of the two intergal types for making sure that no overflow
+// occurs wile using librados::bufferlist
+static constexpr const bool POSSIBLE_OVERFLOW = (sizeof(size_t) > sizeof(unsigned int));
+
+
+// do precasting for better performance
+// (if sizeof(size_t) > sizeof(unsigned int), get maximum value in size_t)
+static constexpr const unsigned int MAX_RADOS_OP_SIZE = std::numeric_limits<unsigned int>::max();
+
+static constexpr const size_t MAX_BUFFER_SIZE = static_cast<const size_t>(MAX_RADOS_OP_SIZE);
+
+
 namespace singaistorageipc
 {
 
 using std::string;
 
+
+// converts size_t to such a value that librados::bufferlist
+// never overflows
+static size_t maximumDataOperationSize(const size_t dataSize)
+{
+
+
+  // if size_t can store larger values than 
+  // unsigned int, need to cap the value
+  if(POSSIBLE_OVERFLOW && dataSize > MAX_BUFFER_SIZE) 
+  {
+    return MAX_BUFFER_SIZE;
+  }//if
+ 
+ 
+  return dataSize; // no need to cap the value
+
+}
 
 CephContext::CephContext(const char* conf, const string& userName, 
                          const string& clusterName,
@@ -279,32 +311,6 @@ CephContext::RadosOpHandler::pollAsyncIOs(
 }
 
 
-unsigned int
-CephContext::RadosOpHandler::readRadosObject(librados::IoCtx* ioCtx,
-                             const std::string& objId,
-                             const unsigned int readBytes,
-                             const uint64_t offset,
-                             void* userCtx)
-{
-
-  return 0;
-}
-
-
-unsigned int
-CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
-                             const std::string& objId,
-                             const char* rawData,
-                             const unsigned int writeBytes,
-                             const uint64_t offset,
-                             const bool appendData,
-                             void* userCtx)
-{
-
-  return 0;
-}
-
-
 
 void
 CephContext::RadosOpHandler::radosAsyncCompletionCallback(
@@ -333,8 +339,7 @@ CephContext::RadosOpHandler::radosAsyncCompletionCallback(
 
 
   // delete the async operation and its context
-  opCtx->ioCmpl->release(); // deletes itself
-  delete opCtx;
+  opCtx->release();
    
 
   
@@ -357,6 +362,144 @@ CephContext::RadosOpHandler::radosAsyncCompletionCallback(
     } // if needToFinish
   }// if leftVal == 0
 }
+
+
+// A helper function to make it possible to use a callback on a method.
+void aioRadosCallbackFunc(librados::completion_t cb, void* args)
+{
+ 
+ const CephContext::RadosOpHandler::CmplCtx* tmpCtx = reinterpret_cast<const CephContext::RadosOpHandler::CmplCtx*>(args); // cast the pointer (Context) 
+
+  // call the method to handle the operation 
+  tmpCtx->objPtr->radosAsyncCompletionCallback(cb, args);
+
+}
+
+
+
+size_t
+CephContext::RadosOpHandler::readRadosObject(librados::IoCtx* ioCtx,
+                             const std::string& objId,
+                             const size_t readBytes,
+                             const uint64_t offset,
+                             void* userCtx)
+{
+
+  // The following code is taken from the Ceph librados tutorial
+  /****************** Ceph Librados Tutorial ******************/
+  // Create callback context
+
+  CephContext::RadosOpHandler::CmplCtx* args = CephContext::RadosOpHandler::CmplCtx::createHandlerCompletionContext();
+
+  // Create I/O Completion.
+  
+  librados::AioCompletion* readCompletion =\
+            librados::Rados::aio_create_completion(\
+              reinterpret_cast<void*>(args), 
+              aioRadosCallbackFunc, nullptr);
+
+
+  // create an operation context
+  CephContext::RadosOpCtx* opCtx = CephContext::RadosOpCtx::createRadosOpCtx();
+
+  // initialize the Completion context
+  args->objPtr   = this; // this object
+  args->ioCmpl   = readCompletion;
+  args->radosCtx = opCtx;
+
+  // proivde opearation context
+  opCtx->opType    = CommonCode::IOOpCode::OP_READ;
+  opCtx->opStatus  = CommonCode::IOStatus::ERR_INTERNAL;
+  opCtx->userCtx   = userCtx; // passed user context
+
+
+  const size_t canReadAtOnce = maximumDataOperationSize(readBytes);
+
+  const int ret = ioCtx->aio_read(objId, readCompletion, 
+                                  &(opCtx->opData), canReadAtOnce,
+                                  offset);
+
+
+  if(ret < 0) // failure occurred
+  {
+    // log it first;
+    int a = 0; // for logging
+    
+    // delete all allocated fields
+    args->release();
+
+    return 0; // notify that cannot read 
+  }
+
+  return canReadAtOnce; // return number of bytes to be read
+
+  
+}
+
+
+size_t
+CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
+                             const std::string& objId,
+                             const char* rawData,
+                             const size_t writeBytes,
+                             const uint64_t offset,
+                             const bool appendData,
+                             void* userCtx)
+{
+
+    // The following code is taken from the Ceph librados tutorial
+  /****************** Ceph Librados Tutorial ******************/
+  // Create callback context
+
+  CephContext::RadosOpHandler::CmplCtx* args = CephContext::RadosOpHandler::CmplCtx::createHandlerCompletionContext();
+
+  // Create I/O Completion.
+  
+  librados::AioCompletion* writeCompletion =\
+            librados::Rados::aio_create_completion(
+              reinterpret_cast<void*>(args), nullptr, 
+              aioRadosCallbackFunc);
+
+  // create an operation context
+  CephContext::RadosOpCtx* opCtx = CephContext::RadosOpCtx::createRadosOpCtx();
+
+  // initialize the Completion context
+  args->objPtr  = this; // this object
+  args->ioCmpl  = writeCompletion;
+  args->radosCtx = opCtx;
+
+  // proivde opearation context
+  opCtx->opType    = CommonCode::IOOpCode::OP_WRITE;
+  opCtx->opStatus  = CommonCode::IOStatus::ERR_INTERNAL;
+  opCtx->userCtx   = userCtx; // passed user context
+
+
+
+  // get the maximum number of bytes that can be written at once
+  const size_t canWriteAtOnce = maximumDataOperationSize(writeBytes);
+
+  // copy the data to a librados::bufferlist
+  opCtx->opData.append(rawData, static_cast<unsigned int>(canWriteAtOnce));
+
+
+  const int ret = ioCtx->aio_append(objId, writeCompletion, 
+                                    opCtx->opData, canWriteAtOnce);
+
+
+  if(ret < 0) // failure occurred
+  {
+    // log it first;
+    int a = 0; // for logging
+    
+    // delete all allocated fields
+    args->release();
+
+    return 0; // notify that cannot read 
+  }
+
+  return canWriteAtOnce; // return number of bytes to be read
+}
+
 
 
 } // namesapce singaistorageipc

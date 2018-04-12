@@ -22,6 +22,11 @@
 namespace singaistorageipc
 {
 
+
+// Define a function for Rados callbacks 
+extern void aioRadosCallbackFunc(librados::completion_t cb, void* args);
+
+
 class CephContext
 {
 /**
@@ -84,6 +89,18 @@ class CephContext
        
      }
 
+     unsigned int getDataLength() const noexcept
+     {
+       return opData.length();
+     }
+
+     
+     static RadosOpCtx* createRadosOpCtx() 
+     {
+       return new RadosOpCtx(); 
+     }
+
+
      private:
 
        // users cannot delete the context (use release method)
@@ -95,15 +112,71 @@ class CephContext
 
   private:
 
+    // Friend function to access the private class
+    friend void aioRadosCallbackFunc(librados::completion_t cb,
+                                         void* args); 
+
     class RadosOpHandler
     {
 
       private:
 
+        // friend function for accessing provate fields 
+        // of the class
+        friend void aioRadosCallbackFunc(librados::completion_t cb,
+                                         void* args); 
+
         typedef struct CmplCtx
         {
+          RadosOpHandler*          objPtr;   // object pointer
           librados::AioCompletion* ioCmpl;   // completion context  
           RadosOpCtx*              radosCtx; // rados op context
+
+          
+          CmplCtx(RadosOpHandler* objPtr = nullptr,
+                  librados::AioCompletion* aioRados = nullptr,
+                  RadosOpCtx* opCtx = nullptr)
+          : ioCmpl(aioRados),
+            radosCtx(opCtx)
+          {}
+
+          CmplCtx(const CmplCtx&) = delete;
+          CmplCtx(CmplCtx&&) = delete;
+          CmplCtx& operator=(const CmplCtx&) = delete;
+          CmplCtx& operator=(CmplCtx&&) = delete;
+
+
+
+          static CmplCtx* createHandlerCompletionContext()
+          {
+            return new CmplCtx();
+          }
+
+          void release()
+          {
+            if(ioCmpl)
+            {
+              ioCmpl->release(); // deletes itself
+              ioCmpl = nullptr;
+            }
+            
+            if(radosCtx)
+            {
+              // reset the context
+              radosCtx->userCtx = nullptr;
+              radosCtx->release(); // deletes itself
+              radosCtx = nullptr;
+            }
+
+            // reset the object pointer
+            objPtr = nullptr;
+
+            delete this; // delete the object
+
+          }
+
+         private:
+           ~CmplCtx() = default;
 
         } CmplCtx; // struct CmplCtx
 
@@ -130,13 +203,13 @@ class CephContext
          * @param: offset:    from where to start reading  
          * @param: userCtx:   user passed context which will be returned
          *
-         * @return: number of bytes to be read 
+         * @return: number of bytes to be read (0 on failure) 
          */
-        unsigned int readRadosObject(librados::IoCtx* ioCtx,
-                            const std::string& objId,
-                            const unsigned int readBytes,
-                            const uint64_t offset=0,
-                            void* userCtx=nullptr);
+        size_t readRadosObject(librados::IoCtx* ioCtx,
+                               const std::string& objId,
+                               const size_t readBytes,
+                               const uint64_t offset=0,
+                               void* userCtx=nullptr);
 
         /**
          * Write data to the cluster (a Rados object).
@@ -151,15 +224,15 @@ class CephContext
          * @param: userCtx:    user context which is returned 
          *                     with this call
          *
-         * @return : number of bytes to be written
+         * @return : number of bytes to be written (0 on failure)
          */
-        unsigned int writeRadosObject(librados:: IoCtx* ioCtx,
-                            const std::string& objId,
-                            const char* rawData,
-                            const unsigned int writeBytes,
-                            const uint64_t offset=0,
-                            const bool append=true,
-                            void* userCtx=nullptr);
+        size_t writeRadosObject(librados:: IoCtx* ioCtx,
+                                const std::string& objId,
+                                const char* rawData,
+                                const size_t  writeBytes,
+                                const uint64_t offset=0,
+                                const bool append=true,
+                                void* userCtx=nullptr);
 
 
         /**
@@ -202,7 +275,8 @@ class CephContext
           std::condition_variable                  termCond_;           
 
           librados::Rados*                         cluster_;
-        
+       
+ 
           ConcurrentQueue<CephContext::RadosOpCtx*,
                           std::deque<CephContext::RadosOpCtx*> >  
                                                    asyncOps_; 
