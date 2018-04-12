@@ -14,6 +14,7 @@ typedef struct CommonCode final
     OP_AUTH   = 4,
     OP_COMMIT = 5,
     OP_CLOSE  = 6,
+    OP_APPEND = 7,  // same as write only that append data
     OP_NOP    = 255 // no operation (for default initialization)
 
   }; // enum IOOpCode

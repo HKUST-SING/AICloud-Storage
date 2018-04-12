@@ -33,19 +33,23 @@ class RemoteProtocol
 
       IOResult*            success; // now we only have responses on
                                     // success
+      
+      IOResult*            failure; // if failure happens
 
       /**
        * A couple of constructors and assignment operations.
        */
 
-      Result(IOResult* resMsg = nullptr,
+      Result(IOResult* succMsg = nullptr,
+             IOResult* errMsg  = nullptr,
              const CommonCode::IOOpCode op = 
                    CommonCode::IOOpCode::OP_NOP,
              const CommonCode::IOStatus stat = 
                    CommonCode::IOStatus::ERR_INTERNAL)
       : opCode(op),
         opStatus(stat),
-        success(resMsg)  
+        success(succMsg),
+        failure(errMsg)  
         {}
 
      /**
@@ -54,10 +58,12 @@ class RemoteProtocol
      Result(struct RemoteProtocol::Result&& other)
      : opCode(other.opCode),
        opStatus(other.opStatus),
-       success(other.success)
+       success(other.success),
+       failure(other.failure)
      {
        //reset the other to nullptr
        other.success = nullptr;
+       other.failure = nullptr;
      }
 
     /**
@@ -72,13 +78,20 @@ class RemoteProtocol
         {
           delete this->success;
         }
+      
+        if(this->failure)
+        {
+          delete this->failure;
+        }
 
         this->opCode   = other.opCode;
         this->opStatus = other.opStatus; 
         this->success  = other.success;
+        this->failure  = other.failure;
 
         // set the other to nullptr
         other.success = nullptr;
+        other.failure = nullptr;
        
       }
 
@@ -97,6 +110,12 @@ class RemoteProtocol
        {
          delete success;
          success = nullptr;
+       }
+
+       if(failure)
+       {
+         delete failure;
+         failure = nullptr;
        }
      }
 

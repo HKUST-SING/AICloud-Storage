@@ -4,10 +4,19 @@
 #include <map>
 #include <string>
 #include <cstdint>
+#include <atomic>
+#include <deque>
+#include <mutex>
+#include <condition_variable>
 
 
 // Ceph lib
 #include <rados/librados.hpp>
+
+
+//Project lib
+#include "include/ConcurrentQueue.h"
+#include "include/CommonCode.h"
 
 
 namespace singaistorageipc
@@ -22,6 +31,187 @@ class CephContext
  * Each worker has its own instance of CephContext to avoid
  * state sharing.
  */
+
+
+
+  public:
+    typedef struct RadosOpCtx
+    {
+      CommonCode::IOOpCode   opType;   // operation opcde
+      CommonCode::IOStatus   opStatus; // operation status
+
+      librados::bufferlist   opData;   // data (for read only)
+      void*                  userCtx;  // user context (passed together)
+
+      RadosOpCtx()
+      : opType(CommonCode::IOOpCode::OP_NOP),
+        opStatus(CommonCode::IOStatus::ERR_INTERNAL),
+        userCtx(nullptr)
+      {
+      }
+
+
+      /* No Copying is supported */
+      RadosOpCtx(const RadosOpCtx&) = delete;
+      RadosOpCtx& operator=(const RadosOpCtx&) = delete;
+      RadosOpCtx& operator=(RadosOpCtx&&) = delete;
+
+
+      /* Move constructor is supported */
+      RadosOpCtx(RadosOpCtx&& other)
+      : opType(other.opType),
+        opStatus(other.opStatus),
+        opData(std::move(opData)),
+        userCtx(other.userCtx)
+      {
+        // reset the user context of 'other'
+        other.userCtx = nullptr;
+      }
+
+
+     bool release()
+     {
+       if(userCtx) // must reset context
+       {
+         return false; // signal that context is still available
+       }
+      
+       opData.clear(); // clear the data
+
+       delete this; // delete the object
+     
+       return true;
+       
+     }
+
+     private:
+
+       // users cannot delete the context (use release method)
+       ~RadosOpCtx() = default;
+
+
+    } RadosOpCtx; // struct RadosOpCtx
+
+
+  private:
+
+    class RadosOpHandler
+    {
+
+      private:
+
+        typedef struct CmplCtx
+        {
+          librados::AioCompletion* ioCmpl;   // completion context  
+          RadosOpCtx*              radosCtx; // rados op context
+
+        } CmplCtx; // struct CmplCtx
+
+        /**
+         * Simple class which is reponsible for handling Rados
+         * requests. This implementation uses async operations,
+         * but in general it is preferred to have an interface
+         * an multiple implementations.
+         */
+    
+
+     public:
+        RadosOpHandler()  = delete;
+        explicit RadosOpHandler(librados::Rados* rados) noexcept;
+        ~RadosOpHandler();
+
+
+        /**
+         * Read an object from the cluster.
+         *
+         * @param: ioCtx:     pool context
+         * @param: objId:     Rados object id
+         * @param: readBytes: how many bytes to read
+         * @param: offset:    from where to start reading  
+         * @param: userCtx:   user passed context which will be returned
+         *
+         * @return: number of bytes to be read 
+         */
+        unsigned int readRadosObject(librados::IoCtx* ioCtx,
+                            const std::string& objId,
+                            const unsigned int readBytes,
+                            const uint64_t offset=0,
+                            void* userCtx=nullptr);
+
+        /**
+         * Write data to the cluster (a Rados object).
+         * 
+         *
+         * @param: ioCtx:      pool context
+         * @param: objId:      Rados object id
+         * @param: rawData:    data to write to an object 
+         * @param: writeBytes: size of the data buffer
+         * @param: offset:     offset at which to write
+         * @param: append:     append the data to the current object
+         * @param: userCtx:    user context which is returned 
+         *                     with this call
+         *
+         * @return : number of bytes to be written
+         */
+        unsigned int writeRadosObject(librados:: IoCtx* ioCtx,
+                            const std::string& objId,
+                            const char* rawData,
+                            const unsigned int writeBytes,
+                            const uint64_t offset=0,
+                            const bool append=true,
+                            void* userCtx=nullptr);
+
+
+        /**
+         * Poll the handler for completed Async Rados IO
+         * operations.
+         *
+         * @param: completeAIOs: for storing all completed operations.
+         */
+        void pollAsyncIOs(std::deque<CephContext::RadosOpCtx*>& 
+                               completedAIOs);
+
+
+
+       /**
+        * Ensure that the handler completes all its operations
+        * or at least tries its best to clean up properly.
+        */
+       void stopRadosOpHandler();
+     
+
+
+        private:
+         /**
+          * Private method which is called every time an ASYNC
+          * operation completes.
+          */
+          void radosAsyncCompletionCallback(librados::completion_t cb,
+                                            void* args);
+      
+      
+
+        private:
+          // atomic data for ensuring that all operations
+          // have completed
+          std::atomic<unsigned int>                activeIOs_;
+          std::atomic<bool>                        done_;
+
+          // for terminating the handler only
+          std::mutex                               termLock_;
+          std::condition_variable                  termCond_;           
+
+          librados::Rados*                         cluster_;
+        
+          ConcurrentQueue<CephContext::RadosOpCtx*,
+                          std::deque<CephContext::RadosOpCtx*> >  
+                                                   asyncOps_; 
+                                              // asynchronously finished
+                                              // operations
+    
+
+    }; // class RadosOpHandler
+
 
 
 
@@ -46,7 +236,7 @@ class CephContext
      * and tries to connect to the cluster.
      * 
      *
-     * @return: true on succes, false on failure.
+     * @return: true on success, false on failure.
      */
 
 
@@ -150,7 +340,9 @@ class CephContext
                                                    // (one per pool)
 
     bool init_;           // flag if the cluster initialized
-    
+    RadosOpHandler* opHandler_; // entity responseible for
+                                // IO operations    
+ 
 }; // class CephContext
 
 

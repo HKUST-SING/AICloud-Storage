@@ -28,30 +28,21 @@ class JSONRemoteProtocol : public RemoteProtocol
 
     void handleMessage(std::shared_ptr<IOresponse> ioRes,
                        const RemoteProtocol::ProtocolCallback& protCall,
-                       RemoteProtocol::CallbackContext context) override
-
-    {
-
-    }
+                       RemoteProtocol::CallbackContext context) override;
 
 
 
   protected:
-    bool doInitializeProtocol() override
-    {
-      return true;
-    }
+    bool doInitializeProtocol() override;
 
    
-    void doStopProtocol() override
-    {
-
-    }
+    void doStopProtocol() override;
 
 
 
   private:
     JSONHandler<const uint8_t*> jsonDecoder_; // json decoder
+    
     
 
 
