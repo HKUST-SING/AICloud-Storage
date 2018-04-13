@@ -2,6 +2,7 @@
 
 // C++ std lib
 #include <memory>
+#include <limits>
 
 
 //Project lib
@@ -35,6 +36,14 @@ class RemoteProtocol
      */
     class ProtocolHandler
     {
+
+      private:
+        // use this end as a signal to know if a READ operation
+        // is new read or repeating a failed operation.
+        // if the offset field is this value, means a new op
+        static constexpr const uint64_t OFFSET_END = std::numeric_limits<uint64_t>::max();
+
+
       public:
 
         
@@ -129,6 +138,7 @@ class RemoteProtocol
          *                     returned with polling 
          *                     (by poling CephContext)
          *
+         *
          * @return : bytes to be read (0 on failure)
          */
         virtual uint64_t readData(const uint64_t readBytes,
@@ -144,6 +154,31 @@ class RemoteProtocol
         virtual uint64_t getTotalDataSize() const
         {
           return 0;
+        }
+
+        
+        /** 
+         * The method resets the read operatiosn for now only.
+         * It is useful if a READ fails and want to repeat it.
+         *
+         * @param: the data offset from which to read
+         *
+         * @return: true if a valid offset
+         */
+        virtual bool resetDataOffset(const uint64_t offset)
+        {
+          return false;
+        }
+
+        /**
+         * Only for read operations. Returns if 
+         * the handler has finished reading data.
+         *
+         * @return : true when done reading an object.
+         */
+        virtual bool doneReading() const
+        {
+          return false;
         }
 
 

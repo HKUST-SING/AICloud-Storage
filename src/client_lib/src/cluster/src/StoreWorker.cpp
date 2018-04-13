@@ -1,7 +1,7 @@
 // C++ std
 #include <cassert>
 #include <cstring>
-
+#include <limits>
 
 // Facebook folly
 
@@ -12,6 +12,11 @@
 #include "remote/Authentication.h"
 
 #define WORKER_SHARED_SECRET "workersharedsecretpassword"
+
+// maximum Rados IO Operation. Rados cannot read/write data greater 
+// than unsigned int max. See ceph::bufferlist for details.
+static constexpr const uint64_t MAX_IO_SIZE = static_cast<const uint64_t>(std::numeric_limits<unsigned int>::max());
+
 
 using folly::Future;
 using folly::Promise;

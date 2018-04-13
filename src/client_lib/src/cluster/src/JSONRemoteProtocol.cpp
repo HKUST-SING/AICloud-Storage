@@ -1,11 +1,25 @@
 // C++ std lib
 #include <exception>
+#include <algorithm>
+#include <cassert>
+
 
 #include "JSONRemoteProtocol.h"
 
 
 using std::shared_ptr;
 using std::unique_ptr;
+using std::string;
+
+
+// for ensuring proper conversion between size_t and uint64_t
+static constexpr const size_t MAX_SIZE_T = std::numeric_limits<size_t>::max();
+
+static constexpr const uint64_t SIZE_T_U64 = static_cast<const uint64_t>(std::numeric_limits<size_t>::max());
+
+
+static constexpr const uint64_t MAX_U64 = std::numeric_limits<uint64_t>::max();
+
 
 
 namespace singaistorageipc
@@ -116,15 +130,21 @@ JSONRemoteProtocol::JSONProtocolVoidHandler::JSONProtocolVoidHandler(CephContext
 JSONRemoteProtocol::JSONProtocolReadHandler::JSONProtocolReadHandler(CephContext& cephCont)
 : RemoteProtocol::ProtocolHandler(cephCont,
                                   CommonCode::IOOpCode::OP_READ,
-                                  true)
-
+                                  true),
+  totalSize_(0),
+  readObject_(0)
 {
  
 }
 
 
 JSONRemoteProtocol::JSONProtocolReadHandler::~JSONProtocolReadHandler()
-{}
+{
+
+  // clear objects
+  radObjs_.clear();
+
+}
 
 
 
@@ -136,21 +156,107 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
 {}
 
 
+
+bool
+JSONRemoteProtocol::JSONProtocolReadHandler::doneReading() const
+{
+
+  return (totalSize_ == readObject_);
+
+}
+
+
 uint64_t
 JSONRemoteProtocol::JSONProtocolReadHandler::readData(
                               const uint64_t readBytes,
                               void*          userCtx)
 {
 
-  return 0;
+  // try to find an existing Rados object which contains
+  // info
+  auto radosIter = std::find_if(std::begin(radObjs_), std::end(radObjs_),
+                   [this](const RadosObjRead& radObj) -> bool
+                   { return (this->readObject_ >= radObj.global_ && this->readObject_ < (radObj.global_ + radObj.size_));});
+
+
+  // check if an object at the offset exists
+  if (radosIter == std::end(radObjs_))
+  {
+    int a = 5; // log this as an error
+    
+    return 0;
+  }
+
+
+  //found a valid object
+  // cannot read more than left of the object
+  const uint64_t capRadosSize = ((radosIter->size_ - radosIter->offset_) < readBytes) ? (radosIter->size_ - radosIter->offset_) : readBytes;
+
+  // cap possible reading size
+  const size_t tryRead = (SIZE_T_U64 < capRadosSize) ? MAX_SIZE_T : static_cast<size_t>(capRadosSize);
+
+  
+  // try to issue a read operation to the librados API   
+  const size_t willRead = cephCtx_.readObject(
+                              radosIter->objID,
+                              radosIter->poolName,
+                              tryRead, // try to read than many bytes
+                              radosIter->offset_,
+                              userCtx);
+
+
+  if(!willRead)
+  {
+    //log this since there is an error
+    int a = 0;
+    
+    return 0;
+  }
+
+  // update the internal values and return 
+  // the number of bytes to be read
+  const uint64_t acceptedBytes = static_cast<const uint64_t>(willRead);
+
+  // update the offset
+  radosIter->offset_ += acceptedBytes; // 
+
+  // update the global offset (storage system object offset)
+  // overflow shall never happen
+  readObject_ = ((readObject_ + acceptedBytes) < acceptedBytes) ? MAX_U64 :  (readObject_ + acceptedBytes);
+
+
+  // avoid any wrong offsets (log them if they ever occur)
+  assert(readObject_ <= totalSize_);
+
+
+  // eventually return the number of bytes accepted
+  // by the lower layer
+
+  return acceptedBytes;
 }
 
+bool
+JSONRemoteProtocol::JSONProtocolReadHandler::resetDataOffset(const uint64_t offset)
+{
+
+  if(offset >= totalSize_)
+  {
+    return false;
+  }
+
+ 
+  readObject_ = offset; // reset the current data offset
+
+
+  return true;
+
+}
 
 uint64_t
 JSONRemoteProtocol::JSONProtocolReadHandler::getTotalDataSize() const
 {
 
-  return 0;
+  return totalSize_;
 }
 
 

@@ -26,6 +26,50 @@ class JSONRemoteProtocol : public RemoteProtocol
   private:
     class JSONProtocolReadHandler : public RemoteProtocol::ProtocolHandler
     {
+
+      private:
+        typedef struct RadosObjRead
+        /**
+         * A Wrapper for maintaining multiple Rados Object reads.
+         */
+        {
+          std::string poolName; // pool name
+          std::string objID;    // object name
+
+          uint64_t    size_;    // Rados object size in bytes
+          uint64_t    offset_;  // where reading now this object
+
+          uint64_t    global_;  // global offset of the value (for using)
+                                // algorithms
+
+
+          RadosObjRead()
+          : poolName(""),
+            objID(""),
+            size_(0),
+            offset_(0),
+            global_(0)
+         {}
+ 
+         RadosObjRead(std::string&& pln,
+                      std::string&& oid,
+                      const uint64_t obSize = 0,
+                      const uint64_t obOff = 0,
+                      const uint64_t obGl = 0)
+         : poolName(std::move(pln)),
+           objID(std::move(oid)),
+           size_(obSize),
+           offset_(obOff),
+           global_(obGl)
+         {} 
+       
+        
+
+         ~RadosObjRead() = default;
+             
+
+        } RadosObjRead; // struct RadosObjRead
+
       public:
         JSONProtocolReadHandler(CephContext& cephCont);
 
@@ -53,6 +97,17 @@ class JSONRemoteProtocol : public RemoteProtocol
 
 
          uint64_t getTotalDataSize() const override;
+
+         bool doneReading() const override;
+
+         bool resetDataOffset(const uint64_t offset) override;
+
+
+         private:
+           uint64_t totalSize_;  // total object size 
+           uint64_t readObject_; // that many bytes have read
+
+           std::vector<RadosObjRead> radObjs_; // Rados objects
         
 
     }; // class  JSONProtocolReadHandler
