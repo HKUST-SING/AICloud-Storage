@@ -26,17 +26,18 @@ class JSONRemoteProtocol : public RemoteProtocol
     JSONRemoteProtocol() = default;
 
 
-    void handleMessage(std::shared_ptr<IOresponse> ioRes,
-                       const RemoteProtocol::ProtocolCallback& protCall,
-                       RemoteProtocol::CallbackContext context) override;
+    std::shared_ptr<RemoteProtocol::ProtocolHandler>
+         handleMessage(std::shared_ptr<IOresponse> ioRes,
+                       const Task& task,
+                       CephContext& cephCtx) override;
 
 
 
   protected:
-    bool doInitializeProtocol() override;
+    bool doInitialize() override {return true;} 
 
    
-    void doStopProtocol() override;
+    void doClose() override {}
 
 
 

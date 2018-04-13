@@ -277,7 +277,7 @@ typedef struct IOResult
       msg_.reset(nullptr);
 
       // move values
-      msg_ = std::move(other.msg_);
+      msg_.swap(other.msg_);
     }
 
     return *this;

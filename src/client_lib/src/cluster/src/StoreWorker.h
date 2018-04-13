@@ -145,7 +145,7 @@ class StoreWorker: public Worker
 
 
     using ProtocolRes  =\
-        std::pair<std::unique_ptr<RemoteProtocol::Result>,\
+        std::pair<std::shared_ptr<RemoteProtocol::ProtocolHandler>,\
                                   WorkerContext*>;
 
 
@@ -274,10 +274,6 @@ class StoreWorker: public Worker
     void executeRadosOps();
 
 
-    void handleProtocol(std::unique_ptr<RemoteProtocol::Result>&&,
-                        RemoteProtocol::CallbackContext context); 
-
-
     /** 
      * Terminate the worker. Worker cleans itslef up
      * and terminates
@@ -318,8 +314,6 @@ class StoreWorker: public Worker
                                // (accesing the Cluster)
 
     RemoteProtocol* remProt_;  // remote protocol
-
-    const std::function<void(std::unique_ptr<RemoteProtocol::Result>&&, RemoteProtocol::CallbackContext)>       protCall_;   // protocol callback
 }; // class StoreWorker
 
 

@@ -26,9 +26,7 @@ StoreWorker::StoreWorker(std::unique_ptr<CephContext>&&    ctx,
                          std::shared_ptr<Security> sec)
 : Worker(id, sec),
   cephCtx_(ctx.release()),
-  remProt_(prot.release()),
-  protCall_(std::bind(&StoreWorker::handleProtocol, this,
-                std::placeholders::_1, std::placeholders::_2))
+  remProt_(prot.release())
 {
 }
 
@@ -46,13 +44,13 @@ StoreWorker::~StoreWorker()
 
 void 
 StoreWorker::closeStoreWorker()
-{
- 
+{ 
+
+   // stop the protocol
+  remProt_->closeProtocol();
+
   // close the ceph context
   cephCtx_->closeCephContext();
-
-  // stop the protocol
-  remProt_->stopProtocol();
 
   // release all the retrieved objects 
   // and enqueued tasks
@@ -465,8 +463,7 @@ StoreWorker::executeRadosOps()
 
       remProt_->handleMessage(
          std::make_shared<IOResponse>(std::move(opIter->secRes->value())),
-         protCall_, /*Callback object*/
-         reinterpret_cast<void*>(opIter->uppReq));
+         opIter->uppReq->second,  *cephCtx_);
 
       // 
       opIter->uppReq = nullptr; // ensures it's not deleted
@@ -482,21 +479,5 @@ StoreWorker::executeRadosOps()
   }// while
   
 }
-
-
-void
-StoreWorker::handleProtocol(
-    std::unique_ptr<RemoteProtocol::Result>&& protRes,
-    RemoteProtocol::CallbackContext context)
-{
-  // cast the context into a pointer
-  WorkerContext* tmp = reinterpret_cast<WorkerContext*>(context);
-  assert(tmp); // make sure casted correctly
-
-  protRes_.push_back(std::move(std::make_pair(
-                     std::move(protRes), tmp)));
-
-}
-
 
 } // namesapce singaistorageaipc
