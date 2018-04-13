@@ -36,12 +36,17 @@ class RemoteProtocol
     class ProtocolHandler
     {
       public:
+
+        
+        // static string for default implementation
+        static const std::string empty_value;
+
+
         ProtocolHandler(CephContext& cephCont, 
-                        const CommonCode::IOStatus opStat,
                         const CommonCode::IOOpCode opCode,
                         const bool needCeph = false)
         : cephCtx_(cephCont),
-          ioStat_(opStat),
+          ioStat_(CommonCode::IOStatus::ERR_INTERNAL),
           opType_(opCode),
           needCeph_(needCeph)
         {}
@@ -142,16 +147,41 @@ class RemoteProtocol
         }
 
 
+       /**
+        * For metadata operations.
+        *
+        */
+       virtual const std::string& 
+           getValue(const std::string& key) const
+       {
+         return ProtocolHandler::empty_value; // empty string
+       }
+
+
+      /**
+       * For metadata operations. (If the key value hardcoded).
+       */
+       virtual const std::string& 
+           getValue(const char* key) const
+       {
+         return ProtocolHandler::empty_value; // empty string
+       }
+ 
+
+
         CommonCode::IOOpCode getOpType() const
         {
           return opType_;
         }
+
+
+       virtual ~ProtocolHandler() = default; // shall be virtual
         
 
 
       protected:
         CephContext& cephCtx_;
-        const CommonCode::IOStatus ioStat_;
+        CommonCode::IOStatus ioStat_;
         const CommonCode::IOOpCode opType_;
         const bool needCeph_;
     
@@ -233,6 +263,12 @@ class RemoteProtocol
 
 
 
+  /**
+   * A factory method for creating protocols.
+   */
+  static std::unique_ptr<RemoteProtocol> createRemoteProtocol(const char* type);
+
+
   protected:
    
     /**
@@ -246,11 +282,9 @@ class RemoteProtocol
      virtual void doClose() = 0;
  
 
-
-
   protected:
-    IOResult emptyRes_; // empty result (can be resused many times
-                        // since move operations make it valid) 
+    IOResult emptyRes_;    // empty result (can be resused many times
+                           // since move operations make it valid) 
   
   
 

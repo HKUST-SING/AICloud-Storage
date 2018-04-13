@@ -54,6 +54,8 @@ class JSONResult
         JSONIter(JSONTree* obj, const bool loopItr=false);
         JSONIter(const JSONIter&);
         JSONIter(JSONIter&&); // move constructor
+        JSONIter& operator=(const JSONIter& other);
+        JSONIter& operator=(JSONIter&& other);
 
 
         ~JSONIter() = default;
@@ -160,7 +162,7 @@ class JSONResult
       private:
         JSONTree*    objTree_;
         JSONItem     childItr_; 
-        const bool   isLoop_;  // is this iterator used for looping
+        bool         isLoop_;  // is this iterator used for looping
         
   
 

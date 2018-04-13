@@ -79,6 +79,38 @@ JSONResult::JSONIter::JSONIter(const JSONIter& other)
 {}
 
 
+JSONResult::JSONIter&
+JSONResult::JSONIter::operator=(const JSONIter& other)
+{
+  if(this != &other)
+  {
+    objTree_  = other.objTree_;
+    childItr_ = other.childItr_;
+    isLoop_   = other.isLoop_;
+  }
+
+  return *this;
+}
+
+
+JSONResult::JSONIter&
+JSONResult::JSONIter::operator=(JSONIter&& other)
+{
+  if(this != &other)
+  {
+    objTree_  = other.objTree_;
+    childItr_ = other.childItr_;
+    isLoop_   = other.isLoop_;
+
+    other.objTree_ = nullptr;
+  }
+
+
+  return *this;
+
+}
+
+
 JSONResult::JSONIter
 JSONResult::JSONIter::begin() const
 {

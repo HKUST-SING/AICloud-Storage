@@ -17,7 +17,9 @@ add_library(clusterlib
     src/CephContext.cpp
     src/StoreObj.cpp
     src/Worker.cpp
-    src/StoreWorker.cpp)
+    src/StoreWorker.cpp
+    src/RemoteProtocol.cpp
+    src/JSONRemoteProtocol.cpp)
 
 
 add_library(singstorage::clusterlib ALIAS clusterlib)
