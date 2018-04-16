@@ -292,8 +292,36 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
 
         void send_response() override {}
     }; // class SING_CreateBucket   
- 
 
+   
+    typedef struct SINGRadosObj
+    {
+      rgw_raw_obj obj_info;
+      uint64_t    size_;
+      uint64_t    offset_;
+      uint64_t    new_write_; // if true (==1), write, not append
+
+   
+      SINGRadosObj(const rgw_raw_obj& raw_oj,
+                   const uint64_t write_av = 0,
+                   const uint64_t offset = 0,
+                   const uint64_t new_write = 0)
+      : obj_info(raw_obj.rgw_pool, raw_obj.oid, raw_obj.loc),
+        size_(write_av),
+        offset_(offset),
+        new_weite_(new_write)
+      {}
+
+     ~SINGRadosObj() = default;
+
+
+    } SINGRadosObj; // struct SINGRadosObj
+
+   std::vector<SINGRadosObj> writeRados_; // objects to be written to
+
+
+ 
+   RGWObjManifest*   manifest_{nullptr}; // local manifest
    uint64_t data_size = 0; // data size to store in
                            // the cluster
 
@@ -307,20 +335,16 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
    uint64_t sing_err{sing_err_name::SUCCESS}; // SING specific error 
    
 
-   void do_error_response();       // send an errno code
+   void do_error_response();       // send an error code
 
    int extend_manifest(RGWObjManifest& manifest,
-                       rgw_raw_obj& obj,
-                       uint64_t& offset,
-                       uint64_t& stripe_size);         
+                       const uint64_t write_size);         
                                    // means the object
                                    // already exists;
                                    // need to extend the manifest
 
    int create_new_manifest(RGWObjManifest& manifest,
-                           rgw_raw_obj& obj,
-                           uint64_t& offset,
-                           uint64_t& stripe_size);     
+                           const uint64_t write_size);     
                                    // new object ==> new manifest
 
    int prepare_init(uint64_t* chunk_size, const rgw_obj& obj);
@@ -334,11 +358,7 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
                      rgw_obj& obj);
 
    // send the manifest to the worker
-   void do_send_response(RGWObjManifest& manifest,
-                         const rgw_raw_obj& obj,
-                         const string& tail_path,
-                         const uint64_t str_offset,
-                         const uint64_t max_rados_size); 
+   void do_send_response(const RGWObjManifest& manifest); 
   
   
    uint64_t get_obj_size();        // retrieve object size
@@ -366,7 +386,13 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
          delete get_op_;
          get_op_ = nullptr;
        }
-
+     
+       if(manifest_)
+       {
+         delete manifest_;
+         manifest_ = nullptr;
+       }
+ 
      }    
 
 

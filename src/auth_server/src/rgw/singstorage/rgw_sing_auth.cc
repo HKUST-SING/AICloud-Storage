@@ -258,7 +258,9 @@ done_get_sing_auth:
   
   // need to encode the the error type or tenant_path
   assert(s->formatter && s->format == RGW_FORMAT_JSON);
-    
+  
+  s->formatter->open_object_section(""); // empty JSON wrapper
+ 
   s->formatter->open_object_section("Result");
   
   if(ret == STATUS_ACCEPTED) // account
@@ -270,7 +272,9 @@ done_get_sing_auth:
     s->formatter->dump_unsigned("Error_Type", err_code);
   }
 
-  s->formatter->close_section(); // close JSON object
+  s->formatter->close_section(); // close JSON object 'Result'
+ 
+  s->formatter->close_section(); // close the wrapper
   
 
   // complete the header and dump the body

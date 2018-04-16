@@ -629,6 +629,9 @@ RGWGetObjLayout_SING::send_response()
   }
 
 
+  s->formatter->open_object_section(""); // empty object for
+                                         // wrapping
+
   s->formatter->open_object_section("Result");
 
    if(!manifest || op_ret < 0)
@@ -664,7 +667,8 @@ RGWGetObjLayout_SING::send_response()
 
   }
 
-  s->formatter->close_section(); // close JSON object
+  s->formatter->close_section(); // close 'Result' field
+  s->formatter->close_section(); // close the wrapper
 
 
   // clear raw object
@@ -920,7 +924,8 @@ RGWPutObj_ObjStore_SING::execute()
   if (obj_size == 0)
   {
     op_ret = -ERR_TOO_SMALL;
-  
+ 
+    sing_err = sing_err_name::BAD_PARAMS;
     return;
   }
 
@@ -971,9 +976,22 @@ RGWPutObj_ObjStore_SING::execute()
 
   s->op_type = RGWPutObj_ObjStore::get_type(); // reset type
 
-  // keep the value of data to write
-  data_size = obj_size; // need for creating stripes
 
+
+
+  // tried to retrieve a manifest (might have failed)
+ 
+
+  if(get_op_->manifest)
+  { // succeeded in retrieving a manifest (data layout)
+    op_ret = extend_manifest(*(get_op_->manifest), obj_size);
+  }
+  else
+  { // create a new manifest (object does not exist)
+    manifest_ = new RGWObjManifest();
+    op_ret    = create_new_manifest(*manifest_, obj_size);
+  }
+   
 }
 
 
@@ -1060,8 +1078,10 @@ RGWPutObj_ObjStore_SING::do_error_response()
   dump_errno(s);
 
 
+  s->formatter->open_object_section(""); // empty wrapper
   s->formatter->open_object_section("Result");
   s->formatter->dump_unsigned("Error_Type", sing_err);
+  s->formatter->close_section(); // close 'Result'
   s->formatter->close_section(); // close JSON object
 
   // send the body
@@ -1074,46 +1094,190 @@ RGWPutObj_ObjStore_SING::do_error_response()
 
 int
 RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
-                         rgw_raw_obj& obj,
-                         uint64_t& offset,
-                         uint64_t& stripe_size)
+                         const uint64_t write_size)
 {
 
-  // get starting offset
-  offset = manifest.get_obj_size(); // current object size
-  
+  // check if if it is possible to append any 
+  // more data to the current head
+  const bool append_head_only = (write_size <= (manifest.get_max_head_size() - manifest.get_head_size()));
 
-  const bool conv_op = store->obj_to_raw(
-             manifest.get_head_placement_rule(),
-             manifest.get_obj(), &obj);
-
-  if(!conv_op) // some error occured
+  if(append_head_only)
   {
-    sing_err = sing_err_name::INTERNAL_ERR;
-    return -ERR_INVALID_OBJECT_NAME; 
+    //try to append to head
+    rgw_raw_obj tmp_raw_obj;
+    const int res_conv = store->obj_to_raw(manifest.get_head_placement_rule(), manifest.get_obj(), tmp_raw_obj);
+  
+    if(!res_conv)
+    {
+      // failed to convert onject to raw object
+      derr << "ERROR: store->obj_to_raw failed" << dendl;
+      sing_err = sing_err_name::INTERNAL_ERR;
+      
+      return -ERR_INVALID_OBJEC_NAME;
+    }
+
+    // successfully converted the head
+    writeRados_.push_back(tmp_raw_obj, write_size,
+                          manifest.get_head_size(), 0);
+
+    // update head size and object size
+    manifest.set_head_size(manifest.get_head_size() + write_size);
+    manifest.set_obj_size(manifest.get_obj_size() + write_size);
+
+    return 0; // success
   }
 
-  // update the object size value
-  //const uint64_t new_obj_size = manifest.get_obj_size() + data_size;
-  // update object size
-  //manifest.set_obj_size(new_obj_size);
+  // store the new object size
+  const uint64_t new_total_obj_size = manifest.get_obj_size() + write_size;
 
 
   // success
   RGWObjManifestRule rule;
   const bool found = manifest.get_rule(0, &rule);
 
-
   if(!found)
   {
     derr << "ERROR: manifest->get_rule could not find rule" << dendl;
-    // use the maximum head size
-    stripe_size = manifest.get_max_head_size();
+    sing_err = sing_err_name::INTERNAL_ERR;
+    return -EIO;
   }
-  else
+ 
+  
+  // iterate over all current objects and 
+  // get their objects
+  if(!manifest.has_tail() || (manifest.get_head_size() == manifest.get_max_head_size()))
   {
-    stripe_size = rule.stripe_max_size; // maximum Rados obj size
-  }
+
+    //try to append to head
+    rgw_raw_obj tmp_raw_obj;
+    const int res_conv = store->obj_to_raw(manifest.get_head_placement_rule(), manifest.get_obj(), tmp_raw_obj);
+  
+    if(!res_conv)
+    {
+      // failed to convert onject to raw object
+      derr << "ERROR: store->obj_to_raw failed" << dendl;
+      sing_err = sing_err_name::INTERNAL_ERR;
+      
+      return -ERR_INVALID_OBJEC_NAME;
+    }
+
+    // only head object
+    writeRados_.push_back(tmp_raw_obj, 
+      (manifest.get_max_head_size() - manifest.get_head_size()),
+      manifest.get_head_size(), 0);
+
+   
+    // need to create a few objects
+    rgw_obj_select cur_obj;
+    uint64_t cur_offset = manifest.get_max_head_size();
+    uint64_t cur_stripe = (cur_offset - manifest.get_max_head_size()) / rule.max_stripe_size + 1;
+
+    uint64_t written_bytes = manifest.get_max_head_size() = manifest.get_head_size();
+
+    while(written_bytes < write_size)
+    {
+      manifest.get_implicit_location(0, cur_stripe,
+                                     cur_offset, nullptr,
+                                     &cur_obj);
+
+
+      // compute a raw object for writing
+      writeRados_.push_back(cur_obj.get_raw_obj(store),
+                           rule.max_stripe_size, 0, 0);
+
+
+      if(writeRados_.back().obj_info.empty())
+      {
+        // clear all write objects
+        writeRados_.clear();
+    
+        derr << "ERROR: cur_obj.get_raw_obj returned an empty objcet (extend_manifest)" << dendl;
+       
+        sing_err = sing_err_name::INTERNAL_ERR;
+        return -EIO;
+       
+      }
+
+      // update stripe number and offset
+      ++cur_stripe;
+      cur_offset += rule.max_stripe_size;
+      written_bytes += rule.max_stripe_size;
+   
+    } // while
+ 
+  }//if
+  else
+  { // there are some existing tail objects or head is full
+    // compute append offset and size
+    const uint64_t tail_size = manifest.get_obj_size() - manifest.get_max_head_size();
+
+    const uint64_t app_off = tail_size - (tail_size / rule.max_stripe_size)*rule.max_stripe_size;
+    
+    uint64_t cur_stripe = (tail_size / rule.max_stripe_size) + 1;
+    uint64_t cur_offset = tail_size;
+    uint64_t written_bytes = 0;
+
+    rgw_obj_select cur_obj;    
+
+    if(app_off)
+    { // need to retrieve current object and append to it
+      manifest.get_implicit_location(0, cur_stripe, tail_size, 
+                            nullptr, &cur_obj);
+
+      writeRados_.push_back(cur_obj.get_raw_obj(store), 
+                            (rule.max_stripe_size - app_off),
+                            app_off, 0);
+
+      if(writeRados_.back().obj_info.empty())
+      {
+        derr << "ERROR: extend_manifest, cannot append to tail" << dendl;
+        writeRados_.clear();
+        sing_err = sing_err_name::INTERNAL_ERR;
+        return -EIO;
+      }
+
+      // update stripe number
+      ++cur_stripe;
+      cur_offset += (rule.max_stripe_size - app_off);
+      written_bytes += (rule.max_stripe_size - app_off);
+    }// if
+    
+
+    // just keep appending 
+    // until write is complete
+    while(written_bytes < write_size)
+    {
+      // create a new object for writing
+      manifest.get_implicit_location(0, cur_stripe, cur_offset, 
+                            nullptr, &cur_obj);
+
+      writeRados_.push_back(cur_obj.get_raw_obj(store), 
+                            rule.max_stripe_size,
+                            0, 1);
+
+      if(writeRados_.back().obj_info.empty())
+      {
+        derr << "ERROR: extend_manifest, cannot append to tail" << dendl;
+        writeRados_.clear();
+        sing_err = sing_err_name::INTERNAL_ERR;
+        return -EIO;
+      }
+
+      // update stripe number
+      ++cur_stripe;
+      cur_offset += rule.max_stripe_size;
+      written_bytes += rule.max_stripe_size;
+
+    }// while
+
+
+  }// else has_tail()
+   
+
+  
+  // update the current manifest
+  manifest.set_obj_size(new_total_obj_size);
+  manifest.set_head_size(manifest.get_max_head_size());
 
   return 0;
 }
@@ -1121,15 +1285,11 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
 
 void
-RGWPutObj_ObjStore_SING::do_send_response(RGWObjManifest& manifest,
-                         const rgw_raw_obj& prefix_obj,
-                         const string&  tail_path,
-                         const uint64_t data_offset,
-                         const uint64_t max_rados_size)
+RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest)
 
 {
 
- const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
   assert(tranID);
   
   dump_header(s, "HTTP_X_TRAN_ID", tranID);
@@ -1139,6 +1299,8 @@ RGWPutObj_ObjStore_SING::do_send_response(RGWObjManifest& manifest,
   set_req_state_err(s, SING_HTTP_OK);
   dump_errno(s);
 
+
+  s->formatter->open_object_section("");
 
   // 'Result' field
   s->formatter->open_object_section("Result");
@@ -1152,30 +1314,38 @@ RGWPutObj_ObjStore_SING::do_send_response(RGWObjManifest& manifest,
   s->formatter->close_section();
 
 
-  // 'Head_Object' field (needed for later use when reply)
-  s->formatter->open_object_section("Head_Object");
-  manifest.get_obj().dump(s->formatter);
-
-  s->formatter->close_section(); // close 'Head_Object'
- 
-
-  // 'Head_Raw_Object' field
-  s->formatter->open_object_section("Head_Raw_Object");
-  prefix_obj.dump(s->formatter); // encode as a JSON
-  s->formatter->close_section(); // close Head_Raw_Object
-
-  // 'Tail_Prefix'
-  s->formatter->dump_string("Tail_Prefix", tail_path);
-
-  // 'Data_Offset' field
-  s->formatter->dump_unsigned("Data_Offset", data_offset);
+  // send object for writing to
+  // Array 'Rados_Objs'
+  s->formatter->open_array_section("Rados_Objs");
   
-  // 'Max_Rados_Size' field
-  s->formatter->dump_unsigned("Max_Rados_Size", max_rados_size);
+  for(const auto& rad_obj : writeRados_)
+  {
+    s->formatter->open_object_section("Object");
+    // store object info
+    rad_obj.obj_info.dump(s->formatter);
+    s->formatter->dump_unsigned("size", rad_obj.size_);
+    s->formatter->dump_unsigned("offset", rad_obj.offset_);
+    s->formatter->dump_unsigned("new_object", rad_obj.new_write_);
+    
+    // Rados object has been completed
+    s->formatter->close_section();
 
+  } // for
+
+ 
+  // close 'Rados_Objs' field
+  s->formatter->close_section();
 
   // close 'Result' field
   s->formatter->close_section(); // close JSON object
+
+  // close empty object (wrapper)
+  s->formatter->close_section();
+
+
+  // clear the write objects
+  writeRados_.clear();
+
 
   // send the body
   end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
@@ -1250,67 +1420,16 @@ RGWPutObj_ObjStore_SING::send_response()
   }
   else
   {
-
-    rgw_raw_obj prefix_obj;
-    uint64_t str_offset;  // where to start writing data
-    uint64_t stripe_size; // Rados Obj maximum size
-    RGWObjManifest tmpManifest;
-    RGWObjManifest* man_ptr = &tmpManifest;
-    int res_code = 0;
-
-
+    // send the manifest and explicit objects
     if(get_op_->manifest)
     {
-      // succeeded in retrieving a manifest (data layout)
-      res_code = extend_manifest(*(get_op_->manifest),
-                          prefix_obj, str_offset,
-                          stripe_size);
-
-      man_ptr = get_op_->manifest; // set manifest to point
-                                  // to value
-
+      do_send_response(*(get_op_->manifest));
     }
     else
-    {
-       // create a new manifest
-       res_code = create_new_manifest(tmpManifest,
-                    prefix_obj, str_offset, stripe_size);
- 
-
+    { // send the newly created manifest
+      do_send_response(*manifest_);
     }
-
-
-    // check the return code
-    if(res_code < 0) // error occured
-    {
-      op_ret = res_code;
-
-      do_error_response();
-    }
-
-    else // manifest opeartion successfully completed
-    {
-      string tmp_tail;
-      res_code = build_tail_path(prefix_obj, man_ptr->get_prefix(),
-                      tmp_tail);
-
-       if(res_code < 0)
-       { // something wrong with the path
-         op_ret = res_code;
-         do_error_response();
-       }
-       else
-       {
-        do_send_response((*man_ptr), prefix_obj,
-                       tmp_tail, // tail path
-                       str_offset,
-                       stripe_size);
-
-      }
-    }
-
-
- } // else
+  } // else (send response)
   
 }
 
@@ -1344,7 +1463,7 @@ RGWPutObj_ObjStore_SING::init_manifest(CephContext* cct,
   man_ptr->set_tail_placement(placement_rule, bucket);
   man_ptr->set_head(placement_rule, obj, 0);
 
-  // generate a random string for stroring the object
+  // generate a random string for storing the object
   
   char buf[33];
   gen_rand_alphanumeric(cct, buf, sizeof(buf) - sizeof(char));
@@ -1357,7 +1476,7 @@ RGWPutObj_ObjStore_SING::init_manifest(CephContext* cct,
   oid_prefix.append("_");
 
   /* TODO: Need to check if the generated object does not
-     exists yet */
+     exist yet */
 
  
   man_ptr->set_prefix(oid_prefix);
@@ -1374,9 +1493,7 @@ RGWPutObj_ObjStore_SING::init_manifest(CephContext* cct,
 
 int
 RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
-                                rgw_raw_obj& raw_obj,
-                                uint64_t& offset,
-                                uint64_t& stripe_size)
+                         const uint64_t write_size)
 {
 
   // create a new manifest according to object name, bucket
@@ -1425,24 +1542,93 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
     }
 
 
-    // initialized the manifest; create stripes for writing data
-    const bool conv_res =  store->obj_to_raw(
-                             manifest.get_head_placement_rule(),
-                             manifest.get_obj(), &raw_obj);
-
-    if(!conv_res)
-    {   
-      sing_err = sing_err_name::INTERNAL_ERR;
-      return -ERR_INVALID_OBJECT_NAME;
-    } 
-
 
   } while(gen_again); // try creating manifest until no overlaps found
              
 
+  
+  // try to retrieve the same rule
+  RGWObjManifestRule tmp_rule;
+  const found = manifest.get_rule(0, &tmp_rule);
 
-  offset = 0; // start from the very beginning
-  stripe_size = store->ctx()->_conf->rgw_obj_stripe_size;
+  if(!found)
+  {
+    derr << "ERROR: manifest.get_rule() could not find a rule" << dendl;
+    
+    sing_err = sing_err_name::INTERNAL_ERR;
+    return -EIO;
+  }
+
+  // rule works
+  const uint64_t stripe_size = tmp_rule.stripe_max_size;
+ 
+    
+  // generate objects
+  rgw_obj_select cur_obj;
+
+
+
+  // first write is to the head
+  manifest.get_implicit_location(0, 0, 0, nullptr,
+                                 &cur_obj);
+
+  // get raw object
+  rgw_raw_obj write_obj = cur_obj.get_raw_obj(store);
+
+  if(write_obj.empty())
+  {
+    derr << "ERROR: cur_obj.get_raw_obj returned an empty object" << dendl;
+    sing_err = sing_err_name::INTERNAL_ERR;
+    return -EIO;
+  }
+
+
+  uint64_t cur_offset = (write_size < manifest.get_max_head_size())? write_size : manifest.get_max_head_size();
+
+  // push the retrieved object onto the stack
+  writeRados_.push_back(SINGRadosObj(write_obj, cur_offset,
+                                     0, 1));
+
+  if(cur_offset == write_size)
+  {
+    manifest.set_obj_size(write_size);
+    manifest.set_head_size(write_size); // head is larger
+    return 0; // success
+  }
+
+  uint64_t cur_stripe = (cur_offset - manifest.get_max_head_size()) / stripe_size + 1;
+
+
+
+  while(cur_offset < write_size)
+  { // generate objects until no more objects needed
+    manifest.get_implicit_location(0, cur_stripe, 
+                                  cur_offset, nullptr,
+                                  &cur_obj);
+
+    // get raw object
+    writeRados_.push_back(cur_obj.get_raw_obj(store),
+                          stripe_size, 0, 1);
+
+    if(writeRados_.back().obj_info.empty())
+    {
+      // clear all write objects
+      writeRados_.clear();
+
+      derr << "ERROR: cur_obj.get_raw_obj returned an empty object (create_new_manifest)" << dendl;
+      sing_err = sing_err_name::INTERNAL_ERR;
+      return -EIO;
+    }// if
+
+    // update stripe number and offset
+    ++cur_stripe;
+    cur_offset += stripe_size; // increase the current offset
+
+  }// while
+  
+  // got passed all values
+  manifest.set_obj_size(write_size); 
+  manifest.set_head_size(manifest.get_max_head_size());
 
   return 0; // successfully created a manifest
 
@@ -1527,11 +1713,17 @@ RGWPost_Manifest_SING::send_response()
   }
 
 
+  // empty JSOn object wrapper
+  s->formatter->open_object_section("");
+
   // 'Result' field
   s->formatter->open_object_section("Result");
   s->formatter->dump_unsigned("Error_Type", sing_err);
   // close 'Result'
   s->formatter->close_section(); 
+
+
+  s->formatter->close_section(); // close empty wrapper
 
   // send a JSON response to the client
   end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
