@@ -536,6 +536,76 @@ RGWGetObjLayout_SING::get_sing_error(const int sys_error)
 }
 
 
+
+int
+RGWGetObjLayout_SING::verify_permission()
+{
+  // need to verify if the user can
+  // read the data
+ if(!verify_object_permission(s, rgw::IAM::s3GetObject))
+ {
+   // cannot access data (no permission granted)
+   return -EPERM;
+ }
+  
+  return 0;
+}
+
+
+void
+RGWGetObjLayout_SING::execute()
+{
+
+  // execute the parent operation first
+  RGWGetObjLayout::execute();
+  
+  // check the status
+  if(op_ret < 0)
+  {
+    rawObjs_.clear();
+    return; // stop processing further
+  }
+
+  // retrieved manifest
+  // get all raw objects for reading
+  rgw_raw_obj read_obj;
+
+
+  if(manifest) // has manifest
+  {
+    auto iter    = manifest->obj_begin();
+    auto man_end = manifest->obj_end();   
+
+
+    for(; iter != man_end; ++iter)
+    {
+      read_obj = iter.get_location().get_raw_obj(store);
+     
+      if(read_obj.empty())
+      {
+        op_ret = -ERR_INTERNAL_ERROR;
+        // clear all objects
+        rawObjs_.clear();
+   
+        return;
+      }
+
+      // push the value to the vector
+      rawObjs_.push_back(ReadObjInfo(read_obj,
+                                     iter.get_stripe_size()));
+     
+    } //for
+  }//if
+  else // no manifest (impossible)
+  {
+    op_ret = -ERR_INTERNAL_ERROR;
+    rawObjs_.clear();
+  }
+
+
+}
+
+
 void
 RGWGetObjLayout_SING::send_response()
 {
@@ -572,40 +642,33 @@ RGWGetObjLayout_SING::send_response()
   else
   {
 
-    // get head object
-    rgw_raw_obj head_obj;
-    const bool ret_res = store->obj_to_raw(
-                      manifest->get_head_placement_rule(),
-                      manifest->get_obj(), &head_obj);     
+    // first of all, add total object size
+    s->formatter->dump_unsigned("Object_Size", manifest->obj_size);
 
-    if(!ret_res)
-    {
-       // some inernal error
-       s->formatter->dump_unsigned("Error_Type", 
-          rgw::singstorage::SINGErrorCode::INTERNAL_ERR);
-      
-       // Send an error code 
-       s->formatter->close_section(); // close JSON object
-       end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
-
-       return; 
-    }
-
-
-    // manifest for replying
-    s->formatter->open_object_section("Data_Manifest");
-    manifest->dump(s->formatter); // encode as a JSON object
-    s->formatter->close_section();
+    // send a JSON Array of Rados Objects
+    s->formatter->open_array_section("Rados_Objs");
     
+    for(const auto& rad_obj : rawObjs_)
+    {
+      s->formatter->open_object_section("Object");
+      // store object info
+      rad_obj.obj_info.dump(s->formatter);
+      s->formatter->dump_unsigned("size", rad_obj.obj_size);
+      // Rados object has completed
+      s->formatter->close_section();
 
-    // add raw object of the head
-    s->formatter->open_object_section("Head_Raw_Object");
-    head_obj.dump(s->formatter); // encode as a JSON
-    s->formatter->close_section(); // close Head_Object
+    }  
+
+    // close 'Rados_Objs' array
+    s->formatter->close_section();
 
   }
 
   s->formatter->close_section(); // close JSON object
+
+
+  // clear raw object
+  rawObjs_.clear(); 
 
   // send the body
   end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);

@@ -227,12 +227,39 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
 {
 
   private:
+   
+    typedef struct ReadObjInfo
+    {
+      rgw_raw_obj obj_info;
+      uint64_t    obj_size;
+
+      ReadObjInfo(const rgw_raw_obj& raw_obj, 
+                  const uint64_t stripe_size)
+      : obj_info(raw_obj.pool, raw_obj.oid, raw_obj.loc),
+        obj_size(stripe_size)
+      {}
+
+
+      ~RadosObjInfo() = default;
+
+    } ReadObjInfo; // struct ReadObjInfo 
+
+    std::vector<ReadObjInfo> rawObjs_; // all raw objects to read
+
+
     friend class RGWPutObj_ObjStore_SING; // for accessing state
     static uint64_t get_sing_error(const int sys_error);
+
+    
+
 
   public:
     RGWGetObjLayout_SING() = default;
     ~RGWGetObjLayout_SING() override {}
+
+    int verify_permission() override;
+    
+    void execute() override;
 
     void send_response() override; // send a JSON
                                    // containing
