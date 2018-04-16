@@ -302,14 +302,14 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
       uint64_t    new_write_; // if true (==1), write, not append
 
    
-      SINGRadosObj(const rgw_raw_obj& raw_oj,
+      SINGRadosObj(const rgw_raw_obj& raw_obj,
                    const uint64_t write_av = 0,
                    const uint64_t offset = 0,
                    const uint64_t new_write = 0)
-      : obj_info(raw_obj.rgw_pool, raw_obj.oid, raw_obj.loc),
+      : obj_info(raw_obj.pool, raw_obj.oid, raw_obj.loc),
         size_(write_av),
         offset_(offset),
-        new_weite_(new_write)
+        new_write_(new_write)
       {}
 
      ~SINGRadosObj() = default;

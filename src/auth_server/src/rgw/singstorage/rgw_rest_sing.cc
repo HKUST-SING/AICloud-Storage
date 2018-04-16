@@ -1105,7 +1105,7 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
   {
     //try to append to head
     rgw_raw_obj tmp_raw_obj;
-    const int res_conv = store->obj_to_raw(manifest.get_head_placement_rule(), manifest.get_obj(), tmp_raw_obj);
+    const bool res_conv = store->obj_to_raw(manifest.get_head_placement_rule(), manifest.get_obj(), &tmp_raw_obj);
   
     if(!res_conv)
     {
@@ -1113,12 +1113,13 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       derr << "ERROR: store->obj_to_raw failed" << dendl;
       sing_err = sing_err_name::INTERNAL_ERR;
       
-      return -ERR_INVALID_OBJEC_NAME;
+      return -ERR_INVALID_OBJECT_NAME;
     }
 
     // successfully converted the head
-    writeRados_.push_back(tmp_raw_obj, write_size,
-                          manifest.get_head_size(), 0);
+    writeRados_.push_back(
+      RGWPutObj_ObjStore_SING::SINGRadosObj(tmp_raw_obj, write_size,
+                                      manifest.get_head_size(), 0));
 
     // update head size and object size
     manifest.set_head_size(manifest.get_head_size() + write_size);
@@ -1150,7 +1151,7 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
     //try to append to head
     rgw_raw_obj tmp_raw_obj;
-    const int res_conv = store->obj_to_raw(manifest.get_head_placement_rule(), manifest.get_obj(), tmp_raw_obj);
+    const bool res_conv = store->obj_to_raw(manifest.get_head_placement_rule(), manifest.get_obj(), &tmp_raw_obj);
   
     if(!res_conv)
     {
@@ -1158,21 +1159,21 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       derr << "ERROR: store->obj_to_raw failed" << dendl;
       sing_err = sing_err_name::INTERNAL_ERR;
       
-      return -ERR_INVALID_OBJEC_NAME;
+      return -ERR_INVALID_OBJECT_NAME;
     }
 
     // only head object
-    writeRados_.push_back(tmp_raw_obj, 
+    writeRados_.push_back(RGWPutObj_ObjStore_SING::SINGRadosObj(tmp_raw_obj, 
       (manifest.get_max_head_size() - manifest.get_head_size()),
-      manifest.get_head_size(), 0);
+      manifest.get_head_size(), 0));
 
    
     // need to create a few objects
     rgw_obj_select cur_obj;
     uint64_t cur_offset = manifest.get_max_head_size();
-    uint64_t cur_stripe = (cur_offset - manifest.get_max_head_size()) / rule.max_stripe_size + 1;
+    uint64_t cur_stripe = (cur_offset - manifest.get_max_head_size()) / rule.stripe_max_size + 1;
 
-    uint64_t written_bytes = manifest.get_max_head_size() = manifest.get_head_size();
+    uint64_t written_bytes = (manifest.get_max_head_size() - manifest.get_head_size());
 
     while(written_bytes < write_size)
     {
@@ -1182,8 +1183,9 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
 
       // compute a raw object for writing
-      writeRados_.push_back(cur_obj.get_raw_obj(store),
-                           rule.max_stripe_size, 0, 0);
+      writeRados_.push_back(
+        RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store),
+                                            rule.stripe_max_size, 0, 0));
 
 
       if(writeRados_.back().obj_info.empty())
@@ -1200,8 +1202,8 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
       // update stripe number and offset
       ++cur_stripe;
-      cur_offset += rule.max_stripe_size;
-      written_bytes += rule.max_stripe_size;
+      cur_offset += rule.stripe_max_size;
+      written_bytes += rule.stripe_max_size;
    
     } // while
  
@@ -1211,9 +1213,9 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
     // compute append offset and size
     const uint64_t tail_size = manifest.get_obj_size() - manifest.get_max_head_size();
 
-    const uint64_t app_off = tail_size - (tail_size / rule.max_stripe_size)*rule.max_stripe_size;
+    const uint64_t app_off = tail_size - (tail_size / rule.stripe_max_size)*rule.stripe_max_size;
     
-    uint64_t cur_stripe = (tail_size / rule.max_stripe_size) + 1;
+    uint64_t cur_stripe = (tail_size / rule.stripe_max_size) + 1;
     uint64_t cur_offset = tail_size;
     uint64_t written_bytes = 0;
 
@@ -1224,9 +1226,10 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       manifest.get_implicit_location(0, cur_stripe, tail_size, 
                             nullptr, &cur_obj);
 
-      writeRados_.push_back(cur_obj.get_raw_obj(store), 
-                            (rule.max_stripe_size - app_off),
-                            app_off, 0);
+      writeRados_.push_back(
+        RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store), 
+                                        (rule.stripe_max_size - app_off),
+                                                            app_off, 0));
 
       if(writeRados_.back().obj_info.empty())
       {
@@ -1238,8 +1241,8 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
       // update stripe number
       ++cur_stripe;
-      cur_offset += (rule.max_stripe_size - app_off);
-      written_bytes += (rule.max_stripe_size - app_off);
+      cur_offset += (rule.stripe_max_size - app_off);
+      written_bytes += (rule.stripe_max_size - app_off);
     }// if
     
 
@@ -1251,9 +1254,10 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       manifest.get_implicit_location(0, cur_stripe, cur_offset, 
                             nullptr, &cur_obj);
 
-      writeRados_.push_back(cur_obj.get_raw_obj(store), 
-                            rule.max_stripe_size,
-                            0, 1);
+      writeRados_.push_back(
+        RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store), 
+                                                    rule.stripe_max_size,
+                                                                  0, 1));
 
       if(writeRados_.back().obj_info.empty())
       {
@@ -1265,13 +1269,13 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
       // update stripe number
       ++cur_stripe;
-      cur_offset += rule.max_stripe_size;
-      written_bytes += rule.max_stripe_size;
+      cur_offset += rule.stripe_max_size;
+      written_bytes += rule.stripe_max_size;
 
     }// while
 
 
-  }// else has_tail()
+  }// else !has_tail()
    
 
   
@@ -1549,7 +1553,7 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
   
   // try to retrieve the same rule
   RGWObjManifestRule tmp_rule;
-  const found = manifest.get_rule(0, &tmp_rule);
+  const bool found = manifest.get_rule(0, &tmp_rule);
 
   if(!found)
   {
@@ -1586,8 +1590,9 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
   uint64_t cur_offset = (write_size < manifest.get_max_head_size())? write_size : manifest.get_max_head_size();
 
   // push the retrieved object onto the stack
-  writeRados_.push_back(SINGRadosObj(write_obj, cur_offset,
-                                     0, 1));
+  writeRados_.push_back(
+    RGWPutObj_ObjStore_SING::SINGRadosObj(write_obj, cur_offset,
+                                                         0, 1));
 
   if(cur_offset == write_size)
   {
@@ -1607,8 +1612,9 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
                                   &cur_obj);
 
     // get raw object
-    writeRados_.push_back(cur_obj.get_raw_obj(store),
-                          stripe_size, 0, 1);
+    writeRados_.push_back(
+      RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store),
+                                                   stripe_size, 0, 1));
 
     if(writeRados_.back().obj_info.empty())
     {
