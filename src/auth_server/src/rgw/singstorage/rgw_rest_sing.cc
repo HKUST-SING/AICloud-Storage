@@ -591,7 +591,7 @@ RGWGetObjLayout_SING::execute()
       }
 
       // push the value to the vector
-      rawObjs_.push_back(ReadObjInfo(read_obj,
+      rawObjs_.push_back(RGWGetObjLayout_SING::ReadObjInfo(read_obj,
                                      iter.get_stripe_size()));
      
     } //for
@@ -643,7 +643,7 @@ RGWGetObjLayout_SING::send_response()
   {
 
     // first of all, add total object size
-    s->formatter->dump_unsigned("Object_Size", manifest->obj_size);
+    s->formatter->dump_unsigned("Object_Size", manifest->get_obj_size());
 
     // send a JSON Array of Rados Objects
     s->formatter->open_array_section("Rados_Objs");

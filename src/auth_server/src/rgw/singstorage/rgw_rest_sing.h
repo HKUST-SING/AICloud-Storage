@@ -240,7 +240,7 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
       {}
 
 
-      ~RadosObjInfo() = default;
+      ~ReadObjInfo() = default;
 
     } ReadObjInfo; // struct ReadObjInfo 
 
