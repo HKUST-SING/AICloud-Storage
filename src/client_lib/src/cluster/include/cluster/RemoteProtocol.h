@@ -5,10 +5,16 @@
 #include <limits>
 
 
+
+//Ceph libraries
+#include <rados/librados.hpp>
+
+
 //Project lib
 #include "CephContext.h"
 #include "include/Task.h"
 #include "include/CommonCode.h"
+
 
 
 namespace singaistorageipc
@@ -125,7 +131,29 @@ class RemoteProtocol
          */
         virtual uint64_t writeData(const char*    rawData,
                                    const uint64_t writeBytes,
-                                   void*          userCtx) = 0;
+                                   void*          userCtx)
+        { 
+          return 0; 
+        }
+
+
+        /**
+         * Write data to a storage system object.
+         * 
+         * @param: buffer     : buffer of data to send
+         * @param: userCtx    : some user context which will be
+         *                      returned with polling 
+         *                      (by poling CephContext)
+         *
+         * @return : copied bytes (0 on failure)
+         */
+        virtual uint64_t writeData(librados::bufferlist& buffer,
+                                   void*          userCtx)
+        { 
+          return 0; 
+        }
+
+
 
 
 
@@ -142,7 +170,11 @@ class RemoteProtocol
          * @return : bytes to be read (0 on failure)
          */
         virtual uint64_t readData(const uint64_t readBytes,
-                                  void*          userCtx) = 0;
+                                  void*          userCtx)
+
+        {
+          return 0;
+        }
 
 
         /** 
@@ -152,6 +184,16 @@ class RemoteProtocol
          */
 
         virtual uint64_t getTotalDataSize() const
+        {
+          return 0;
+        }
+
+
+        /**
+         * Mostly for read operations.
+         * Return current offset (read bytes) of the data object.
+         */
+        virtual uint64_t getDataOffset() const
         {
           return 0;
         }

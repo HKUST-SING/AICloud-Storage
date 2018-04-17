@@ -39,8 +39,8 @@ class JSONRemoteProtocol : public RemoteProtocol
           uint64_t    size_;    // Rados object size in bytes
           uint64_t    offset_;  // where reading now this object
 
-          uint64_t    global_;  // global offset of the value (for using)
-                                // algorithms
+          uint64_t    global_;  // global offset of the value (for using
+                                // algorithms)
 
 
           RadosObjRead()
@@ -61,7 +61,25 @@ class JSONRemoteProtocol : public RemoteProtocol
            size_(obSize),
            offset_(obOff),
            global_(obGl)
-         {} 
+         {}
+
+
+         RadosObjRead(const struct RadosObjRead& other)
+         : poolName(other.poolName),
+           objID(other.objID),
+           size_(other.size_),
+           offset_(other.offset_),
+           global_(other.global_) 
+         {}
+
+
+         RadosObjRead(RadosObjRead&& other)
+         : poolName(std::move(other.poolName)),
+           objID(std::move(other.objID)),
+           size_(other.size_),
+           offset_(other.offset_),
+           global_(other.global_)
+         {}           
        
         
 
@@ -84,23 +102,30 @@ class JSONRemoteProtocol : public RemoteProtocol
        
 
 
-         uint64_t writeData(const char*    rawData,
-                            const uint64_t writeBytes,
-                            void*          userCtx) override
-
-         {
-           return 0;  /*Do not support this*/
-         }
-
          uint64_t readData(const uint64_t readBytes,
                            void*          userCtx) override;
 
 
          uint64_t getTotalDataSize() const override;
 
+         uint64_t getDataOffset() const override;
+
+
          bool doneReading() const override;
 
          bool resetDataOffset(const uint64_t offset) override;
+
+
+
+         private:
+           /**
+            * Process Rados Objects.
+            *
+            * @param: iterator which points to the 'Rados_Objs' field. 
+            *
+            * @return: processing code
+            */
+           CommonCode::IOStatus processObjects(const JSONResult::JSONIter& iter);
 
 
          private:
@@ -115,6 +140,72 @@ class JSONRemoteProtocol : public RemoteProtocol
 
     class JSONProtocolWriteHandler : public RemoteProtocol::ProtocolHandler
     {
+
+      private:
+        /**
+         * A structure for storing all Rados Write Objects.
+         */
+        typedef struct RadosObjWrite
+        {
+          std::string poolName; // pool name
+          std::string objID;    // object name
+          
+          uint64_t    avSize_;  // available bytes to write
+          uint64_t    offset_;  // offset at which to start writing
+          bool        append_;  // if append or write at offset
+          
+          uint64_t    global_;  // global offset of the value
+                                // (for using algorithms)
+
+
+          RadosObjWrite()
+          : poolName(""),
+            objID(""),
+            avSize_(0),
+            offset_(0),
+            append_(true),
+            global_(0)
+          {}
+
+          
+          RadosObjWrite(std::string&& pln,
+                       std::string&& oid,
+                       const uint64_t available = 0,
+                       const uint64_t wOffset   = 0,
+                       const bool     needAppend = 0,
+                       const uint64_t obGl       = 0)
+          : poolName(std::move(pln)),
+            objID(std::move(oid)),
+            avSize_(available),
+            offset_(wOffset),
+            append_(needAppend),
+            global_(obGl)
+          {}
+
+         
+           RadosObjWrite(const struct RadosObjWrite& other) 
+           : poolName(other.poolName),
+             objID(other.objID),
+             avSize_(other.avSize_),
+             offset_(other.offset_),
+             append_(other.append_),
+             global_(other.global_)
+          {}
+
+
+           RadosObjWrite(struct RadosObjWrite&& other) 
+           : poolName(std::move(other.poolName)),
+             objID(std::move(other.objID)),
+             avSize_(other.avSize_),
+             offset_(other.offset_),
+             append_(other.append_),
+             global_(other.global_)
+           {}        
+
+
+        } RadosObjWrite; // struct radosObjWrite
+
+
       public:
         JSONProtocolWriteHandler(CephContext& cephCont);
        
@@ -122,10 +213,7 @@ class JSONRemoteProtocol : public RemoteProtocol
         ~JSONProtocolWriteHandler() override;
 
 
-        bool needNotifyCephSuccess() const override
-        {
-          return true;
-        }
+        bool needNotifyCephSuccess() const override;
        
 
         std::unique_ptr<IOResult> getCephSuccessResult() override;
@@ -142,17 +230,23 @@ class JSONRemoteProtocol : public RemoteProtocol
                            void*          userCtx) override;
 
 
-        uint64_t readData(const uint64_t readBytes,
-                          void*          userCtx) override
-
-        { 
-          return 0; 
-
-        } /* Do not support this */
+        uint64_t writeData(librados::bufferlist& buffer,
+                           void* userCtx) override;
 
 
       private:
-        std::unique_ptr<IOResult> successRes_;
+        /** 
+         * Private utility methods.
+         */
+        CommonCode::IOStatus processObjects(const JSONResult::JSONIter&);
+
+        CommonCode::IOStatus prepareResult(std::shared_ptr<IOResponse> ioRes, const Task& task);
+
+
+      private:
+        std::unique_ptr<IOResult>  successRes_;
+        std::vector<RadosObjWrite> radosWrites_;
+        bool avSuccess_; // if need to send a response
  
         
 
@@ -168,27 +262,11 @@ class JSONRemoteProtocol : public RemoteProtocol
          ~JSONProtocolAuthHandler() override;
 
 
-         uint64_t writeData(const char*    rawData,
-                            const uint64_t writeBytes,
-                            void*          userCtx) override
-
-          {
-            return 0;
-          }
-
 
           void handleJSONMessage(JSONDecoder<const uint8_t*>& dec, 
                                 std::shared_ptr<IOResponse> ioRes,
                                 const Task& task);
 
-
-         uint64_t readData(const uint64_t readBytes,
-                           void*          userCtx) override
-
-         { 
-           return 0; 
-
-         } /* Do not support this */
 
          
          // Implement key/value store for retrieving some
@@ -211,6 +289,20 @@ class JSONRemoteProtocol : public RemoteProtocol
 
 
 
+    class JSONProtocolStatusHandler : public RemoteProtocol::ProtocolHandler
+    {
+      public:
+        JSONProtocolStatusHandler(CephContext& cephCont);
+
+        ~JSONProtocolStatusHandler() override;
+
+         void handleJSONMessage(JSONDecoder<const uint8_t*>& dec,
+                                std::shared_ptr<IOResponse> ioRes,
+                                const Task& task);
+
+    }; // class JSONProtocolStatusHandler
+
+
     class JSONProtocolDeleteHandler : public RemoteProtocol::ProtocolHandler
     {
       public:
@@ -223,22 +315,6 @@ class JSONRemoteProtocol : public RemoteProtocol
         void handleJSONMessage(JSONDecoder<const uint8_t*>& dec, 
                                std::shared_ptr<IOResponse> ioRes,
                                const Task& task);
-
-        uint64_t writeData(const char*    rawData,
-                           const uint64_t writeBytes,
-                           void*          userCtx) override
-
-        {
-          return 0;
-        }
-
-
-        uint64_t readData(const uint64_t readBytes,
-                          void*          userCtx) override
-        { 
-          return 0; 
-
-        } /* Do not support this */
  
         
 
@@ -258,26 +334,6 @@ class JSONRemoteProtocol : public RemoteProtocol
 
 
          ~JSONProtocolVoidHandler() override = default;
-
-
-         uint64_t writeData(const char*    rawData,
-                            const uint64_t writeBytes,
-                            void*          userCtx) override
-
-         {
-           return 0;
-         }
-
-
-         uint64_t readData(const uint64_t readBytes,
-                           void*          userCtx) override
-
-         { 
-           return 0; 
-
-          } /* Do not support this */
- 
-        
          
 
     }; // class  JSONProtocolErrHandler

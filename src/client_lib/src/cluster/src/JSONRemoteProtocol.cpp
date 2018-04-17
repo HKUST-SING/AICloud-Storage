@@ -10,6 +10,7 @@
 using std::shared_ptr;
 using std::unique_ptr;
 using std::string;
+using JSONIter = singaistorageipc::JSONResult::JSONIter;
 
 
 // for ensuring proper conversion between size_t and uint64_t
@@ -20,6 +21,26 @@ static constexpr const uint64_t SIZE_T_U64 = static_cast<const uint64_t>(std::nu
 
 static constexpr const uint64_t MAX_U64 = std::numeric_limits<uint64_t>::max();
 
+
+// This function is similar to the one found in rgw_rados.h (Ceph rgw)
+static inline void prependBucketMarker(const std::string& marker,
+                                       const std::string& origID,
+                                       std::string& oid)
+{
+
+  if(marker.empty() || origID.empty())
+  {
+   oid = origID;
+  }
+  else
+  {
+    // prepend bucket marker (tail objects follow such pattern)
+    oid = marker,
+    oid.append("_");
+    oid.append(origID);
+  }
+
+}
 
 
 namespace singaistorageipc
@@ -105,6 +126,16 @@ JSONRemoteProtocol::handleMessage(shared_ptr<IOResponse> ioRes,
       // return the handler
       return handler;
     }
+   
+   case  CommonCode::IOOpCode::OP_COMMIT:
+    {
+      auto handler = std::make_shared<JSONRemoteProtocol::JSONProtocolStatusHandler>(cephCtx);
+
+      handler->handleJSONMessage(jsonDecoder_, ioRes, task);
+     
+      // return the handler
+      return handler;
+    }
   
 
     default:
@@ -118,6 +149,73 @@ JSONRemoteProtocol::handleMessage(shared_ptr<IOResponse> ioRes,
 
 }
 
+
+JSONRemoteProtocol::JSONProtocolStatusHandler::JSONProtocolStatusHandler(CephContext& cephCont)
+: RemoteProtocol::ProtocolHandler(cephCont, CommonCode::IOOpCode::OP_COMMIT,
+  false)
+{}
+
+void
+JSONRemoteProtocol::JSONProtocolStatusHandler::handleJSONMessage(
+JSONDecoder<const uint8_t*>& decoder, shared_ptr<IOResponse> ioRes,
+const Task& task)
+{
+  // try to decode the message and find the required fields
+  bool errorFound = !(decoder.decode(ioRes->msg_->data_->data()));
+  
+  if(errorFound)
+  {
+    // set the internal error and return
+    int a = 5; // log the case
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+   
+    return;
+
+  }
+
+  // get a reference to the result object
+  auto& jsonRes = decoder.getResult();  
+
+  JSONIter resObj;
+
+  // try to find the proper message fields
+  try
+  {
+    resObj = jsonRes.getObject("Result");
+  
+  } catch(const std::exception& exp)
+  {
+    int a = 5; // log the exception
+    errorFound = true;
+  }
+
+
+  //check if error has occured
+  if(errorFound)
+  {
+   RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+   return; 
+ 
+  }
+
+  // try to decode the status message
+  try
+  {
+    // get status type
+    auto errType = resObj->getValue<uint64_t>("Error_Type");
+    // cast the error type (it also return status SUCCESS)
+    RemoteProtocol::ProtocolHandler::ioStat_ = static_cast<CommonCode::IOStatus>(errType);
+    // done
+
+  }catch(const std::exception& exp)
+  {
+    int a = 5; // log the exception
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+  }
+ 
+
+}
 
 
 JSONRemoteProtocol::JSONProtocolVoidHandler::JSONProtocolVoidHandler(CephContext& cephCont, const CommonCode::IOOpCode opCode)
@@ -153,7 +251,175 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
                             JSONDecoder<const uint8_t*>& decoder, 
                             std::shared_ptr<IOResponse> ioRes, 
                             const Task& task)
-{}
+{
+
+  // try to decode the message and find the required fields
+  bool errorFound = !(decoder.decode(ioRes->msg_->data_->data()));
+  
+  if(errorFound)
+  {
+    // set the internal error and return
+    int a = 5; // log the case
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+   
+    return;
+
+  }
+
+  // get a reference to the result object
+  auto& jsonRes = decoder.getResult();  
+
+  JSONIter resObj;
+
+  // try to find the proper message fields
+  try
+  {
+    resObj = jsonRes.getObject("Result");
+  
+  } catch(const std::exception& exp)
+  {
+    int a = 5; // log the exception
+    errorFound = true;
+  }
+
+
+  //check if error has occured
+  if(errorFound)
+  {
+   RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+   return; 
+ 
+  }
+
+  JSONIter radosObjIter;
+  // try to look for the object size and Rados objects
+  try
+  {
+    auto objSize  = resObj->getValue<uint64_t>("Object_Size");
+    
+    if(objSize == 0)
+    {
+      int a = 5; // log this
+      RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+      errorFound = true;
+  
+    }
+    else
+    {
+      // try to retrieve the objects 
+      // (build internal representation of a storage Object)
+      radosObjIter = resObj->getObject("Rados_Objs");
+      
+      // retrieved the objects
+      errorFound = false;
+      totalSize_ = objSize;
+     
+    }
+  
+
+  }catch(const std::exception& exp)
+  {
+    int a = 5; // log the exception
+    errorFound = true;
+  }
+
+
+  if(errorFound)
+  { // try to find the error type
+    
+    try
+    {
+      //try to retrieve the error type
+      auto errType = resObj->getValue<uint64_t>("Error_Type");
+      
+      // successfully retrieved the error type
+      RemoteProtocol::ProtocolHandler::ioStat_ = static_cast<CommonCode::IOStatus>(errType);
+
+
+    } catch(const std::exception& exp)
+      {
+        // need to log since there is a problem with the 
+        // protocol
+        int a = 0; // log the logical error
+        RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+   
+      }   
+
+  }// if
+  else // no error has been found (found 'Obj_Size' and 'Rados_Objs')
+  {
+    auto objRes = processObjects(radosObjIter);
+    
+    if(objRes == CommonCode::IOStatus::STAT_SUCCESS)
+    { // objects have been read
+
+      RemoteProtocol::ProtocolHandler::ioStat_ = objRes;
+
+    }    
+    else
+    { // some problems with the objects
+      totalSize_ = 0; // reset object size to 0
+      RemoteProtocol::ProtocolHandler::ioStat_ = objRes;
+    }
+
+  }//else
+  
+
+}
+
+
+CommonCode::IOStatus
+JSONRemoteProtocol::JSONProtocolReadHandler::processObjects(const JSONResult::JSONIter& objIter)
+{
+
+  // must make sure that it's a loop object
+  if(!objIter || objIter.end())
+  {
+    int a = 5; // log this
+    return CommonCode::IOStatus::ERR_INTERNAL;
+  
+  }
+
+  // prepare to return
+  auto objsRet = CommonCode::IOStatus::STAT_SUCCESS;
+  // Iterate over objects and create a vector of objects
+  uint64_t globalOffset = 0; // for efficient search
+
+  try
+  {
+    for(auto tmpIter = objIter.begin(); !tmpIter.end(); ++tmpIter)
+    {
+      auto radosPool = tmpIter->getValue<std::string>("pool");
+      auto radosID   = tmpIter->getValue<std::string>("oid");
+      auto radosSize = tmpIter->getValue<uint64_t>("size");
+      
+      // successfully retrieved a Rados object
+      radObjs_.push_back(std::move(
+        JSONProtocolReadHandler::RadosObjRead(std::move(radosPool),
+                                              std::move(radosID),
+                                              radosSize,
+                                              0,
+                                              globalOffset)));
+
+
+       // update the global offset value for future processing
+       globalOffset += radosSize;
+    }
+
+  } catch(const std::exception& exp)
+  {
+    objsRet = CommonCode::IOStatus::ERR_INTERNAL;
+    radObjs_.clear(); // clear the read objects
+  }
+
+  // make sure that the read object size
+  // is equal to the per Rados object size
+  assert(totalSize_ == globalOffset);
+
+
+  return objsRet; // return the status code
+}
 
 
 
@@ -171,6 +437,13 @@ JSONRemoteProtocol::JSONProtocolReadHandler::readData(
                               const uint64_t readBytes,
                               void*          userCtx)
 {
+
+  // first check if reading completed
+  if(doneReading())
+  {
+    return 0; /* nothing to read*/
+  }
+
 
   // try to find an existing Rados object which contains
   // info
@@ -200,7 +473,7 @@ JSONRemoteProtocol::JSONProtocolReadHandler::readData(
   const size_t willRead = cephCtx_.readObject(
                               radosIter->objID,
                               radosIter->poolName,
-                              tryRead, // try to read than many bytes
+                              tryRead, // try to read that many bytes
                               radosIter->offset_,
                               userCtx);
 
@@ -218,7 +491,7 @@ JSONRemoteProtocol::JSONProtocolReadHandler::readData(
   const uint64_t acceptedBytes = static_cast<const uint64_t>(willRead);
 
   // update the offset
-  radosIter->offset_ += acceptedBytes; // 
+  radosIter->offset_ += acceptedBytes;  
 
   // update the global offset (storage system object offset)
   // overflow shall never happen
@@ -239,7 +512,7 @@ bool
 JSONRemoteProtocol::JSONProtocolReadHandler::resetDataOffset(const uint64_t offset)
 {
 
-  if(offset >= totalSize_)
+  if(offset > totalSize_)
   {
     return false;
   }
@@ -260,6 +533,14 @@ JSONRemoteProtocol::JSONProtocolReadHandler::getTotalDataSize() const
 }
 
 
+uint64_t
+JSONRemoteProtocol::JSONProtocolReadHandler::getDataOffset() const
+{
+
+  return readObject_;
+}
+
+
 JSONRemoteProtocol::JSONProtocolWriteHandler::JSONProtocolWriteHandler(
                   CephContext& cephCont)
 
@@ -267,7 +548,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::JSONProtocolWriteHandler(
 : RemoteProtocol::ProtocolHandler(cephCont,  
                                   CommonCode::IOOpCode::OP_WRITE,
                                   true),
-  successRes_{nullptr}
+  successRes_{nullptr},
+  avSuccess_(false)
 {
  
 }
@@ -276,6 +558,7 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::JSONProtocolWriteHandler(
 JSONRemoteProtocol::JSONProtocolWriteHandler::~JSONProtocolWriteHandler()
 {
   successRes_.reset(nullptr);
+  radosWrites_.clear();
 }
 
 
@@ -285,9 +568,176 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::handleJSONMessage(
                             JSONDecoder<const uint8_t*>& decoder, 
                             std::shared_ptr<IOResponse> ioRes, 
                             const Task& task)
-{}
+{
+
+  // go over different stages of decoding the message and
+  // check for status
+  bool errorFound = !(decoder.decode(ioRes->msg_->data_->data()));
+  
+  if(errorFound)
+  {
+    // set the internal error and return
+    int a = 5; // log the case
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+    return;
+  }
+  
+
+  // get a reference to the result object
+  auto& jsonRes = decoder.getResult();
+
+  JSONIter resObj;
+
+  // try to find the 'Result' field which encapsulates
+  // all results (successes and errors)
+  try
+  {
+    resObj = jsonRes.getObject("Result");
+  }catch(const std::exception& exp)
+  {
+    int a = 5; // lof the exception
+    errorFound = true; 
+  }
 
 
+  // check the result of the previous stage ('Result')
+  if(errorFound)
+  {
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+    return; // no need to process further
+
+  }
+
+  // get a reference to 'Rados_Objs'
+  JSONIter radosIter;
+
+  try
+  {
+    radosIter = resObj->getObject("Rados_Objs");
+
+    // check if 'Data_Manifest' exists
+    auto manifestIter = resObj->getObject("Data_Manifest");
+
+  }catch(const std::exception& exp)
+  {
+    int a = 5; // log this
+    errorFound = true;
+  }
+
+
+  if(errorFound)
+  {
+    // 'Rados_Objs' does not exist; check for 'Error_Type'
+    try
+    {
+      auto errType = resObj->getValue<uint64_t>("Error_Type");
+      
+      // successfully retrieved the error type
+      RemoteProtocol::ProtocolHandler::ioStat_ = static_cast<CommonCode::IOStatus>(errType); // cast the error type
+
+    }catch(const std::exception& exp)
+    {
+      // something went wrong
+      int a = 5; // log the case
+
+      RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+    }
+
+  }// if errorFound
+  else
+  { // no errors have been found ('Rados_Objs' exists)
+    // process the 'Rados_Objs' field
+    RemoteProtocol::ProtocolHandler::ioStat_ = processObjects(radosIter);
+
+    if(RemoteProtocol::ProtocolHandler::ioStat_ == CommonCode::IOStatus::STAT_SUCCESS)
+    {
+      // prepare the return message
+      auto prepRes = prepareResult(ioRes, task);
+      
+      if(prepRes != CommonCode::IOStatus::STAT_SUCCESS)
+      {
+        RemoteProtocol::ProtocolHandler::ioStat_ = prepRes;
+      }
+      else
+      {
+        avSuccess_ = true; // need to send a response back on success
+      }
+      
+    }// if STAT_SUCCESS
+
+  }// else (errorFound)
+
+}
+
+
+CommonCode::IOStatus
+JSONRemoteProtocol::JSONProtocolWriteHandler::processObjects(const JSONResult::JSONIter& radosObjs)
+{
+  // make sure it is not empty
+  if(!radosObjs || radosObjs.end())
+  {
+    int a = 5; // log this
+    return CommonCode::IOStatus::ERR_INTERNAL;
+  }
+
+  // set return result
+  auto objsRet = CommonCode::IOStatus::STAT_SUCCESS;
+
+  // Iterate over objects and create a vector for future
+  // writing of objects.
+
+  uint64_t globalOffset = 0;
+
+  try
+  {
+    for(auto tmpIter = radosObjs.begin(); !tmpIter.end(); ++tmpIter)
+    {
+      auto radosPool   = tmpIter->getValue<std::string>("pool");
+      auto radosID     = tmpIter->getValue<std::string>("oid");
+      auto radosSize   = tmpIter->getValue<uint64_t>("size");
+      auto radosOffset = tmpIter->getValue<uint64_t>("offset");
+      auto radosWrite  = tmpIter->getValue<uint64_t>("new_object");
+
+      // retrieved all needed values
+      // process them for future use
+      if(radosSize <= radosOffset)
+      {
+        int a = 5; // log this case
+        throw std::exception();
+      }
+
+      radosWrites_.push_back(std::move(
+        JSONProtocolWriteHandler::RadosObjWrite(
+          std::move(radosPool), std::move(radosID), 
+          (radosSize - radosOffset), radosOffset,
+          (radosWrite)?false:true, globalOffset)));
+
+      // upgrade the global offset
+      globalOffset += (radosSize - radosOffset);
+
+    }//for
+  
+
+  }catch(const std::exception& exp)
+  {
+    int a = 5; // log this case
+    radosWrites_.clear(); // clear the retrieved objects
+    objsRet = CommonCode::IOStatus::ERR_INTERNAL;
+  }
+
+  return objsRet;
+
+}
+
+
+
+bool
+JSONRemoteProtocol::JSONProtocolWriteHandler::needNotifyCephSuccess() const
+{
+  return avSuccess_;
+}
 
 
 uint64_t
@@ -301,17 +751,62 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
 }
 
 
+uint64_t
+JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
+                              librados::bufferlist& buffer,
+                              void*          userCtx)
+{
+
+
+  return 0;
+
+}
+ 
+
+CommonCode::IOStatus 
+JSONRemoteProtocol::JSONProtocolWriteHandler::prepareResult(shared_ptr<IOResponse> ioRes, const Task& task)
+{
+  // prepare a response message for a successful IO Operation
+  auto tmpUnique = std::make_unique<IOResult>(
+    std::move(std::make_unique<Request>(
+      0, task.username_, RemoteProtocol::ProtocolHandler::empty_value,
+      task.path_, CommonCode::IOOpCode::OP_COMMIT)));
+
+  successRes_.swap(tmpUnique);
+
+  // created a successful message
+  
+  /// finish filling the required information
+  successRes_->msg_->msgEnc_ = Message::MessageEncoding::JSON_ENC;
+  successRes_->msg_->data_.swap(ioRes->msg_->data_);
+
+  
+  return CommonCode::IOStatus::STAT_SUCCESS;
+
+}
+
 unique_ptr<IOResult>
 JSONRemoteProtocol::JSONProtocolWriteHandler::getCephSuccessResult()
 {
-  // Make sure that after swap the remaining pointer is just nullptr
-  unique_ptr<IOResult> tmpAns(std::move(successRes_));
 
-  // reset the value of unique
-  successRes_.reset(nullptr);
-  successRes_.release();
+  if(!avSuccess_)
+  {
+    return unique_ptr<IOResult>{nullptr};
+  }
+  else
+  {
 
-  return std::move(tmpAns);
+    // Make sure that after swap the remaining pointer is just nullptr
+    unique_ptr<IOResult> tmpAns(std::move(successRes_));
+
+    // reset the value of unique
+    successRes_.reset(nullptr);
+    successRes_.release();
+    avSuccess_ = false; // not available anymore
+
+    return std::move(tmpAns);
+
+  } //else
 }
 
 
@@ -370,7 +865,7 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::handleJSONMessage(
   }
 
 
-  //check if error has occured
+  //check if error has occurred
   if(errorFound)
   {
    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
@@ -379,12 +874,12 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::handleJSONMessage(
  
   }
 
-  // try to look for an error
+  // try to look for the successful check
   try
   {
     auto accValue = resObj->getValue<std::string>("Account");
     
-    //foudn account
+    //found account
     errorFound = false;
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::STAT_SUCCESS;
 

@@ -30,11 +30,12 @@ typedef struct CommonCode final
     ERR_QUOTA         = 5,  // cannot write more (quota exceeded)
     ERR_OBJ_LARGE     = 6,  // object too big to write
     ERR_OBJ_SMALL     = 7,  // object too small to write
-    ERR_CONTENT       = 8,  // sent message conntent not understood
-    ERR_PROT          = 9,  // wrong protocol used
-    ERR_LOCK          = 10,  // cannot acquire lock on data
-    STAT_PARTIAL_READ = 11,  // there is more data to read
-    STAT_CLOSE        = 12,  // close op succeeded    
+    ERR_CONTENT       = 8,  // message conntent cannot be understood
+    ERR_PARAMS        = 9,  // parameters cannot be understood
+    ERR_PROT          = 10,  // wrong protocol used
+    ERR_LOCK          = 11,  // cannot acquire lock on data
+    STAT_PARTIAL_READ = 12,  // there is more data to read
+    STAT_CLOSE        = 13,  // close op succeeded    
 
     ERR_INTERNAL      = 255 // internal error
   }; // enum IOStatus
