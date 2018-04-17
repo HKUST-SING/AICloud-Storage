@@ -433,7 +433,8 @@ class CephContext
                        const std::string& poolName,
                        const char* buffer, 
                        const size_t writeBytes, 
-                       const uint64_t offset=0, 
+                       const uint64_t offset=0,
+                       const bool append = true, 
                        void* userCtx = nullptr);
 
 

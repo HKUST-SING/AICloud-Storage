@@ -303,9 +303,11 @@ CephContext::readObject(const std::string& oid,
 
 
 size_t
-CephContext::writeObject(const std::string& oid, const std::string& poolName,
+CephContext::writeObject(const std::string& oid, 
+                         const std::string& poolName,
                          const char* buffer, const size_t writeBytes,
-                         const uint64_t offset, void* userCtx)
+                         const uint64_t offset, const bool append,
+                         void* userCtx)
 {
 
   if(!init_) // either not connected yet or has already been closed
@@ -336,7 +338,7 @@ CephContext::writeObject(const std::string& oid, const std::string& poolName,
   // try to write
   auto writeOpSize = opHandler_->writeRadosObject(&ioRadCtx, oid, 
                                                  buffer, writeBytes, 
-                                                 offset, true,
+                                                 offset, append,
                                                  userCtx);
 
   if(!writeOpSize)
@@ -616,11 +618,23 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
   const size_t canWriteAtOnce = maximumDataOperationSize(writeBytes);
 
   // copy the data to a librados::bufferlist
-  opCtx->opData.append(rawData, static_cast<unsigned int>(canWriteAtOnce));
+  opCtx->opData.append(rawData, static_cast<const unsigned int>(canWriteAtOnce));
 
 
-  const int ret = ioCtx->aio_append(objId, writeCompletion, 
+  int ret = 0; // Rados  op result
+  
+  if(appendData)
+  { // try to append data
+
+    ret = ioCtx->aio_append(objId, writeCompletion, 
                                     opCtx->opData, canWriteAtOnce);
+  }
+  else
+  { // write at the provided offset
+    ret = ioCtx->aio_write(objId, writeCompletion, 
+                                    opCtx->opData, canWriteAtOnce,
+                                    offset);
+  }
 
 
   if(ret < 0) // failure occurred

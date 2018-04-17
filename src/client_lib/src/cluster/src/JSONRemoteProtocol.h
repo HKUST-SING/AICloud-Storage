@@ -116,7 +116,6 @@ class JSONRemoteProtocol : public RemoteProtocol
          bool resetDataOffset(const uint64_t offset) override;
 
 
-
          private:
            /**
             * Process Rados Objects.
@@ -218,7 +217,10 @@ class JSONRemoteProtocol : public RemoteProtocol
 
         std::unique_ptr<IOResult> getCephSuccessResult() override;
 
-
+        bool resetDataOffset(const uint64_t offset) override;
+       
+        uint64_t getDataOffset() const override;
+ 
 
         void handleJSONMessage(JSONDecoder<const uint8_t*>& dec, 
                                std::shared_ptr<IOResponse> ioRes,
@@ -246,7 +248,8 @@ class JSONRemoteProtocol : public RemoteProtocol
       private:
         std::unique_ptr<IOResult>  successRes_;
         std::vector<RadosObjWrite> radosWrites_;
-        bool avSuccess_; // if need to send a response
+        bool      avSuccess_;     // if need to send a response
+        uint64_t  writeOffset_;   // current offset to write data to
  
         
 

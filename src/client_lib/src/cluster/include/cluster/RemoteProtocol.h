@@ -55,6 +55,7 @@ class RemoteProtocol
         
         // static string for default implementation
         static const std::string empty_value;
+        static const uint64_t    invalid_offset;
 
 
         ProtocolHandler(CephContext& cephCont, 
@@ -189,19 +190,10 @@ class RemoteProtocol
         }
 
 
-        /**
-         * Mostly for read operations.
-         * Return current offset (read bytes) of the data object.
-         */
-        virtual uint64_t getDataOffset() const
-        {
-          return 0;
-        }
-
         
         /** 
          * The method resets the read operatiosn for now only.
-         * It is useful if a READ fails and want to repeat it.
+         * It is useful if a READ/WRITE fails and want to repeat it.
          *
          * @param: the data offset from which to read
          *
@@ -211,6 +203,20 @@ class RemoteProtocol
         {
           return false;
         }
+
+        
+        /** 
+         * Method is used to get the current data offset.
+         * Only valid for READ/WRITE operations.
+         *
+         * @return: current internal data offset
+         */
+        virtual uint64_t getDataOffset() const
+        {
+          return ProtocolHandler::invalid_offset;
+        }
+
+
 
         /**
          * Only for read operations. Returns if 
