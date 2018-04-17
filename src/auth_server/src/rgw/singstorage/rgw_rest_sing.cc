@@ -1229,7 +1229,7 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       writeRados_.push_back(std::move(
         RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store), 
                                         (rule.stripe_max_size - app_off),
-                                                            app_off, 0));
+                                                            app_off, 0)));
 
       if(writeRados_.back().obj_info.empty())
       {

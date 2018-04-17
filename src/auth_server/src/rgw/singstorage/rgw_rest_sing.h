@@ -251,10 +251,10 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
       : obj_size(other.obj_size)
       {
         // steal Rados info from the 'other' object
-        obj_info.pool.name = std::move(other.pool.name);
-        obj_info.pool.ns   = std::move(other.pool.ns);
-        obj_info.oid       = std::move(other.oid);
-        obj_info.loc       = std::move(other.loc);
+        obj_info.pool.name = std::move(other.obj_info.pool.name);
+        obj_info.pool.ns   = std::move(other.obj_info.pool.ns);
+        obj_info.oid       = std::move(other.obj_info.oid);
+        obj_info.loc       = std::move(other.obj_info.loc);
       }
 
 
@@ -349,10 +349,10 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
        new_write_(other.new_write_)
      {
        // steal Rados info from the 'other' object
-       obj_info.pool.name = std::move(other.pool.name);
-       obj_info.pool.ns   = std::move(other.pool.ns);
-       obj_info.oid       = std::move(other.oid);
-       obj_info.loc       = std::move(other.loc);
+       obj_info.pool.name = std::move(other.obj_info.pool.name);
+       obj_info.pool.ns   = std::move(other.obj_info.pool.ns);
+       obj_info.oid       = std::move(other.obj_info.oid);
+       obj_info.loc       = std::move(other.obj_info.loc);
 
      }
  
