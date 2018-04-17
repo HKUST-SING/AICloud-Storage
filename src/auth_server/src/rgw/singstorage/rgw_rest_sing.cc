@@ -591,8 +591,7 @@ RGWGetObjLayout_SING::execute()
       }
 
       // push the value to the vector
-      rawObjs_.push_back(RGWGetObjLayout_SING::ReadObjInfo(read_obj,
-                                     iter.get_stripe_size()));
+      rawObjs_.push_back(std::move(RGWGetObjLayout_SING::ReadObjInfo(read_obj, iter.get_stripe_size())));
      
     } //for
   }//if
@@ -1117,9 +1116,9 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
     }
 
     // successfully converted the head
-    writeRados_.push_back(
+    writeRados_.push_back(std::move(
       RGWPutObj_ObjStore_SING::SINGRadosObj(tmp_raw_obj, write_size,
-                                      manifest.get_head_size(), 0));
+                                      manifest.get_head_size(), 0)));
 
     // update head size and object size
     manifest.set_head_size(manifest.get_head_size() + write_size);
@@ -1163,9 +1162,10 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
     }
 
     // only head object
-    writeRados_.push_back(RGWPutObj_ObjStore_SING::SINGRadosObj(tmp_raw_obj, 
+    writeRados_.push_back(std::move(
+      RGWPutObj_ObjStore_SING::SINGRadosObj(tmp_raw_obj, 
       (manifest.get_max_head_size() - manifest.get_head_size()),
-      manifest.get_head_size(), 0));
+      manifest.get_head_size(), 0)));
 
    
     // need to create a few objects
@@ -1183,9 +1183,9 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
 
 
       // compute a raw object for writing
-      writeRados_.push_back(
+      writeRados_.push_back(std::move(
         RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store),
-                                            rule.stripe_max_size, 0, 0));
+                                            rule.stripe_max_size, 0, 0)));
 
 
       if(writeRados_.back().obj_info.empty())
@@ -1226,7 +1226,7 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       manifest.get_implicit_location(0, cur_stripe, tail_size, 
                             nullptr, &cur_obj);
 
-      writeRados_.push_back(
+      writeRados_.push_back(std::move(
         RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store), 
                                         (rule.stripe_max_size - app_off),
                                                             app_off, 0));
@@ -1254,10 +1254,10 @@ RGWPutObj_ObjStore_SING::extend_manifest(RGWObjManifest& manifest,
       manifest.get_implicit_location(0, cur_stripe, cur_offset, 
                             nullptr, &cur_obj);
 
-      writeRados_.push_back(
+      writeRados_.push_back(std::move(
         RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store), 
                                                     rule.stripe_max_size,
-                                                                  0, 1));
+                                                                  0, 1)));
 
       if(writeRados_.back().obj_info.empty())
       {
@@ -1590,9 +1590,9 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
   uint64_t cur_offset = (write_size < manifest.get_max_head_size())? write_size : manifest.get_max_head_size();
 
   // push the retrieved object onto the stack
-  writeRados_.push_back(
+  writeRados_.push_back(std::move(
     RGWPutObj_ObjStore_SING::SINGRadosObj(write_obj, cur_offset,
-                                                         0, 1));
+                                                         0, 1)));
 
   if(cur_offset == write_size)
   {
@@ -1612,9 +1612,9 @@ RGWPutObj_ObjStore_SING::create_new_manifest(RGWObjManifest& manifest,
                                   &cur_obj);
 
     // get raw object
-    writeRados_.push_back(
+    writeRados_.push_back(std::move(
       RGWPutObj_ObjStore_SING::SINGRadosObj(cur_obj.get_raw_obj(store),
-                                                   stripe_size, 0, 1));
+                                                   stripe_size, 0, 1)));
 
     if(writeRados_.back().obj_info.empty())
     {

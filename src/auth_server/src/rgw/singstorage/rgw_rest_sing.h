@@ -240,6 +240,25 @@ class RGWGetObjLayout_SING : public RGWGetObjLayout
       {}
 
 
+      ReadObjInfo(const struct ReadObjInfo& other)
+      : obj_info(other.obj_info.pool, 
+                 other.obj_info.oid, 
+                 other.obj_info.loc),
+        obj_size(other.obj_size)
+      {}
+
+      ReadObjInfo(struct ReadObjInfo&& other)
+      : obj_size(other.obj_size)
+      {
+        // steal Rados info from the 'other' object
+        obj_info.pool.name = std::move(other.pool.name);
+        obj_info.pool.ns   = std::move(other.pool.ns);
+        obj_info.oid       = std::move(other.oid);
+        obj_info.loc       = std::move(other.loc);
+      }
+
+
+
       ~ReadObjInfo() = default;
 
     } ReadObjInfo; // struct ReadObjInfo 
@@ -311,6 +330,33 @@ class RGWPutObj_ObjStore_SING : public RGWPutObj_ObjStore
         offset_(offset),
         new_write_(new_write)
       {}
+
+
+     SINGRadosObj(const struct SINGRadosObj& other)
+     : obj_info(other.obj_info.pool, 
+                other.obj_info.oid,
+                other.obj_info.loc),
+       size_(other.size_),
+       offset_(other.offset_),
+       new_write_(other.new_write_)
+     {}
+
+
+     SINGRadosObj(struct SINGRadosObj&& other)
+     : obj_info(),
+       size_(other.size_),
+       offset_(other.offset_),
+       new_write_(other.new_write_)
+     {
+       // steal Rados info from the 'other' object
+       obj_info.pool.name = std::move(other.pool.name);
+       obj_info.pool.ns   = std::move(other.pool.ns);
+       obj_info.oid       = std::move(other.oid);
+       obj_info.loc       = std::move(other.loc);
+
+     }
+ 
+
 
      ~SINGRadosObj() = default;
 
