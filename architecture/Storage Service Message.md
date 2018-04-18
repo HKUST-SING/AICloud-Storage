@@ -1,11 +1,11 @@
 ## Inter-Processing Message Structure
 
-| Data type  | Generic                                                                |
-| ---------- | -----------------------------------------------------------------------|
-| `uint8_t`  | msg_type (STATUS=0,AUTH=1,READ=2,WRITE=3,CON_REPLY=4,CLOSE=5,DELETE=6) |
-| `uint32_t` | msg_id  (an message identifer)                                         |
-| `uint32_t` | msg_length (in bytes)                                                  |
-|            | specific content (describe in below)                                   |
+| Data type  | Generic                                                                          |
+| ---------- | ---------------------------------------------------------------------------------|
+| `uint8_t`  | msg_type (STATUS=0,AUTH=1,READ=2,WRITE=3,CON_REPLY=4,CLOSE=5,DELETE=6,RELEASE=7) |
+| `uint32_t` | msg_id  (an message identifer)                                                   |
+| `uint32_t` | msg_length (in bytes)                                                            |
+|            | specific content (describe in below)                                             |
 
 | Data type  | Authentication                              |
 | ---------- | ------------------------------------------- |
