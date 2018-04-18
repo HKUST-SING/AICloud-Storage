@@ -66,7 +66,9 @@ public:
 		return std::move(iobuf);
 	};
 
-
+	void asRelease(){
+		msgType_ = IPCMessage::MessageType::RELEASE;
+	}
 
 	void setPath(const std::string& val){
 		pathVal_ = val;

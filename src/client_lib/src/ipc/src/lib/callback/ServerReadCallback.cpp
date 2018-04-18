@@ -215,16 +215,16 @@ bool ServerReadCallback::allocatSM(size_t &allocsize, BFCAllocator::Offset &memo
 bool ServerReadCallback::finishThisReadRequest(const std::string& path)
 {
 	auto contextmap = readContextMap_.find(path);
-	auto readrequests = contextmap->second.pendingList_;
 
-	if(readrequests.empty()){
+	if(contextmap->second.pendingList_.empty()){
 		// No other more requests need to process.
 		readContextMap_.erase(path);
 		return true;
 	}
 	else{
 		// Get the next request.
-		IPCReadRequestMessage nextrequest = readrequests.front();
+		IPCReadRequestMessage nextrequest = 
+			contextmap->second.pendingList_.front();
 		contextmap->second.pendingList_.pop();
 
 		/**
@@ -483,36 +483,54 @@ void ServerReadCallback::handleReadRequest(
 
 //====================== Write =============================
 
+void ServerReadCallback::sendWriteReply(
+	std::string path,uint32_t id,uint32_t pro,bool isrelease)
+{
+	IPCReadRequestMessage reply;
+	reply.setPath(path);
+	reply.setID(id);
+	reply.setProperties(pro);
+	if(isrelease){
+		reply.asRelease();
+	}
+	auto send_iobuf = reply.createMsg();
+	socket_->writeChain(&wcb_,std::move(send_iobuf));
+}
+
 void ServerReadCallback::doWriteRequestCallback(Task task,uint32_t pro)
 {
 	futurePool_.erase(task.tranID_);
 
+	/**
+	 * Update contextmap
+	 */
+	auto contextmap = writeContextMap_.find(task.path_);
+	contextmap->second.workerID_ = task.workerID_;
+
 	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
-		DLOG(INFO) << "permit WRITE request";
-		IPCReadRequestMessage reply;
-		reply.setPath(task.path_);
-		reply.setID(task.tranID_);
-		reply.setProperties(pro);
+		DLOG(INFO) << "handle WRITE request";
 
-		auto send_iobuf = reply.createMsg();
-		socket_->writeChain(&wcb_,std::move(send_iobuf));
+		sendWriteReply(task.path_,task.tranID_,pro,false);
 
-		/**
-		 * Update context.
-		 */
-		auto contextmap = writeContextMap_.find(task.path_);
-		contextmap->second.workerID_ = task.workerID_;
-		contextmap->second.lastResponse_ = reply;
+	}
+	else if(task.opStat_ == CommonCode::IOStatus::STAT_PARTIAL_WRITE){
+		// merge this write reques to others
+		DLOG(INFO) << "merge WRITE request";
 
-
-		if(pro != 1 && task.dataAddr_ == 0 && task.dataSize_ == 0){
-			writeContextMap_.erase(task.path_);
-		}
+		sendWriteReply(task.path_,task.tranID_,task.mergeID_,true);
 	}
 	else{
 		DLOG(INFO) << "deny WRITE request";
+		
+		sendStatus(task.tranID_,task.opStat_);
+	}
+
+	contextmap->second.processingRequests_.erase(task.tranID_);
+	if(contextmap->second.processingRequests_.size() == 0 && 
+		(task.opStat_ != CommonCode::IOStatus::STAT_SUCCESS ||
+			(pro != 1 && task.dataAddr_ == 0 && task.dataSize_ == 0)))
+	{
 		writeContextMap_.erase(task.path_);
-		sendStatus(task.tranID_,task.opStat_);		
 	}
 }
 
@@ -555,6 +573,11 @@ void ServerReadCallback::handleWriteRequest(
 		writeContextMap_.emplace(std::make_pair(path,std::move(writecontext)));
 		contextmap = writeContextMap_.find(path);
 	}
+
+	/**
+	 * Store write request into the list
+	 */
+	contextmap->second.processingRequests_.emplace(tranID);
 
 	/**
 	 * Write data to ceph.

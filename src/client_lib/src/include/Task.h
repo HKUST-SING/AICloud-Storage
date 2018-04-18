@@ -30,7 +30,7 @@ typedef struct Task
 	uint64_t objSize_; // used by Unix service and worker to determine object size
 	CommonCode::IOStatus opStat_;
 
-
+  uint32_t mergeID_;
 
     /**
      * Default constructor.

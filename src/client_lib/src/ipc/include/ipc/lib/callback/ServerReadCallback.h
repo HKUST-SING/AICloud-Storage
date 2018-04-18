@@ -192,6 +192,7 @@ private:
     bool passReadRequesttoTask(uint32_t, const std::unordered_map
 				<std::string,ReadRequestContext>::iterator);
     bool doReadCredential(uint32_t,const std::string&);
+    void sendWriteReply(std::string,uint32_t,uint32_t);
     void doWriteRequestCallback(Task,uint32_t);
 
     std::unordered_map<uint32_t,folly::Future<Task>> futurePool_;

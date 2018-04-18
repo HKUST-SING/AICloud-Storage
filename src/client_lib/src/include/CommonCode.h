@@ -32,10 +32,11 @@ typedef struct CommonCode final
     ERR_OBJ_SMALL     = 7,  // object too small to write
     ERR_CONTENT       = 8,  // message conntent cannot be understood
     ERR_PARAMS        = 9,  // parameters cannot be understood
-    ERR_PROT          = 10,  // wrong protocol used
-    ERR_LOCK          = 11,  // cannot acquire lock on data
-    STAT_PARTIAL_READ = 12,  // there is more data to read
-    STAT_CLOSE        = 13,  // close op succeeded    
+    ERR_PROT          = 10, // wrong protocol used
+    ERR_LOCK          = 11, // cannot acquire lock on data
+    STAT_PARTIAL_READ = 12, // there is more data to read
+    STAT_PARTIAL_WRITE= 13, // there is merging write
+    STAT_CLOSE        = 14, // close op succeeded    
 
     ERR_INTERNAL      = 255 // internal error
   }; // enum IOStatus

@@ -29,10 +29,7 @@ public:
 class WriteRequestContext :  public RequestContext{
 
 public:
-	IPCReadRequestMessage lastResponse_;
-
-//	std::queue<IPCWriteRequestMessage> pendingList_;
-
+	std::set<uint32_t> processingRequests_;
 };
 
 }

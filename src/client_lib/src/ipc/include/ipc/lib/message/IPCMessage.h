@@ -24,7 +24,8 @@ public:
 		WRITE = 3,
 		CON_REPLY = 4,
 		CLOSE = 5,
-		DELETE = 6
+		DELETE = 6,
+		RELEASE = 7
 	};
 
 	/**
