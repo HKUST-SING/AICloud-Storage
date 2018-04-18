@@ -252,7 +252,9 @@ void ServerReadCallback::callbackReadRequest(Task task)
 	// Update the context
 	auto contextmap = readContextMap_.find(task.path_);
 
-	if(task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS){
+	if(task.opStat_ == CommonCode::IOStatus::STAT_PARTIAL_READ||
+		task.opStat_ == CommonCode::IOStatus::STAT_SUCCESS)
+	{
 		DLOG(INFO) << "permit READ request";
 		/**
 		 * Then reply write message to client.
@@ -327,7 +329,7 @@ bool ServerReadCallback::passReadRequesttoTask(
 	}
 
 	size_t allocsize;
-	if(objectSize >= std::numeric_limits<uint32_t>::max()){
+	if(objectSize >= std::numeric_limits<uint32_t>::max() - 1){
 		allocsize = defaultAllocSize_;
 	} 
 	else{
@@ -359,7 +361,6 @@ bool ServerReadCallback::passReadRequesttoTask(
  	future.via(folly::EventBaseManager::get()->getEventBase())
  		  .then(&ServerReadCallback::callbackReadRequest,this);
  	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
-//	futurePool_[tranID] = std::move(future);
 	return true;
 }
 
@@ -368,11 +369,11 @@ bool ServerReadCallback::doReadCredential(uint32_t tranID,const std::string &pat
 	auto contextmap = readContextMap_.find(path);
 	if(contextmap == readContextMap_.end()){
 		ReadRequestContext newcontext;
-		readContextMap_.emplace(path,newcontext);
+		readContextMap_.emplace(std::make_pair(path,std::move(newcontext)));
 		contextmap = readContextMap_.find(path);
 	}
 	contextmap->second.workerID_ = 0;
-	contextmap->second.remainSize_ = std::numeric_limits<uint64_t>::max();
+	contextmap->second.remainSize_ = std::numeric_limits<uint64_t>::max() - 1;
 	return passReadRequesttoTask(tranID,contextmap);
 }
 
@@ -551,7 +552,7 @@ void ServerReadCallback::handleWriteRequest(
 		 */
 		WriteRequestContext writecontext;
 		writecontext.workerID_ = 0;
-		writeContextMap_.emplace(path,writecontext);
+		writeContextMap_.emplace(std::make_pair(path,std::move(writecontext)));
 		contextmap = writeContextMap_.find(path);
 	}
 
