@@ -582,10 +582,7 @@ void ServerReadCallback::handleWriteRequest(
 	/**
 	 * Write data to ceph.
 	 */
-	Task task(username_,path,CommonCode::IOOpCode::OP_WRITE,
-		write_msg.getStartingAddress(),
-		write_msg.getDataLength(),tranID,contextmap->second.workerID_);
-	folly::Future<Task> future = std::move(worker_->sendTask(task));
+	bool isfirst;
 	if(pro == 1){
 		/**
 		 *	The flag set. It means this is the first 
@@ -595,6 +592,24 @@ void ServerReadCallback::handleWriteRequest(
 		 *	`dataLength_`, while the `startAddress_` is 0.
 		 *	Here, we just grant every request.
 		 */
+		isfirst = true;
+	}
+	else{
+		isfirst = false;
+	}
+
+	CommonCode::IOOpCode op;
+	if(isfirst){
+		op = CommonCode::IOOpCode::OP_CHECK_WRITE;
+	}
+	else{
+		op = CommonCode::IOOpCode::OP_WRITE;
+	}
+
+	Task task(username_,path,op,write_msg.getStartingAddress(),
+		write_msg.getDataLength(),tranID,contextmap->second.workerID_);
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
+	if(isfirst){
  	 	future.via(folly::EventBaseManager::get()->getEventBase())
  	 		  .then(&ServerReadCallback::callbackWriteCredential,this);
 	}

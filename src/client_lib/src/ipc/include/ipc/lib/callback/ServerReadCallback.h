@@ -129,7 +129,7 @@ public:
      * @param ex        An exception describing the error that occurred.
      */
     void readErr(const folly::AsyncSocketException& ex) noexcept override{
-        DLOG(WARNING) << ex.what();
+        LOG(WARNING) << ex.what();
         readEOF();
     };
 
