@@ -19,7 +19,7 @@ static constexpr const bool POSSIBLE_OVERFLOW = (sizeof(size_t) > sizeof(unsigne
 
 // do precasting for better performance
 // (if sizeof(size_t) > sizeof(unsigned int), get maximum value in size_t)
-static constexpr const unsigned int MAX_RADOS_OP_SIZE = std::numeric_limits<unsigned int>::max();
+static constexpr const unsigned int MAX_RADOS_OP_SIZE = (std::numeric_limits<unsigned int>::max() >> 1);
 
 static constexpr const size_t MAX_BUFFER_SIZE = static_cast<const size_t>(MAX_RADOS_OP_SIZE);
 
@@ -353,6 +353,61 @@ CephContext::writeObject(const std::string& oid,
 }
 
 
+size_t
+CephContext::writeObject(const std::string& oid, 
+                         const std::string& poolName,
+                         const librados::bufferlist& buffer, 
+                         const size_t writeBytes,
+                         const uint64_t offset, const bool append,
+                         void* userCtx)
+{
+
+  if(!init_) // either not connected yet or has already been closed
+  {
+    return 0;
+  }
+
+  
+  // check if the data pool already exists
+  if(!checkPoolExists(poolName))
+  { // if the pool has not been accessed before
+    // try to connect to it
+    auto addRes = addRadosContext(poolName);
+    
+    if(!addRes)
+    { // something went wrong
+      int a = 5; // log this
+ 
+      return 0;
+    }
+ 
+  } //if
+
+  // have an active IO Context
+  // issue a write operation
+  auto& ioRadCtx = getPoolRadosContext(poolName);
+
+  // try to write
+  auto writeOpSize = opHandler_->writeRadosObject(&ioRadCtx, oid, 
+                                                 buffer, writeBytes, 
+                                                 offset, append,
+                                                 userCtx);
+
+  if(!writeOpSize)
+  {
+    int a = 5; // need to log if there is any problem
+  }
+
+  return writeOpSize;
+
+
+
+}
+
+
+
+
+
 CephContext::PollSize
 CephContext::getCompletedOps(std::deque<CephContext::RadosOpCtx*>& ops)
 {
@@ -472,14 +527,20 @@ CephContext::RadosOpHandler::radosAsyncCompletionCallback(
     opCtx->radosCtx->opStatus = CommonCode::IOStatus::STAT_SUCCESS;
   } 
   
-  // coppy the rados context
+  // copy the rados context
   CephContext::RadosOpCtx* retCntx = opCtx->radosCtx;
   opCtx->radosCtx = nullptr;  
 
-
   // delete the async operation and its context
   opCtx->release();
-   
+
+  // if the operation is write
+  // clear the buffer
+  if(retCntx->opType == CommonCode::IOOpCode::OP_WRITE)
+  {
+    // clear the data buffer (no need anymore)
+    retCntx->opData.clear();
+  }
 
   
   // finally enqueue the result
@@ -585,6 +646,126 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
                              const bool appendData,
                              void* userCtx)
 {
+   
+   // get the maximum number of bytes that can be written at once
+  size_t canWriteAtOnce = maximumDataOperationSize(writeBytes);
+  
+  if(canWriteAtOnce == 0)
+  {
+    // log it before returning
+    int a = 5;
+    return 0;
+  }
+
+
+
+    // The following code is taken from the Ceph librados tutorial
+  /****************** Ceph Librados Tutorial ******************/
+  // Create callback context
+
+  CephContext::RadosOpHandler::CmplCtx* args = CephContext::RadosOpHandler::CmplCtx::createHandlerCompletionContext();
+
+  // Create I/O Completion.
+  
+  librados::AioCompletion* writeCompletion =\
+            librados::Rados::aio_create_completion(
+              reinterpret_cast<void*>(args), nullptr, 
+              aioRadosCallbackFunc);
+
+
+
+  // create an operation context
+  CephContext::RadosOpCtx* opCtx = CephContext::RadosOpCtx::createRadosOpCtx();
+
+  // initialize the Completion context
+  args->objPtr  = this; // this object
+  args->ioCmpl  = writeCompletion;
+  args->radosCtx = opCtx;
+
+  // proivde opearation context
+  opCtx->opType    = CommonCode::IOOpCode::OP_WRITE;
+  opCtx->opStatus  = CommonCode::IOStatus::ERR_INTERNAL;
+  opCtx->userCtx   = userCtx; // passed user context
+
+ 
+  // copy the data to a librados::bufferlist
+  opCtx->opData.append(rawData, static_cast<const unsigned int>(canWriteAtOnce));
+
+
+
+
+  int ret = 0; // Rados  op result flag
+ 
+  while(canWriteAtOnce) // as long as there is some data to write
+  {
+
+    if(appendData)
+    { // try to append data
+
+      ret = ioCtx->aio_append(objId, writeCompletion, 
+                                    opCtx->opData, canWriteAtOnce);
+    }
+    else
+    { // write at the provided offset
+      ret = ioCtx->aio_write(objId, writeCompletion, 
+                                    opCtx->opData, canWriteAtOnce,
+                                    offset);
+    }
+
+    if(ret == -E2BIG) // menas it's too much data (cannot write more)
+    {
+      // half the value
+      canWriteAtOnce >>= 1; // reduce the write size
+    }
+    else
+    {
+      // break
+      break; // don't try to write again
+    }
+
+  }// while
+ 
+ 
+
+  if(ret < 0) // failure occurred
+  {
+    // check if the size failure occurred
+    
+
+    // log it first;
+    int a = 0; // for logging
+    
+    // delete all allocated fields
+    args->release();
+
+    return 0; // notify that cannot read 
+  }
+
+  return canWriteAtOnce; // return number of bytes to be read
+}
+
+
+
+size_t
+CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
+                             const std::string& objId,
+                             const librados::bufferlist& buffer,
+                             const size_t writeBytes,
+                             const uint64_t offset,
+                             const bool appendData,
+                             void* userCtx)
+{
+
+  // get the maximum number of bytes that can be written at once
+  size_t canWriteAtOnce = maximumDataOperationSize(writeBytes);
+  
+  if(canWriteAtOnce == 0)
+  {
+    // log it before returning
+    int a = 5;
+    return 0;
+  }
+
 
     // The following code is taken from the Ceph librados tutorial
   /****************** Ceph Librados Tutorial ******************/
@@ -614,27 +795,34 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
 
 
 
-  // get the maximum number of bytes that can be written at once
-  const size_t canWriteAtOnce = maximumDataOperationSize(writeBytes);
+  int ret = 0; // Rados  op result flag
 
-  // copy the data to a librados::bufferlist
-  opCtx->opData.append(rawData, static_cast<const unsigned int>(canWriteAtOnce));
-
-
-  int ret = 0; // Rados  op result
+  while(canWriteAtOnce)
+  {
   
-  if(appendData)
-  { // try to append data
+    if(appendData)
+    { // try to append data
 
-    ret = ioCtx->aio_append(objId, writeCompletion, 
-                                    opCtx->opData, canWriteAtOnce);
-  }
-  else
-  { // write at the provided offset
-    ret = ioCtx->aio_write(objId, writeCompletion, 
-                                    opCtx->opData, canWriteAtOnce,
+      ret = ioCtx->aio_append(objId, writeCompletion, 
+                                     buffer, canWriteAtOnce);
+    }
+    else
+    { // write at the provided offset
+      ret = ioCtx->aio_write(objId, writeCompletion, 
+                                    buffer, canWriteAtOnce,
                                     offset);
-  }
+    }
+
+    if(ret == -E2BIG)
+    {
+      canWriteAtOnce >>= 1; // try to reduce the write size
+    }
+    else
+    {
+      break; // don't care about other cases   
+    }
+
+  }//while
 
 
   if(ret < 0) // failure occurred
@@ -643,13 +831,16 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
     int a = 0; // for logging
     
     // delete all allocated fields
+    args->radosCtx->userCtx = nullptr;
     args->release();
 
-    return 0; // notify that cannot read 
+    return 0; // notify that cannot write 
   }
 
   return canWriteAtOnce; // return number of bytes to be read
 }
+
+
 
 
 

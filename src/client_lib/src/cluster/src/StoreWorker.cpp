@@ -14,8 +14,9 @@
 #define WORKER_SHARED_SECRET "workersharedsecretpassword"
 
 // maximum Rados IO Operation. Rados cannot read/write data greater 
-// than unsigned int max. See ceph::bufferlist for details.
-static constexpr const uint64_t MAX_IO_SIZE = static_cast<const uint64_t>(std::numeric_limits<unsigned int>::max());
+// than (unsigned int max)/2. See ceph::bufferlist and 
+// ceph::libraods for details.
+static constexpr const uint64_t MAX_IO_SIZE = static_cast<const uint64_t>((std::numeric_limits<unsigned int>::max() >> 1));
 
 
 using folly::Future;
@@ -286,12 +287,14 @@ StoreWorker::processTasks()
 
         default:
         {
-          Worker::done_.store(true); // completed processing
+          Worker::done_.store(true, std::memory_order_release); 
+                                        // completed processing
         }
       } // switch
 
     } // for (new tasks)
-
+   
+    passedTasks.clear();
 
     /* after issueing all new requests */
     /* process data operations */
@@ -372,7 +375,8 @@ StoreWorker::processWriteOp(UpperRequest&& task)
                                  resTask.path_, 
                              UserAuth(resTask.username_, 
                              reinterpret_cast<const char*>(workerSecret)),
-                             CommonCode::IOOpCode::OP_WRITE)));
+                             CommonCode::IOOpCode::OP_WRITE,
+                             task.objSize_)));
 
 
   // appned to the list

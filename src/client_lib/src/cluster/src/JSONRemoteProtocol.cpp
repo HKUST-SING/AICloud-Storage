@@ -439,7 +439,7 @@ JSONRemoteProtocol::JSONProtocolReadHandler::readData(
 {
 
   // first check if reading completed
-  if(doneReading() || RemoteProtocol::ProtocolHandler::ioStat_ != CommonCode::IOStatus::STAT_SUCCESS)
+  if(doneReading() || RemoteProtocol::ProtocolHandler::ioStat_ != CommonCode::IOStatus::STAT_SUCCESS || readBytes == 0)
   {
     return 0; /* nothing to read*/
   }
@@ -774,7 +774,7 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
                               const uint64_t writeBytes,
                               void*          userCtx)
 {
-  if(RemoteProtocol::ProtocolHandler::ioStat_ != CommonCode::IOStatus::STAT_SUCCESS || radosWrites_.empty())
+  if(RemoteProtocol::ProtocolHandler::ioStat_ != CommonCode::IOStatus::STAT_SUCCESS || radosWrites_.empty() || !rawData || writeBytes == 0)
   {
     return 0; // don't write if failure has occurred
   }
@@ -837,12 +837,73 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
 
 uint64_t
 JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
-                              librados::bufferlist& buffer,
+                              const librados::bufferlist& buffer,
                               void*          userCtx)
 {
 
 
-  return 0;
+  if(RemoteProtocol::ProtocolHandler::ioStat_ != CommonCode::IOStatus::STAT_SUCCESS || radosWrites_.empty() || buffer.length() == 0)
+  {
+    return 0; // don't write if failure has occurred
+  }
+
+  // try to find an existing Rados object which contains
+  // info
+  auto radosIter = std::find_if(std::begin(radosWrites_), 
+                                std::end(radosWrites_), 
+                                [this](const RadosObjWrite& radObj) -> bool {return (this->writeOffset_ >= radObj.global_ && this->writeOffset_ < radObj.global_);});
+
+
+  if(radosIter == std::end(radosWrites_))
+  {
+    int a = 5; // log this case
+    return 0;
+  }
+
+
+  // found a valid object
+
+  const uint64_t writeBytes = static_cast<const uint64_t>(buffer.length());
+  const uint64_t capRadosSize = (radosIter->avSize_ > writeBytes) ? writeBytes : radosIter->avSize_;
+
+  // cap the possible write size
+  const size_t tryWrite = (SIZE_T_U64 < capRadosSize) ? MAX_SIZE_T : static_cast<const size_t>(capRadosSize);
+ 
+  if(!tryWrite)
+  {
+    return 0; // cannot write data (perhaps retry later)
+  }
+
+
+  const size_t willWrite = cephCtx_.writeObject(
+                                    radosIter->objID,
+                                    radosIter->poolName,
+                                    buffer,
+                                    tryWrite,
+                                    radosIter->offset_,
+                                    radosIter->append_,
+                                    userCtx);
+
+  
+  if(!willWrite)
+  {
+    // log this case as an error
+    int a = 0;
+
+    return 0;
+  }
+
+  const uint64_t acceptedBytes = static_cast<const uint64_t>(willWrite);
+
+  radosIter->offset_ += acceptedBytes;
+
+ 
+  // update the global write operation
+  writeOffset_ += acceptedBytes;
+  
+  
+  return acceptedBytes;
+
 
 }
  

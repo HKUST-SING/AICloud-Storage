@@ -15,7 +15,7 @@ find_package(OpenSSL REQUIRED)
 
 add_library(clusterlib 
     src/CephContext.cpp
-    src/StoreObj.cpp
+    src/DataObj.cpp
     src/Worker.cpp
     src/StoreWorker.cpp
     src/RemoteProtocol.cpp
