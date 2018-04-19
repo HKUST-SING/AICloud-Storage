@@ -34,7 +34,7 @@
 #include "include/ConcurrentQueue.h"
 #include "include/Task.h"
 #include "include/CommonCode.h"
-#include "StoreObj.h"
+#include "DataObj.h"
 
 
 
@@ -142,6 +142,14 @@ class StoreWorker: public Worker
           
     } WorkerContext; // struct WorkerContext
 
+
+    typedef struct OpContext
+    {
+      std::shared_ptr<RemoteProtocol::ProtocolHandler>   prot;
+      DataObject                                       object;
+      uint32_t                                         tranID;
+      std::list<std::pair<uint32_t, librados::bufferlist>> pendData;
+    } OpContext; // struct OpContext
 
 
     using ProtocolRes  =\
@@ -289,14 +297,18 @@ class StoreWorker: public Worker
                              // the consumer servs them.
 
 
-    // Map of sent requests
+    // Structures for handling
+    // remote requests
     std::list<WorkerContext>    responses_;     // issued requests
-    std::vector<ProtocolRes>    protRes_;       // protocol responses
-
-    
+ 
 
 
-    std::map<uint32_t, StoreObj> pendReads_; // completed remotely 
+    // serializes WRTIES and READS to the same path
+    std::map<std::string, std::deque<UpperRequest>> pendTasks_;
+    std::map<uintptr_t, >    
+
+
+    std::map<uint32_t, > pendReads_; // completed remotely 
                                              // tasks, pending for 
                                              // further processing
                                              // locally

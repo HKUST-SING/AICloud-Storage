@@ -42,7 +42,7 @@ class CephContext
   public:
     typedef struct RadosOpCtx
     {
-      CommonCode::IOOpCode   opType;   // operation opcde
+      CommonCode::IOOpCode   opType;   // operation opcode
       CommonCode::IOStatus   opStatus; // operation status
 
       librados::bufferlist   opData;   // data (for read only)
@@ -76,10 +76,10 @@ class CephContext
 
      bool release()
      {
-       if(userCtx) // must reset context
-       {
-         return false; // signal that context is still available
-       }
+       //if(userCtx) // must reset context
+      // {
+      //   return false; // signal that context is still available
+      // }
       
        opData.clear(); // clear the data
 
@@ -229,6 +229,30 @@ class CephContext
         size_t writeRadosObject(librados:: IoCtx* ioCtx,
                                 const std::string& objId,
                                 const char* rawData,
+                                const size_t  writeBytes,
+                                const uint64_t offset=0,
+                                const bool append=true,
+                                void* userCtx=nullptr);
+
+
+        /**
+         * Write data to the cluster (a Rados object).
+         * 
+         *
+         * @param: ioCtx:      pool context
+         * @param: objId:      Rados object id
+         * @param: buffer:     data to write to an object 
+         * @param: writeBytes: size of the data buffer to write
+         * @param: offset:     offset at which to write
+         * @param: append:     append the data to the current object
+         * @param: userCtx:    user context which is returned 
+         *                     with this call
+         *
+         * @return : number of bytes to be written (0 on failure)
+         */
+        size_t writeRadosObject(librados:: IoCtx* ioCtx,
+                                const std::string& objId,
+                                const librados::bufferlist& buffer,
                                 const size_t  writeBytes,
                                 const uint64_t offset=0,
                                 const bool append=true,
@@ -436,6 +460,31 @@ class CephContext
                        const uint64_t offset=0,
                        const bool append = true, 
                        void* userCtx = nullptr);
+
+
+    /** 
+   * Write data to the underlying data cluster (Ceph).
+   * Result is returned by polling the context and asking
+   * for any completed operations.
+   * 
+   * @param: oid        : Rados object unique id
+   * @param: poolName   : Ceph pool name
+   * @param: buffer     : data to write to the cluster
+   * @param: writeBytes : number of bytes to write
+   * @param: offset     : at which offset of the object to write to
+   * @param: userCtx    : user context which will be returned 
+   *                      when poll for responses
+   *
+   * @return: number of bytes to be written to the cluster
+   *          (0 on failure)
+   */
+    size_t writeObject(const std::string& oid, 
+                       const std::string& poolName,
+                       const librados::bufferlist& buffer, 
+                       const size_t writeBytes, 
+                       const uint64_t offset=0,
+                       const bool append = true, 
+                       void* userCtx = nullptr); 
 
 
   /**

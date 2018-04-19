@@ -148,7 +148,7 @@ class RemoteProtocol
          *
          * @return : copied bytes (0 on failure)
          */
-        virtual uint64_t writeData(librados::bufferlist& buffer,
+        virtual uint64_t writeData(const librados::bufferlist& buffer,
                                    void*          userCtx)
         { 
           return 0; 

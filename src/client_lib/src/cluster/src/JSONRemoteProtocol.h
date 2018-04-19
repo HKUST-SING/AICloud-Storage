@@ -232,7 +232,7 @@ class JSONRemoteProtocol : public RemoteProtocol
                            void*          userCtx) override;
 
 
-        uint64_t writeData(librados::bufferlist& buffer,
+        uint64_t writeData(const librados::bufferlist& buffer,
                            void* userCtx) override;
 
 
