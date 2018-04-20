@@ -316,14 +316,6 @@ class StoreWorker: public Worker
      void processDeleteOp(UpperRequest&& task);
 
 
-
-    /**
-     * Method goes over all already issued operations
-     * and starts processing them.
-     */
-    void executeRadosOps();
-
-
     /** 
      * Terminate the worker. Worker cleans itslef up
      * and terminates
@@ -349,7 +341,7 @@ class StoreWorker: public Worker
 
 
     /**
-     * Check if any remote responses have to processed.
+     * Check if any remote responses have to be processed.
      */
      void handleRemoteResponses();
 
@@ -393,6 +385,14 @@ class StoreWorker: public Worker
       * write operation.
       */ 
       void sendWriteConfirmation(OpItr&);
+
+     /** 
+      * Decipher the remote operation and decide
+      * how a response from a remote server has to be
+      * processed locally by a store worker.
+      */
+       void processRemoteResult(std::list<WorkerContext>::iterator&,
+                                std::shared_ptr<RemoteProtocol::ProtocolHandler>); 
  
 
   private:

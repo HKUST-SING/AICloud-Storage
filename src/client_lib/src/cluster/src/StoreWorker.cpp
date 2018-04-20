@@ -164,7 +164,7 @@ StoreWorker::OpContext::closeContext()
 
   if(object.validUserContext())
   {
-    Task resTask(object.getTask());
+    Task resTask(std::move(object.getTask(true)));
     resTask.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
     object.setResponse(std::move(resTask));
   }
@@ -508,11 +508,6 @@ StoreWorker::pendTasksEmpty() const
 }
 
 
-
-void
-StoreWorker::handleRemoteResponses()
-{}
-
 void
 StoreWorker::handlePendingTasks()
 {}
@@ -581,7 +576,7 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
 
   //find an active write operation
   auto writeIter = activeOps_.find(procCtx->path);
-  const uint32_t writeOpSize = procCtx->opID;
+  const uint64_t writeOpSize = static_cast<const uint64_t>(procCtx->opID);
   delete procCtx; // don't need anymore  
 
   if(writeIter == activeOps_.end())
@@ -602,7 +597,7 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
     // user request
     assert(opIter.object.validUserContext()); 
 
-    Task resTask(opIter.object.getTask());
+    Task resTask(std::move(opIter.object.getTask(true)));
     resTask.workerID_ = Worker::id_;
     resTask.opStat_   = Status::ERR_INTERNAL;
     
@@ -618,19 +613,22 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
   { // successfully completed an operation
     // process the request
     // check if finished reading
-    opIter.totalOpSize -= static_cast<uint64_t>(writeOpSize);
+    opIter.totalOpSize -= writeOpSize;
     if(opIter.prot->doneWriting() && opIter.totalOpSize == 0)
     {
       // completed writing 
       // send a response to the auth server
       sendWriteConfirmation(writeIter);
+      // change object state
+      // waiting for closing this operation
+      opIter.object.setObjectOpStatus(Status::STAT_CLOSE);
     }
     else
     {
       if(opIter.object.isComplete())
       {
         // get a write operation and send PARTIAL WRITE complete
-        Task resTask(opIter.object.getTask());
+        Task resTask(std::move(opIter.object.getTask(true)));
         resTask.workerID_ = Worker::id_;
         resTask.opStat_ = Status::STAT_SUCCESS;
 
@@ -743,7 +741,9 @@ StoreWorker::issueRadosWrite(StoreWorker::OpItr& iter)
   }
   else
   { // no errors occurred
-    procCtx->opID = static_cast<uint32_t>(resData);
+    // safely can cast since Raods cannot write more than 
+    // 4GB of data at once
+    procCtx->opID = static_cast<uint32_t>(resData); 
     objWrite->updateDataBuffer(resData);
   } 
   
@@ -764,7 +764,7 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
   auto readIter = activeOps_.find(procCtx->path);
   if(readIter == activeOps_.end())
   {
-    //log this as an error
+    //log this as an error(may not be an error if another Op deleted)
     int a = 5;
     delete procCtx;
 
@@ -853,16 +853,17 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
   { // Reading is still going on
     // check if it possible to read locally data or need to issue
     // a new Rados operation.
-    ReadObject* readObj = opIter.object.getReadObject();
+    ReadObject* readObj = opIter.object.getReadObject(false);
     assert(readObj);
 
     while(readObj->availableBuffer())
     { // there is some data to be read locally
-      Task resTask(readObj->getTask());
+      Task resTask(std::move(readObj->getTask(true)));
       resTask.workerID_ = Worker::id_;
       
       
-      const uint64_t bufferSize = static_cast<uint64_t>(resTask.dataSize_);      uint64_t writeBuffer = bufferSize;
+      const uint64_t bufferSize = static_cast<const uint64_t>(resTask.dataSize_);      
+      uint64_t writeBuffer = bufferSize;
 
       // since it is possible to read from multiple
       // librados::bufferlists, need to loop until the 
@@ -1035,7 +1036,7 @@ StoreWorker::processDeleteOp(StoreWorker::UpperRequest&& task)
 
 
 void
-StoreWorker::executeRadosOps()
+StoreWorker::handleRemoteResponses()
 {
   auto opIter = responses_.begin();       // for erasing
   decltype(responses_.begin()) prevIter;  // an item
@@ -1051,14 +1052,35 @@ StoreWorker::executeRadosOps()
       assert(opIter->uppReq); // must not be nullptr
       assert(opIter->secRes); 
 
-      remProt_->handleMessage(
+      
+ 
+      auto res = remProt_->handleMessage(
          std::make_shared<IOResponse>(std::move(opIter->secRes->value())),
          opIter->uppReq->second,  *cephCtx_);
 
-      // 
-      opIter->uppReq = nullptr; // ensures it's not deleted
-      
- 
+      //can handle fast?
+      if(res->getStatusCode() != Status::STAT_SUCCESS)
+      {
+        // send an error to the user
+        Task remErrTask(std::move(opIter->uppReq->second));
+        remErrTask.opStat_ = res->getStatusCode();
+
+        // remove a pending operation is it exists
+        auto pendIter = activeOps_.find(remErrTask.path_);
+        if(pendIter != activeOps_.end())
+        {
+          // remove it
+          activeOps_.erase(pendIter);
+        }
+
+        opIter->uppReq->first.setValue(std::move(remErrTask));
+        // done with this operation
+      }
+      else
+      {
+        processRemoteResult(opIter, res);
+      }
+
       // prepare deleting the current item
       prevIter = opIter; 
       ++opIter;
@@ -1072,19 +1094,107 @@ StoreWorker::executeRadosOps()
 
 
 void
+StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator& resIter, std::shared_ptr<RemoteProtocol::ProtocolHandler> handler)
+{
+ if(handler->needCephIO())
+ {
+   //create an operation context
+   DataObject opObject;
+
+
+
+
+
+   StoreWorker::OpContext(std::move(handler),
+                          std::move(opObject));
+
+   assert(activeOps_.find(resIter->uppReq->second.path_) == activeOps_.end());
+
+   
+
+ }
+ else
+ {
+   // check for delete or connnect operations
+   switch(handler->getOpType())
+   {
+     case OpCode::OP_DELETE:
+     {
+       // notify the user about the success
+       Task delSuccess(std::move(resIter->uppReq->second));
+       delSuccess.opStat_ = Status::STAT_SUCCESS;
+       // remove the operation from active ones
+       auto delOpItr = activeOps_.find(delSuccess.path_);
+       assert(delOpItr != activeOps_.end());
+       activeOps_.erase(delOpItr);
+
+       resIter->uppReq->first.setValue(std::move(delSuccess));
+
+       break;
+     }
+     case OpCode::OP_AUTH:
+     { 
+       // handle authentication
+       Task authSuccess(std::move(resIter->uppReq->second));
+       authSuccess.opStat_ = Status::STAT_SUCCESS;
+       authSuccess.username_ = handler->getValue("Username");
+       assert(authSuccess.username_ != RemoteProtocol::ProtocolHandler::empty_value);
+
+       resIter->uppReq->first.setValue(std::move(authSuccess));
+
+       break;
+     }
+     default:
+     {
+       int a = 5; // log this as an error
+       // reply with a failure 
+       Task errReply(std::move(resIter->uppReq->second));      
+       errReply.opStat_ = Status::ERR_DENY;
+       // remove if any active ops
+       auto opAcItr = activeOps_.find(errReply.path_);
+       if(opAcItr != activeOps_.end())
+       {
+         //remove it
+         activeOps_.erase(opAcItr);
+       }
+       resIter->uppReq->first.setValue(std::move(errReply));
+
+       break;
+     }
+   }//switch
+ }//else
+
+}
+
+
+void
 StoreWorker::sendWriteConfirmation(std::map<std::string, OpContext>::iterator& writeIter)
 {
   auto& opIter = writeIter->second;
-  const auto& tmpRef = opIter.object.getTask();
-  assert(tmpRef != DataObject::empty_task);
-
-  std::string pathVal(tmpRef.path_);
-  UserAuth authVal(tmpRef.username_.c_str(), reinterpret_cast<const char*>(workerSecret));
-  auto ioRes = std::move(opIter.prot->getCephSuccessResult());
-  assert(ioRes); // non null
   
-   
+  assert(opIter.object.validUserContext());
 
+  // initialize the context
+  auto& userCtx = opIter.object.getUserContext(true);
+  std::string pathVal(userCtx.second.path_);
+
+  // initialize the required remote values for auth server
+  UserAuth authVal(userCtx.second.username_.c_str(), reinterpret_cast<const char*>(workerSecret));
+  auto writeResult  = std::move(opIter.prot->getCephSuccessResult());
+  assert(writeResult); // non null
+  auto opTmpCode = writeResult->msg_->opType_; 
+ 
+  StoreWorker::WorkerContext confirmTmpCtx(std::move(userCtx),
+                                  std::move(
+                                  secure_->sendIOResult(
+                                    std::move(pathVal),
+                                    std::move(authVal),
+                                    opTmpCode,
+                                    std::move(*(writeResult.release()))
+                                  )));
+
+
+  responses_.push_back(std::move(confirmTmpCtx));
 }
 
 

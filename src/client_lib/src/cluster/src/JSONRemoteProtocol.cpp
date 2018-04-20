@@ -1092,7 +1092,7 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::getValue(const std::string& key) co
 
   if(resItr == metadata_.end())
   {
-    // retturn not found
+    // return not found
     return RemoteProtocol::ProtocolHandler::empty_value;
   }
   else
