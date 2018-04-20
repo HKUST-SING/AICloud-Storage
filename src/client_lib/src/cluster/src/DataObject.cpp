@@ -17,6 +17,8 @@ static constexpr const uint64_t MAX_U64_T = std::numeric_limits<uint64_t>::max()
 namespace singaistorageipc
 {
 
+namespace radosbuffermanagement
+{
 
 const Task DataObject::empty_task = Task();
 
@@ -898,4 +900,5 @@ ReadObject::setResponse(Task&& response)
   return false;
 }
 
+} // namespace radosbuffermanagement 
 } // namesapce singaistorageipc

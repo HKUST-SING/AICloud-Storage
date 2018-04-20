@@ -42,6 +42,8 @@ namespace singaistorageipc
 {
 
 
+namespace radosbuff = radosbuffermanagement;
+
 class StoreWorker: public Worker
 {
 
@@ -53,7 +55,7 @@ class StoreWorker: public Worker
     using SecResponse  = folly::Future<IOResponse>;
     using Status       = CommonCode::IOStatus;
     using OpCode       = CommonCode::IOOpCode;
- 
+
 
     /**
      * A wrapper for storing a contex of a pending task.
@@ -148,7 +150,7 @@ class StoreWorker: public Worker
     typedef struct OpContext
     {
       std::shared_ptr<RemoteProtocol::ProtocolHandler>   prot;
-      DataObject                                       object;
+      radosbuff::DataObject                            object;
       uint32_t                                         tranID;
       uint32_t                                         backID;
       uint64_t                                         totalOpSize;
@@ -159,7 +161,7 @@ class StoreWorker: public Worker
       OpContext();
       OpContext(struct OpContext&&);     
       OpContext(std::shared_ptr<RemoteProtocol::ProtocolHandler> ph,
-                DataObject&& ob);
+                radosbuff::DataObject&& ob);
 
       OpContext(const struct OpContext&) = delete;
       OpContext& operator=(const struct OpContext&) = delete;
@@ -291,12 +293,6 @@ class StoreWorker: public Worker
      void processReadOp(UpperRequest&& task);
 
 
-     /**
-      * Issue a new READ operation to an authentication server.
-      * This method is called if the request is to read a
-      * piece of data (it has not been issued before).
-      */
-     void issueNewReadOp(UpperRequest&& newTask);
 
 
     /**
@@ -315,6 +311,54 @@ class StoreWorker: public Worker
      */
      void processDeleteOp(UpperRequest&& task);
 
+
+     /**
+      * Process a WRITE_CHECK operation. The method informs
+      * the caller about the result through the passed
+      * promise object.
+      *
+      * @param: task: IO to perform and promise to fulfill
+      */
+     void processNewWriteOp(UpperRequest&& task);
+
+     
+
+
+    
+     /**
+      * Issue an IO operation request to the remote server.
+      * The operation is only used for later respones.
+      *
+      * @param task    : a request issued by user
+      * @param optype  : IO operation type
+      *
+      */
+     void sendRequestToServer(UpperRequest&& task, const OpCode opType);
+
+
+     /**
+      * Helper function for handling errors to the user.
+      *
+      * @param req  : refernece to the user context 
+      * @param stat : error code number
+      */
+     inline void notifyUserError(UpperRequest& req, 
+                                 const Status stat = Status::ERR_INTERNAL);
+
+
+      /**
+       * Method handles operation contexts. When a new 
+       * operation is being issued to a remote server,
+       * a context might need to be created to ensure
+       * serializability.
+       *
+       * @param : pathVal : operation data path
+       * @param : opType  : operation type
+       *
+       * @return : possible to send the request
+       */
+      bool createOperationContext(const std::string& pathVal,
+                                  const OpCode opType);
 
     /** 
      * Terminate the worker. Worker cleans itslef up
@@ -347,7 +391,9 @@ class StoreWorker: public Worker
 
 
     /**
-     * Check if need to issue any pending tasks.
+     * Check if need to issue any pending task.
+     * Operations proceed if no active operations
+     * to the same path.
      */
      void handlePendingTasks();
 

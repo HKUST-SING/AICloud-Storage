@@ -64,13 +64,13 @@ class JSONRemoteProtocol : public RemoteProtocol
          {}
 
 
-         RadosObjRead(const struct RadosObjRead& other)
-         : poolName(other.poolName),
+         RadosObjRead(const struct RadosObjRead& other) = delete;
+         /*: poolName(other.poolName),
            objID(other.objID),
            size_(other.size_),
            offset_(other.offset_),
            global_(other.global_) 
-         {}
+         {}*/
 
 
          RadosObjRead(RadosObjRead&& other)
@@ -182,14 +182,14 @@ class JSONRemoteProtocol : public RemoteProtocol
           {}
 
          
-           RadosObjWrite(const struct RadosObjWrite& other) 
-           : poolName(other.poolName),
+           RadosObjWrite(const struct RadosObjWrite& other) = delete;
+          /* : poolName(other.poolName),
              objID(other.objID),
              avSize_(other.avSize_),
              offset_(other.offset_),
              append_(other.append_),
              global_(other.global_)
-          {}
+          {}*/
 
 
            RadosObjWrite(struct RadosObjWrite&& other) 
@@ -223,7 +223,7 @@ class JSONRemoteProtocol : public RemoteProtocol
 
         bool doneWriting() const override;
 
-        uint64_t getTotalDataSize() const override; 
+        uint64_t getTotalDataSize() const override;
 
         void handleJSONMessage(JSONDecoder<const uint8_t*>& dec, 
                                std::shared_ptr<IOResponse> ioRes,

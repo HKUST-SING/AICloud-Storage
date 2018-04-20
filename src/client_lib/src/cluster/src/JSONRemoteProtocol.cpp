@@ -542,6 +542,7 @@ JSONRemoteProtocol::JSONProtocolReadHandler::getTotalDataSize() const
 }
 
 
+
 uint64_t
 JSONRemoteProtocol::JSONProtocolReadHandler::getDataOffset() const
 {
@@ -775,6 +776,7 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::getTotalDataSize() const
 {
   return writeSize_;
 }
+
 
 bool
 JSONRemoteProtocol::JSONProtocolWriteHandler::doneWriting() const

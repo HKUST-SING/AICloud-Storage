@@ -22,7 +22,8 @@
 
 namespace singaistorageipc
 {
-
+namespace radosbuffermanagement
+{
 
   class WriteObject
   {
@@ -306,4 +307,5 @@ namespace singaistorageipc
 
   }; // wraps read write operations
 
+} // namespace radosbuffermanagement
 } // namesapce singaistorageipc
