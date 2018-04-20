@@ -12,7 +12,7 @@
 
 
 // Ceph librados
-#include <raods/libraods.hpp>
+#include <rados/librados.hpp>
 
 
 // Porject libraries
@@ -34,7 +34,7 @@ namespace singaistorageipc
      using UserCtx = std::pair<folly::Promise<Task>, Task>;
      using Status  = CommonCode::IOStatus;
      using OpType  = CommonCode::IOOpCode;
-
+     using BackUp  = std::list<librados::bufferlist>;
 
 
     public:
@@ -61,7 +61,10 @@ namespace singaistorageipc
         return opStat_;
       }
 
-      void setObjectOpStatus(const Status status);
+      inline void setObjectOpStatus(const Status status)
+      {
+        opStat_ = status;
+      }
 
       
       uint64_t availableBuffer() const;
@@ -73,15 +76,35 @@ namespace singaistorageipc
 
       librados::bufferlist& getDataBuffer();
 
-      UserCtx& getUserContext();
+      const Task& getTask() const;
+
+      Task& getTask(const bool);
 
       void updateDataBuffer(const uint64_t);
+
+      bool replaceUserContext(UserCtx&& ctx);
+
+      inline bool validUserContext() const
+      {
+        return validCtx_;
+      }
+
+      bool setResponse(Task&& response);
+
+      UserCtx& getUserContext(const bool);
+
+      const UserCtx& getUserContext() const;
+
 
 
     private:
       UserCtx              useCtx_;
+      bool                 validCtx_;
       Status               opStat_;
       librados::bufferlist buffer_;
+      BackUp               backUp_; // only for very
+                                    // large writes
+
 
 
   }; // class WriteObject
@@ -138,7 +161,7 @@ namespace singaistorageipc
   
     public:
       explicit ReadObject(UserCtx&& ctx);
-      ReadObject(UserCtx&& ctx, const uint64_t objSize)
+      ReadObject(UserCtx&& ctx, const uint64_t objSize);
       ReadObject(ReadObject&& other);
 
       ReadObject() = delete;
@@ -152,7 +175,7 @@ namespace singaistorageipc
 
       inline OpType getObjectOpType() const
       {
-        OpType::OP_READ;
+        return OpType::OP_READ;
       }
 
 
@@ -162,7 +185,10 @@ namespace singaistorageipc
       }
 
 
-      void setObjectOpStatus(const Status status);
+      inline void setObjectOpStatus(const Status status)
+      {
+        opStat_ = status;
+      }
 
       void setObjectSize(const uint64_t size);
 
@@ -176,13 +202,31 @@ namespace singaistorageipc
 
       bool isComplete() const;
 
-      char* getRawBytes(uint64_t& readBytes);
+      const char* getRawBytes(uint64_t& readBytes);
 
-      UserCtx& getUserContext();
+      const Task& getTask() const;
+
+      Task& getTask(const bool);
+
+
+      bool replaceUserContext(UserCtx&& ctx);
+
+      inline bool validUserContext() const
+      {
+        return validCtx_;
+      }
+
+      bool setResponse(Task&& response);
+
+
+      UserCtx& getUserContext(const bool);
+
+      const UserCtx& getUserContext() const;
 
 
     private:
       UserCtx useCtx_;
+      bool    validCtx_;
       Status  opStat_;
       std::list<ObjectPart> readData_;
       uint64_t totalObjSize_;
@@ -209,13 +253,18 @@ namespace singaistorageipc
         ReadObject*  readPtr;
 
       } ObjectPtr;     
- 
+
+
+      using UserCtx = std::pair<folly::Promise<Task>, Task>; 
 
     public:
-      DataObject();
-      DataObject(DataObject&& other);
-   
+      
+      static const Task empty_task;     
 
+      DataObject();
+      DataObject(DataObject&&);
+      ~DataObject();
+ 
    
       inline CommonCode::IOOpCode getObjectOpType() const
       {
@@ -224,6 +273,8 @@ namespace singaistorageipc
 
       CommonCode::IOStatus getObjectOpStatus() const;
 
+      void setObjectOpStatus(const CommonCode::IOStatus status);
+
 
       void setWriteObject(WriteObject* ptr);
 
@@ -231,12 +282,21 @@ namespace singaistorageipc
 
       bool isComplete() const;
 
+      const Task& getTask() const;
+      Task& getTask(const bool);
+      bool replaceUserContext(UserCtx&& ctx);
+      bool validUserContext() const;
+      bool setResponse(Task&& response);
+
 
       WriteObject* getWriteObject(const bool claim=false);
       
       ReadObject* getReadObject(const bool claim=false);
 
-      ~DataObject();
+      UserCtx& getUserContext(const bool);
+
+      const UserCtx& getUserContext() const;
+
 
     private:
       ObjectPtr ptr_;

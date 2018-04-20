@@ -220,7 +220,10 @@ class JSONRemoteProtocol : public RemoteProtocol
         bool resetDataOffset(const uint64_t offset) override;
        
         uint64_t getDataOffset() const override;
- 
+
+        bool doneWriting() const override;
+
+        uint64_t getTotalDataSize() const override; 
 
         void handleJSONMessage(JSONDecoder<const uint8_t*>& dec, 
                                std::shared_ptr<IOResponse> ioRes,
@@ -250,6 +253,7 @@ class JSONRemoteProtocol : public RemoteProtocol
         std::vector<RadosObjWrite> radosWrites_;
         bool      avSuccess_;     // if need to send a response
         uint64_t  writeOffset_;   // current offset to write data to
+        uint64_t  writeSize_;     // how many bytes to write in total
  
         
 

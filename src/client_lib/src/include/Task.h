@@ -44,7 +44,8 @@ typedef struct Task
       tranID_(0),
       workerID_(0),
       objSize_(0),
-      opStat_(CommonCode::IOStatus::ERR_INTERNAL)
+      opStat_(CommonCode::IOStatus::ERR_INTERNAL),
+      mergeID_(0)
     {}
 
 
@@ -61,7 +62,8 @@ typedef struct Task
           tranID_(0),
           workerID_(0),
           objSize_(0),
-		  opStat_(opStat)
+		  opStat_(opStat),
+          mergeID_(0)
 	{}
 
 	/**
@@ -79,7 +81,8 @@ typedef struct Task
           tranID_(tranID),
           workerID_(workerID),
 		  objSize_(0),
-          opStat_(CommonCode::IOStatus::ERR_INTERNAL)
+          opStat_(CommonCode::IOStatus::ERR_INTERNAL),
+          mergeID_(0)
 
     {}
 
@@ -98,7 +101,8 @@ typedef struct Task
           tranID_(tranID),
 		  workerID_(workerID),
 		  objSize_(remSize),
-          opStat_(opStat)
+          opStat_(opStat),
+          mergeID_(0)
      {}
 
 	/** 
@@ -113,7 +117,8 @@ typedef struct Task
       tranID_(other.tranID_),
       workerID_(other.workerID_),
 	  objSize_(other.objSize_),
-      opStat_(other.opStat_)
+      opStat_(other.opStat_),
+      mergeID_(other.mergeID_)
     {}
 
 	/**
@@ -128,7 +133,8 @@ typedef struct Task
        tranID_(other.tranID_),
        workerID_(other.workerID_),
 	   objSize_(other.objSize_),
-       opStat_(other.opStat_)
+       opStat_(other.opStat_),
+       mergeID_(other.mergeID_)
      {}
 
 
@@ -150,6 +156,7 @@ typedef struct Task
         workerID_ = other.workerID_;
         objSize_  = other.objSize_;
         opStat_   = other.opStat_;
+        mergeID_  = other.mergeID_;
       }
 
       return *this;
@@ -173,11 +180,50 @@ typedef struct Task
         workerID_ = other.workerID_;
         objSize_  = other.objSize_;
         opStat_   = other.opStat_;
+        mergeID_  = other.mergeID_;
       }
 
       return *this;
 
     }
+
+     /**
+      * Comparison operator.
+      */
+     bool operator==(const struct Task& other) const
+     {
+       if(this == &other)
+       {
+         return true;
+       }
+
+       return ((username_ == other.username_) && (path_ == other.path_)
+               && (opType_ == other.opType_) && (dataAddr_ == dataAddr_)
+               && (dataSize_ == dataSize_) && (tranID_ == other.tranID_)
+               && (workerID_ == workerID_) && (objSize_ == objSize_)
+               && (opStat_ == opStat_) && (mergeID_ == mergeID_));
+     }
+
+
+     /**
+      * Inequality operator.
+      */
+     bool operator!=(const struct Task& other) const
+     {
+       if(this == &other)
+       {
+         return false;
+       }
+
+       return ((username_ != other.username_) || (path_ != other.path_)
+               || (opType_ != other.opType_) || (dataAddr_ != dataAddr_)
+               || (dataSize_ != dataSize_) || (tranID_ != other.tranID_)
+               || (workerID_ != workerID_) || (objSize_ != objSize_)
+               || (opStat_ != opStat_) || (mergeID_ != mergeID_));
+     }
+
+
+
 
 } Task; // struct Task
 

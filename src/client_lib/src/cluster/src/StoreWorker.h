@@ -34,7 +34,7 @@
 #include "include/ConcurrentQueue.h"
 #include "include/Task.h"
 #include "include/CommonCode.h"
-#include "DataObj.h"
+#include "DataObject.h"
 
 
 
@@ -51,7 +51,9 @@ class StoreWorker: public Worker
     /*useful definitions*/
     using UpperRequest = std::pair<folly::Promise<Task>, Task>;
     using SecResponse  = folly::Future<IOResponse>;
-
+    using Status       = CommonCode::IOStatus;
+    using OpCode       = CommonCode::IOOpCode;
+ 
 
     /**
      * A wrapper for storing a contex of a pending task.
@@ -148,14 +150,63 @@ class StoreWorker: public Worker
       std::shared_ptr<RemoteProtocol::ProtocolHandler>   prot;
       DataObject                                       object;
       uint32_t                                         tranID;
+      uint32_t                                         backID;
+      uint64_t                                         totalOpSize;
       std::list<std::pair<uint32_t, librados::bufferlist>> pendData;
+      std::list<UpperRequest> pendRequests; // used by replies
+      
+
+      OpContext();
+      OpContext(struct OpContext&&);     
+      OpContext(std::shared_ptr<RemoteProtocol::ProtocolHandler> ph,
+                DataObject&& ob);
+
+      OpContext(const struct OpContext&) = delete;
+      OpContext& operator=(const struct OpContext&) = delete;
+      OpContext& operator=(struct OpContext&&) = delete;
+
+      ~OpContext();
+
+     
+       bool insertReadBuffer(librados::bufferlist&& buffer, 
+                        const uint32_t id);
+
+
+       bool appendRequest(UpperRequest&& val);
+
+       void closeContext();
+
+       private:
+         bool active;
+
     } OpContext; // struct OpContext
+
+
+    typedef struct UserCtx
+    {
+      std::string path; // data path (key)
+      uint32_t    opID; // Rados operation id
+
+      UserCtx()
+      : path(""), 
+        opID(0)
+      {}
+      
+      UserCtx(const std::string& pVal, const uint32_t tranID = 0)
+      : path(pVal),
+        opID(tranID)
+      {}
+
+       
+      ~UserCtx() = default;
+    } UserCtx; // struct UserCtx
 
 
     using ProtocolRes  =\
         std::pair<std::shared_ptr<RemoteProtocol::ProtocolHandler>,\
                                   WorkerContext*>;
 
+    using OpItr = std::map<std::string, StoreWorker::OpContext>::iterator;
 
   public:
 
@@ -265,15 +316,6 @@ class StoreWorker: public Worker
      void processDeleteOp(UpperRequest&& task);
 
 
-     /** 
-      * Return data from a local buffer 
-      * (write into the shared memory) from local memory
-      */
-     void handlePendingRead(
-          std::map<uint32_t, StoreObj>::iterator& mapItr,
-          UpperRequest& task);
-
-
 
     /**
      * Method goes over all already issued operations
@@ -289,6 +331,70 @@ class StoreWorker: public Worker
     void closeStoreWorker();
 
 
+    /**
+     * Check if pending tasks are empty.
+     *
+     * @return: true if there are no pending tasks
+     */
+
+     bool pendTasksEmpty() const;
+
+
+    /** 
+     * Check if any process has been done with currently
+     * active Rados operations 
+     * (if any of them has completed).
+     */
+     void handleActiveOps();
+
+
+    /**
+     * Check if any remote responses have to processed.
+     */
+     void handleRemoteResponses();
+
+
+    /**
+     * Check if need to issue any pending tasks.
+     */
+     void handlePendingTasks();
+
+
+     /**
+      * Process completed Rados Write operation.
+      */
+      void processCompletedRadosWrite(CephContext::RadosOpCtx* const);
+
+     /**
+      * Process completed Rados Read operation.
+      */
+      void processCompletedRadosRead(CephContext::RadosOpCtx* const);
+
+     /**
+      * Process pending read operations (checking is already done).
+      *
+      */
+      void processPendingRead(OpItr& iter);
+   
+
+
+     /**
+      * Try to update Write operation context
+      */
+      void updateWriteOpContext(OpItr& iter);
+
+     /**
+      * Issue a write operation
+      */
+      void issueRadosWrite(OpItr& iter);
+
+     /**
+      * Send information to the remote server about successful
+      * write operation.
+      */ 
+      void sendWriteConfirmation(OpItr&);
+ 
+
   private:
     ConcurrentQueue<UpperRequest, std::deque<UpperRequest> > tasks_; 
                              // the queue is accessed 
@@ -303,16 +409,9 @@ class StoreWorker: public Worker
  
 
 
-    // serializes WRTIES and READS to the same path
+    // serializes WRITES and READS to the same path
     std::map<std::string, std::deque<UpperRequest>> pendTasks_;
-    std::map<uintptr_t, >    
-
-
-    std::map<uint32_t, > pendReads_; // completed remotely 
-                                             // tasks, pending for 
-                                             // further processing
-                                             // locally
-
+    std::map<std::string, OpContext>                activeOps_;    
 
 
     unsigned char workerSecret[SHA256_DIGEST_LENGTH]; // shared

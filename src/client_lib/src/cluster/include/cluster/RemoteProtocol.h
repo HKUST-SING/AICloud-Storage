@@ -179,7 +179,7 @@ class RemoteProtocol
 
 
         /** 
-         * Only valid for read operations.
+         * Only valid for read/write operations.
          *
          * @return: returns total size of the object.
          */
@@ -188,7 +188,6 @@ class RemoteProtocol
         {
           return 0;
         }
-
 
         
         /** 
@@ -225,6 +224,17 @@ class RemoteProtocol
          * @return : true when done reading an object.
          */
         virtual bool doneReading() const
+        {
+          return false;
+        }
+
+        /**
+         * Only for write operations. Returns if 
+         * the handler has finished writing data.
+         *
+         * @return : true when done writing an object
+         */
+        virtual bool doneWriting() const
         {
           return false;
         }

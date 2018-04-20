@@ -559,7 +559,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::JSONProtocolWriteHandler(
                                   true),
   successRes_{nullptr},
   avSuccess_(false),
-  writeOffset_(0)
+  writeOffset_(0),
+  writeSize_(0)
 {
  
 }
@@ -746,7 +747,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::processObjects(const JSONResult::J
       globalOffset += (radosSize - radosOffset);
 
     }//for
-  
+ 
+    writeSize_ = globalOffset; // total size to write 
 
   }catch(const std::exception& exp)
   {
@@ -767,6 +769,18 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::needNotifyCephSuccess() const
   return avSuccess_;
 }
 
+
+uint64_t
+JSONRemoteProtocol::JSONProtocolWriteHandler::getTotalDataSize() const
+{
+  return writeSize_;
+}
+
+bool
+JSONRemoteProtocol::JSONProtocolWriteHandler::doneWriting() const
+{
+  return (writeOffset_ >= writeSize_);
+}
 
 uint64_t
 JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(

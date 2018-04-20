@@ -1,27 +1,34 @@
 // C++ std lib
 #include <cstring>
 #include <limits>
-
+#include <exception>
 
 // Project lib
-#include "DataObj.h"
+#include "DataObject.h"
 
 
 
-static constexpr const unsigned int MAX_RADOS_OP = (std::limits<unsigned int>::max() >> 1);
+static constexpr const unsigned int MAX_RADOS_OP = (std::numeric_limits<unsigned int>::max() >> 1);
 
-static constexpr const unsigned int MAX_UINT_SIZE = std::limits<unsigned int>::max();
+static constexpr const unsigned int MAX_UINT_SIZE = std::numeric_limits<unsigned int>::max();
 
+static constexpr const uint64_t MAX_U64_T = std::numeric_limits<uint64_t>::max();
 
 namespace singaistorageipc
 {
 
+
+const Task DataObject::empty_task = Task();
+
+
 DataObject::DataObject()
-: ptr_.writePtr{nullptr},
-  ptr_.readPtr{nullptr},
+: ptr_(),
   opType_(CommonCode::IOOpCode::OP_NOP)
 {
+  ptr_.writePtr = nullptr;
+  ptr_.readPtr  = nullptr;
 }
+
 
 DataObject::DataObject(DataObject&& other)
 {
@@ -46,14 +53,14 @@ DataObject::DataObject(DataObject&& other)
     {
       ptr_.writePtr = nullptr;
       ptr_.readPtr  = nullptr;
-      opType_        = CommonCode::IOOpCode::OP_NOP;
+      opType_       = CommonCode::IOOpCode::OP_NOP;
     }
       
   } // switch
 
-  other.ptr_.writePtr = nullptr;
-  other.ptr_.readPtr  = nullptr;
-  other.opType_       = CommonCode::IOOpCode::OP_NOP;
+  other.ptr_.writePtr  =  nullptr;
+  other.ptr_.readPtr   =  nullptr;
+  other.opType_        =  CommonCode::IOOpCode::OP_NOP;
 }
 
 
@@ -114,6 +121,35 @@ DataObject::getObjectOpStatus() const
 }
 
 
+
+void
+DataObject::setObjectOpStatus(const CommonCode::IOStatus status)
+{
+
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      ptr_.writePtr->setObjectOpStatus(status);
+      break;
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      ptr_.readPtr->setObjectOpStatus(status);
+      break;
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+}
+
+
+
 bool
 DataObject::isComplete() const
 {
@@ -165,6 +201,207 @@ DataObject::getWriteObject(const bool claim)
   }
 
 }
+
+
+bool
+DataObject::replaceUserContext(UserCtx&& ctx)
+{
+
+   switch(opType_)
+   {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->replaceUserContext(std::move(ctx));
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->replaceUserContext(std::move(ctx));
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  return false; // nothing to set
+
+}
+
+
+bool
+DataObject::validUserContext() const
+{
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->validUserContext();
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->validUserContext();
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  return false; // no user context
+
+}
+
+
+bool
+DataObject::setResponse(Task&& response)
+{
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->setResponse(std::move(response));
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->setResponse(std::move(response));
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  return false; // nothing to set
+
+}
+
+
+const Task&
+DataObject::getTask() const
+{
+
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->getTask();
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->getTask();
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  return DataObject::empty_task; // no result
+
+}
+
+
+
+const DataObject::UserCtx&
+DataObject::getUserContext() const
+{
+
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->getUserContext();
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->getUserContext();
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  throw std::exception(); // problem
+
+}
+
+
+
+
+
+Task&
+DataObject::getTask(const bool moveVal)
+{
+
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->getTask(moveVal);
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->getTask(moveVal);
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  throw std::exception();
+
+}
+
+
+
+DataObject::UserCtx&
+DataObject::getUserContext(const bool moveVal)
+{
+
+  switch(opType_)
+  {
+    case CommonCode::IOOpCode::OP_WRITE:
+    {
+      return ptr_.writePtr->getUserContext(moveVal);
+    }
+    case CommonCode::IOOpCode::OP_READ:
+    {
+      return ptr_.readPtr->getUserContext(moveVal);
+    }
+  
+    default:
+    {
+      break;
+    }
+
+  } //switch
+
+
+  throw std::exception();
+
+}
+
+
 
 
 ReadObject*
@@ -231,7 +468,7 @@ DataObject::setWriteObject(WriteObject* obj)
 
 
 void
-DataObject::setReadObject(Readobject* obj)
+DataObject::setReadObject(ReadObject* obj)
 {
   // check if non empty
   if(opType_ != CommonCode::IOOpCode::OP_NOP)
@@ -271,6 +508,7 @@ DataObject::setReadObject(Readobject* obj)
 
 WriteObject::WriteObject(UserCtx&& opCtx)
 : useCtx_(std::move(opCtx)),
+  validCtx_(true),
   opStat_(Status::ERR_INTERNAL)
 {
 }
@@ -278,6 +516,7 @@ WriteObject::WriteObject(UserCtx&& opCtx)
 
 WriteObject::WriteObject(WriteObject&& other)
 : useCtx_(std::move(other.useCtx_)),
+  validCtx_(other.validCtx_),
   opStat_(other.opStat_),
   buffer_(std::move(other.buffer_))
 {}
@@ -289,17 +528,19 @@ WriteObject::~WriteObject()
   buffer_.clear();
 }
 
-void
-WriteObject::setObjectOpStatus(const WriteObject::Status status)
-{
-  opStat_ = status;
-}
+
 
 uint64_t
 WriteObject::availableBuffer() const
 {
 
-  if(buffer_.length() >= MAX_RADOS_OP)
+  if(isComplete())
+  { // can take as much as possible
+    return MAX_U64_T;
+  }
+
+
+  if(buffer_.length() >= MAX_RADOS_OP || !backUp_.empty())
   {
     return 0; // cannot append more
   }
@@ -321,6 +562,42 @@ WriteObject::appendBuffer(const char* addr, const uint64_t wLen)
   }
 
 
+  if(wLen > MAX_UINT_SIZE)
+  { // use the back up buffer
+    uint64_t remaining = wLen;
+    const char* ptr = addr;
+    
+    if(buffer_.length() < MAX_RADOS_OP)
+    { // append as much as possible to the buffer_
+      const unsigned int canAppend = buffer_.length();
+      buffer_.append(ptr, (MAX_RADOS_OP - canAppend));
+      ptr += canAppend;
+      remaining -= static_cast<uint64_t>(canAppend);
+    }
+
+    uint64_t bufferSize;
+    unsigned int appendBack;
+    librados::bufferlist& backRef = buffer_;
+ 
+    do
+    {
+      backUp_.push_back(librados::bufferlist());
+      backRef = backUp_.back();
+      
+      bufferSize = static_cast<uint64_t>(backRef.length());
+      appendBack = (bufferSize < remaining) ? backRef.length() : static_cast<unsigned int>(remaining);
+      
+      backRef.append(ptr, appendBack);  
+      ptr += appendBack;
+
+      remaining -= static_cast<uint64_t>(appendBack);
+
+    } while(remaining > 0); // keep pushing the values
+   
+   return true;
+  }//if wLen > MAX_UINT_SIZE
+
+
   // otherwise can easily append
   buffer_.append(addr, static_cast<unsigned int>(wLen));
 
@@ -331,21 +608,40 @@ WriteObject::appendBuffer(const char* addr, const uint64_t wLen)
 bool
 WriteObject::isComplete() const
 {
-  return (buffer_.length() == 0);
+  return (buffer_.length() == 0 && backUp_.empty());
 }
 
 
 librados::bufferlist&
 WriteObject::getDataBuffer()
 {
+  if(buffer_.length() == 0 && !backUp_.empty())
+  {
+   // return the back up iterator
+   int a = 5; // log this since it shall never occur
+   return backUp_.front();
+  }
+
   return buffer_;
 }
 
 
-WriteObject::UserCtx&
-WriteObject::getUserContext()
+const Task&
+WriteObject::getTask() const
 {
-  return useCtx_;
+  return useCtx_.second;
+}
+
+
+Task&
+WriteObject::getTask(const bool moveVal)
+{
+  if(validCtx_)
+  {
+    return useCtx_.second;
+  }
+
+  throw std::exception();
 }
 
 
@@ -353,11 +649,22 @@ WriteObject::getUserContext()
 void
 WriteObject::updateDataBuffer(const uint64_t discard)
 {
+
   const uint64_t buffSize = static_cast<const uint64_t>(buffer_.length());
 
   if(buffSize <= discard)
   {
-    buffer_.clear();
+    if(backUp_.empty())
+    {
+      buffer_.clear();
+    }
+    else
+    { // move the front buffer to the buffer_
+      buffer_.claim(backUp_.front(), 
+                  librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE);
+      backUp_.pop_front(); // remove the front part
+    }
+    
   }
   else
   { // need to copy most of the current data
@@ -370,11 +677,36 @@ WriteObject::updateDataBuffer(const uint64_t discard)
 
     //claim all data
     buffer_.claim(tmpList, 
-               librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE);
-    
-  }
+               librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE);  
+  }//else
+
 }
 
+
+
+bool
+WriteObject::replaceUserContext(WriteObject::UserCtx&& newCtx)
+{
+  useCtx_ = std::move(newCtx);
+  validCtx_ = true; // when replaced
+
+  return true;
+}
+
+
+bool
+WriteObject::setResponse(Task&& response)
+{
+  if(validCtx_)
+  {
+    useCtx_.first.setValue(std::move(response));
+    validCtx_ = false;  
+ 
+    return true;
+  }
+
+  return false;
+}
 
 
 ReadObject::ReadObject(ReadObject::UserCtx&& ctx)
@@ -401,12 +733,6 @@ ReadObject::~ReadObject()
   readData_.clear();
 }
 
-
-void
-ReadObject::setObjectOpStatus(const ReadObject::Status status)
-{
-  opStat_ = status;
-}
 
 
 void
@@ -437,7 +763,7 @@ ReadObject::availableBuffer() const
 
 
 bool
-ReadObject::appenndBuffer(librados::bufferlist&& buffer)
+ReadObject::appendBuffer(librados::bufferlist&& buffer)
 {
   // either create a new part or 
   // append to the tail
@@ -449,7 +775,7 @@ ReadObject::appenndBuffer(librados::bufferlist&& buffer)
         librados::bufferlist::CLAIM_ALLOW_NONSHAREABLE);
 
     // enqueue it
-    readData.push_back(std::move(newPart));
+    readData_.push_back(std::move(newPart));
 
   } //if
   else
@@ -474,15 +800,26 @@ ReadObject::isComplete() const
   return (totalObjSize_ == objOffset_);
 }
 
-ReadObject::UserCtx&
-ReadObject::getUserContext()
+const Task&
+ReadObject::getTask() const
 {
-  return useCtx_;
+  return useCtx_.second;
 
 }
 
+Task&
+ReadObject::getTask(const bool moveVal)
+{
+  if(validCtx_)
+  {
+    return useCtx_.second;
+  }
 
-char*
+  throw std::exception();
+}
+
+
+const char*
 ReadObject::getRawBytes(uint64_t& readBytes)
 {
 
@@ -534,6 +871,31 @@ ReadObject::getRawBytes(uint64_t& readBytes)
   // return the address of raw data 
   return (tmpFront.rawData_.c_str() + readOffset);
 
+}
+
+
+bool
+ReadObject::replaceUserContext(ReadObject::UserCtx&& newCtx)
+{
+  useCtx_ = std::move(newCtx);
+  validCtx_ = true;
+
+  return true;
+
+}
+
+bool
+ReadObject::setResponse(Task&& response)
+{
+  if(validCtx_)
+  {
+    useCtx_.first.setValue(std::move(response));
+    validCtx_ = false;
+
+    return true;
+  }
+
+  return false;
 }
 
 } // namesapce singaistorageipc
