@@ -22,7 +22,13 @@
 #define AUTH_ERR  0x10 // some internal error
 
 
-std::string extract_swift_subuser_sing(const std::string& swift_user_name) {
+namespace rgw {
+namespace auth {
+namespace singstorage { 
+
+
+
+static std::string extract_swift_subuser_sing(const std::string& swift_user_name) {
   size_t pos = swift_user_name.find(':');
   if (std::string::npos == pos) {
     return swift_user_name;
@@ -31,9 +37,10 @@ std::string extract_swift_subuser_sing(const std::string& swift_user_name) {
   }
 }
 
-namespace rgw {
-namespace auth {
-namespace singstorage { 
+
+
+
+
 
 
 bool
