@@ -965,7 +965,7 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::getCephSuccessResult()
     successRes_.release();
     avSuccess_ = false; // not available anymore
 
-    return std::move(tmpAns);
+    return tmpAns;
 
   } //else
 }

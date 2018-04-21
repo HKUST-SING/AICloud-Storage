@@ -204,7 +204,8 @@ public:
     DLOG(INFO) << "poll the message";
     std::vector<std::unique_ptr<Response>> res(std::move(pool_));
     pool_.clear();
-    return std::move(res);
+    
+    return res;
   }
 
 private:
