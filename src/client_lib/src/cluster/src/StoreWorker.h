@@ -456,8 +456,8 @@ class StoreWorker: public Worker
 
 
     // serializes WRITES and READS to the same path
-    std::map<std::string, std::deque<UpperRequest>> pendTasks_;
-    std::map<std::string, OpContext>                activeOps_;    
+    std::map<std::string, std::deque<UpperRequest> > pendTasks_;
+    std::map<std::string, OpContext>                 activeOps_;    
 
 
     unsigned char workerSecret[SHA256_DIGEST_LENGTH]; // shared

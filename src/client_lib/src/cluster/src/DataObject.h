@@ -51,13 +51,13 @@ namespace radosbuffermanagement
       ~WriteObject(); // for future use make it virtual
 
     
-      inline OpType getObjectOpType() const
+      inline OpType getObjectOpType() const noexcept
       {
         return OpType::OP_WRITE;
       }
 
 
-      inline Status getObjectOpStatus() const
+      inline Status getObjectOpStatus() const noexcept
       {
         return opStat_;
       }
@@ -79,7 +79,7 @@ namespace radosbuffermanagement
 
       const Task& getTask() const;
 
-      Task& getTask(const bool);
+      Task& getTask(const bool) noexcept(false);
 
       void updateDataBuffer(const uint64_t);
 
@@ -174,13 +174,13 @@ namespace radosbuffermanagement
       ~ReadObject(); // consider to make virtual in the future
 
 
-      inline OpType getObjectOpType() const
+      inline OpType getObjectOpType() const noexcept
       {
         return OpType::OP_READ;
       }
 
 
-      inline Status getObjectOpStatus() const
+      inline Status getObjectOpStatus() const noexcept
       {
         return opStat_;
       }
@@ -207,7 +207,7 @@ namespace radosbuffermanagement
 
       const Task& getTask() const;
 
-      Task& getTask(const bool);
+      Task& getTask(const bool) noexcept(false);
 
 
       bool replaceUserContext(UserCtx&& ctx);
@@ -258,21 +258,19 @@ namespace radosbuffermanagement
 
       using UserCtx = std::pair<folly::Promise<Task>, Task>; 
 
-    public:
-      
-      static const Task empty_task;     
+    public:  
 
       DataObject();
       DataObject(DataObject&&);
       ~DataObject();
  
    
-      inline CommonCode::IOOpCode getObjectOpType() const
+      inline CommonCode::IOOpCode getObjectOpType() const noexcept
       {
         return opType_;
       }
 
-      CommonCode::IOStatus getObjectOpStatus() const;
+      CommonCode::IOStatus getObjectOpStatus() const noexcept;
 
       void setObjectOpStatus(const CommonCode::IOStatus status);
 
@@ -283,8 +281,8 @@ namespace radosbuffermanagement
 
       bool isComplete() const;
 
-      const Task& getTask() const;
-      Task& getTask(const bool);
+      const Task& getTask() const noexcept(false);
+      Task& getTask(const bool) noexcept(false);
       bool replaceUserContext(UserCtx&& ctx);
       bool validUserContext() const;
       bool setResponse(Task&& response);

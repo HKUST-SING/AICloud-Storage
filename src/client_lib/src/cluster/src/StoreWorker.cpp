@@ -510,7 +510,9 @@ StoreWorker::processTasks()
     // process any new tasks
     for(auto&& tmpTask : passedTasks)
     {
-
+       // use the worker ID of this worker
+       tmpTask.second.workerID_ = Worker::id_; 
+ 
       // check the type of the task
       switch(tmpTask.second.opType_)
       {
@@ -693,8 +695,9 @@ StoreWorker::handleActiveOps()
         {
           opCtx->userCtx = nullptr;
           opCtx->release();
-          int a = 5; // log this case
-          assert(false); // fail in this case
+          LOG(ERROR) << "StoreWorker::handleActiveOps: "
+                     << "opCtx->opType neihter OP_WRITE nor "
+                     << "OP_READ";
         }
 
       } // switch
@@ -723,8 +726,8 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
 
   if(writeIter == activeOps_.end())
   {
-    // log this as an error
-    int a = 5;
+    LOG(ERROR) << "StoreWorker::processCompletedRadosWrite: " 
+               << "writeIter == activeOps_.end()";
     return;
   }
 
@@ -834,9 +837,11 @@ StoreWorker::updateWriteOpContext(StoreWorker::OpItr& itr)
      assert(opObj->appendBuffer(rawData, needBuffer));
      avBuffer = opObj->availableBuffer();
 
-     // issue merge signal
+     // issue merge signal (pass the ID of the merging OP)
      Task resTask(std::move(possibleTask));
-     resTask.opStat_ = Status::STAT_PARTIAL_WRITE;
+     resTask.opStat_  = Status::STAT_PARTIAL_WRITE;
+     resTask.mergeID_ = task.tranID_; // merge multiple
+                                      // WRITES
      opIter.pendRequests.front().first.setValue(std::move(resTask));
      
      // done with this operation
@@ -907,7 +912,8 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
   if(readIter == activeOps_.end())
   {
     //log this as an error(may not be an error if another Op deleted)
-    int a = 5;
+    LOG(ERROR) << "StoreWorker::processCompletedRadosRead: "
+               << "readIter == activeOps_.end()";
     delete procCtx;
 
     return;
@@ -954,8 +960,6 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
     assert(opIter.insertReadBuffer(std::move(opCtx->opData),
                                      procCtx->opID));
 
-    // set the status accordingly
-    //opIter.object.setObjectOpStatus(Status::STAT_PARTIAL_READ);
 
     if(readObj->validUserContext())
     { 
@@ -980,7 +984,10 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
 
   if(opIter.object.getObjectOpStatus() != Status::STAT_PARTIAL_READ)
   {
-    int a = 5; // log it (something went wrong)
+    DLOG(WARNING) << "StoreWorker::processPendingRead: "
+                  << "opIter.object.getObjectOpStatus() != "
+                  << "Status::STAT_PARTIAL_READ";
+
     Task resTask(opIter.object.getTask());
     resTask.workerID_ = Worker::id_;
     resTask.opStat_   = opIter.object.getObjectOpStatus();
@@ -1086,7 +1093,8 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
 
       if(readBytes == 0)
       { // internal error
-        int a = 5; // log this error
+        LOG(ERROR) << "StoreWorker::processPendingRead: "
+                   << "opIter.prot->readData() == 0";
         delete userCtx;
         opIter.closeContext();
         activeOps_.erase(pendItr);
@@ -1211,7 +1219,10 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
     {
       notifyUserError(task, Status::ERR_DENY);
       return;
-    }    
+    }   
+
+    // set the read as a pending read
+    opIter.object.setObjectOpStatus(Status::STAT_PARTIAL_READ);
 
     // append the context to the operation
     if(opIter.object.validUserContext())
@@ -1355,6 +1366,7 @@ StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator
      permTask.opStat_ = Status::STAT_SUCCESS;
      ctxItr.object.setResponse(std::move(permTask));
    } // done
+
   
  }
  else
@@ -1408,7 +1420,8 @@ StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator
     
      default:
      {
-       int a = 5; // log this as an error
+       LOG(ERROR) << "StoreWorker::processRemoteResult: "
+                  << "no valid opType";
        // reply with a failure 
        Task errReply(std::move(resIter->uppReq->second));      
        errReply.opStat_ = Status::ERR_DENY;

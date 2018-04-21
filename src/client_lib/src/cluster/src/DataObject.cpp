@@ -1,7 +1,12 @@
 // C++ std lib
 #include <cstring>
 #include <limits>
-#include <exception>
+#include <stdexcept>
+
+
+
+// Google libs
+#include <glog/logging.h>
 
 // Project lib
 #include "DataObject.h"
@@ -19,8 +24,6 @@ namespace singaistorageipc
 
 namespace radosbuffermanagement
 {
-
-const Task DataObject::empty_task = Task();
 
 
 DataObject::DataObject()
@@ -96,7 +99,7 @@ DataObject::~DataObject()
 }
 
 CommonCode::IOStatus
-DataObject::getObjectOpStatus() const
+DataObject::getObjectOpStatus() const noexcept
 {
 
   switch(opType_)
@@ -310,7 +313,7 @@ DataObject::getTask() const
   } //switch
 
 
-  return DataObject::empty_task; // no result
+  throw std::logic_error("Empty DataObject."); // no result
 
 }
 
@@ -339,7 +342,7 @@ DataObject::getUserContext() const
   } //switch
 
 
-  throw std::exception(); // problem
+  throw std::logic_error("Empty DataObject."); // problem
 
 }
 
@@ -370,7 +373,7 @@ DataObject::getTask(const bool moveVal)
   } //switch
 
 
-  throw std::exception();
+  throw std::logic_error("Empty DataObject.");
 
 }
 
@@ -399,7 +402,7 @@ DataObject::getUserContext(const bool moveVal)
   } //switch
 
 
-  throw std::exception();
+  throw std::logic_error("Empty DataObject.");
 
 }
 
@@ -454,7 +457,8 @@ DataObject::setWriteObject(WriteObject* obj)
   
       default:
       {
-        int a = 5; //need to log
+        LOG(WARNING) << "DataObject::opType_: "
+                     << "neither OP_WRITE nor OP_READ"; 
         break;
       }
 
@@ -493,7 +497,8 @@ DataObject::setReadObject(ReadObject* obj)
   
       default:
       {
-        int a = 5; //need to log
+        LOG(WARNING) << "DataObject::opType_: "
+                     << "neither OP_WIRTE nor OP_READ"; 
         break;
       }
 
@@ -620,7 +625,8 @@ WriteObject::getDataBuffer()
   if(buffer_.length() == 0 && !backUp_.empty())
   {
    // return the back up iterator
-   int a = 5; // log this since it shall never occur
+   LOG(WARNING) << "WriteObject::getDataBuffer: "
+                << "buffer_.length() == 0 && !backUp_.empty()";
    return backUp_.front();
   }
 
@@ -643,7 +649,7 @@ WriteObject::getTask(const bool moveVal)
     return useCtx_.second;
   }
 
-  throw std::exception();
+  throw std::logic_error("Invalid User Context.");
 }
 
 
@@ -817,7 +823,7 @@ ReadObject::getTask(const bool moveVal)
     return useCtx_.second;
   }
 
-  throw std::exception();
+  throw std::logic_error("Invalid User Context");
 }
 
 

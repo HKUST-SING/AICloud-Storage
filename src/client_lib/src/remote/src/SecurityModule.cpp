@@ -4,6 +4,11 @@
 #include <limits>
 #include <exception>
 
+
+
+// Google libs
+#include <glog/logging.h>
+
 // Project lib
 #include "include/JSONHandler.h"
 #include "SecurityModule.h"
@@ -293,15 +298,16 @@ SecurityModule::processNewTasks()
 
     auto issTask = std::move(recvTasks_.front()); // get reference 
                                                   // to the first
-                                                 // item
+                                                  // item
 
     // remove the front item 
-    recvTasks_.pop_front();
+    //recvTasks_.pop_front();
 
 
     // send simple signal to terminate the security module
     if(issTask.msg_->msgEnc_ == Message::MessageEncoding::ERR_ENC)
     {
+      LOG(INFO) << "Received Message::MessageEncoding::ERR_ENC to close the Security module";
       return; // signal to close the security module
     }
 
@@ -320,14 +326,19 @@ SecurityModule::processNewTasks()
 
      if(!resPair.second)
      {
-       int a = 0; // log this
+      LOG(WARNING) << "Cannot enqueue a new pending request to send";
+      recvTasks_.front() = std::move(issTask); // put it back
      }
-
-     ++nextID_;    // update transaction ID
-     --windowSize; // update the window size       
+     else
+     {
+       recvTasks_.pop_front(); // remove the front
+       ++nextID_;    // update transaction ID
+       --windowSize; // update the window size  
+     }     
     }
     else // handle the error
     {
+      recvTasks_.pop_front();
       handleInternalError(issTask, CommonCode::IOStatus::ERR_INTERNAL);
 
       // no need to explicitly delete the task since
@@ -405,7 +416,7 @@ SecurityModule::queryServerChannel()
        
       if(mapIter == responses_.end()) // log the event
       {
-        int a = 0; // need to log (logical error)
+        LOG(ERROR) << "Received message fron the auth server has invalid tranID";
       }
       else
       {
@@ -428,7 +439,7 @@ SecurityModule::queryServerChannel()
           default:
           {
             // log the event
-            int a = 5;
+            LOG(ERROR) << "Forgot to set a request type (neither MSG_SERVER nor MSG_WORKER)";
           }
         } // switch
 
@@ -479,7 +490,7 @@ SecurityModule::completedTransaction(const uint32_t tranID)
     auto resPair = complTrans_.emplace(std::make_pair(tranID, true));
     if(!resPair.second) // didn't suceed to insert
     {
-      int a = 0; // shall never happen (log this)
+      LOG(ERROR) << "Cannot emplace a completed transaction into map";
     }
   }// else
   
@@ -514,7 +525,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
 
    if(resValue->msgEnc_ != Message::MessageEncoding::JSON_ENC)
    {
-     int a = 0; // need to log this
+     LOG(WARNING) << "Message uses non-JSON encoding. Message is being discarded";
      return;
    }
 
@@ -531,7 +542,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
     if(!decRes)
     { // set to internal error
       // need to log this
-      int a = 0;
+      LOG(WARNING) << "Decoder cannot decode a JSON Message from the server";
       serverRes.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
 
     }//if
@@ -556,7 +567,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
           serverRes.username_ = std::move(accName);
           serverRes.opStat_   = CommonCode::IOStatus::STAT_SUCCESS;
           
-        }catch(std::exception& exp)
+        }catch(const std::exception& exp)
         {
           internalErr = true;
         }
@@ -574,7 +585,7 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
           serverRes.opStat_   = static_cast<CommonCode::IOStatus>(errType);
           internalErr = false;  // no errors
         }
-        catch(std::exception& exp)
+        catch(const std::exception& exp)
         {
           //final error
           internalErr = true;
@@ -585,15 +596,14 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
 
        
 
-      }catch(std::exception& exp)
+      }catch(const std::exception& exp)
       {
-        int a = 0; // log this
         internalErr = true; // some error occured
       }
 
      if(internalErr)
      { // some internal error occured
-       int a = 0; // log this
+       LOG(WARNING) << "Failed to decode JSON Message from auth server";
        serverRes.opStat_ = CommonCode::IOStatus::ERR_INTERNAL;
      }
 
@@ -646,7 +656,7 @@ SecurityModule::tryHandleSocketErrors()
     if(mapIter == responses_.end())
     {
       // need to log this case
-      int a = 0;  
+      LOG(WARNING) << "Socket Failure Message does not have a valid tranID";
     }
     
    else
@@ -662,6 +672,7 @@ SecurityModule::tryHandleSocketErrors()
   } // for
  
 
+  sockErrors.clear(); // clear explicitly
   // signal that some transactions have been handled
   return true; 
   

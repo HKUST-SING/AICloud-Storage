@@ -4,6 +4,9 @@
 #include <cassert>
 
 
+// Google libs
+#include <glog/logging.h>
+
 #include "JSONRemoteProtocol.h"
 
 
@@ -75,7 +78,9 @@ JSONRemoteProtocol::handleMessage(shared_ptr<IOResponse> ioRes,
   if(ioRes->msg_->msgEnc_ != Message::MessageEncoding::JSON_ENC || ioRes->opStat_ != CommonCode::IOStatus::STAT_SUCCESS)
   {
     // log this error
-    int a = 5;
+    LOG(WARNING) << "JSONRemoteProtocol::handleMessage: "
+                 << "!= MessageEncoding::JSON_ENC || "
+                 << "!=STAT_SUCCESS";
     
     return std::make_shared<JSONRemoteProtocol::JSONProtocolVoidHandler>(cephCtx, ioRes->opType_);
   }
@@ -140,7 +145,8 @@ JSONRemoteProtocol::handleMessage(shared_ptr<IOResponse> ioRes,
 
     default:
     {
-      int a= 5; // log this case
+      LOG(WARNING) << "JSONRemoteProtocol::handleMessage: "
+                   << "unrecognised IOOpCode";
       return std::make_shared<JSONRemoteProtocol::JSONProtocolVoidHandler>(cephCtx, ioRes->opType_);
 
     }
@@ -166,7 +172,8 @@ const Task& task)
   if(errorFound)
   {
     // set the internal error and return
-    int a = 5; // log the case
+    LOG(WARNING) << "JSONProtocolStatusHandler::handleJSONMessage: "
+                 << "deocoder.decode failed";
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
    
     return;
@@ -185,7 +192,8 @@ const Task& task)
   
   } catch(const std::exception& exp)
   {
-    int a = 5; // log the exception
+    LOG(WARNING) << "JSONProtocolstatusHandler::handleJSONMessage: "
+                 << "cannot find 'Result' field";
     errorFound = true;
   }
 
@@ -210,7 +218,8 @@ const Task& task)
 
   }catch(const std::exception& exp)
   {
-    int a = 5; // log the exception
+    LOG(WARNING) << "JSONProtocolStatusHandler::handleJSONMessage: "
+                 << "cannot find 'Erro_Tyoe' field";
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
   }
  
@@ -259,7 +268,8 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
   if(errorFound)
   {
     // set the internal error and return
-    int a = 5; // log the case
+    LOG(WARNING) << "JSONProtocolReadHandler::handleJSONMessage: "
+                 << "decoder.decode failed.";
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
    
     return;
@@ -278,7 +288,8 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
   
   } catch(const std::exception& exp)
   {
-    int a = 5; // log the exception
+    LOG(WARNING) << "JSONProtocolReadHandler::handleJSONMessage: "
+                 << "cannot find 'Result' field";
     errorFound = true;
   }
 
@@ -300,9 +311,10 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
     
     if(objSize == 0)
     {
-      int a = 5; // log this
       RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
       errorFound = true;
+      LOG(WARNING) << "JSONProtocolReadHandler::handleJSONMessage: "
+                   << "'Object_Size' == 0";
   
     }
     else
@@ -320,7 +332,8 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
 
   }catch(const std::exception& exp)
   {
-    int a = 5; // log the exception
+    DLOG(INFO) << "JSONProtocolReadHandler::handleJSONMessage: "
+               << "cannot find either 'Obj_Size' or 'Rados_Objs'.";
     errorFound = true;
   }
 
@@ -341,7 +354,9 @@ JSONRemoteProtocol::JSONProtocolReadHandler::handleJSONMessage(
       {
         // need to log since there is a problem with the 
         // protocol
-        int a = 0; // log the logical error
+        LOG(WARNING) << "JSONProtocolReadHandler::handleJSONMessage: "
+                     << "can find neither 'Obj_Size'/'Rados_Objs' "
+                     << "nor 'Error_Type'";
         RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
    
       }   
@@ -376,7 +391,8 @@ JSONRemoteProtocol::JSONProtocolReadHandler::processObjects(const JSONResult::JS
   // must make sure that it's a loop object
   if(!objIter || objIter.end())
   {
-    int a = 5; // log this
+    LOG(ERROR) << "JSONProtocolReadHandler::processObjects: "
+               << "!objIter || objIter.end()";
     return CommonCode::IOStatus::ERR_INTERNAL;
   
   }
@@ -455,7 +471,8 @@ JSONRemoteProtocol::JSONProtocolReadHandler::readData(
   // check if an object at the offset exists
   if (radosIter == std::end(radObjs_))
   {
-    int a = 5; // log this as an error
+    LOG(WARNING) << "JSONProtocolReadHandler::readData: "
+                 << "radositer == std::end(radObjs_)";
     
     return 0;
   }
@@ -488,7 +505,8 @@ JSONRemoteProtocol::JSONProtocolReadHandler::readData(
   if(!willRead)
   {
     //log this since there is an error
-    int a = 0;
+    LOG(WARNING) << "JSONProtocolReadHandler::readData: "
+                 << "willRead == 0";
     
     return 0;
   }
@@ -607,7 +625,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::handleJSONMessage(
   if(errorFound)
   {
     // set the internal error and return
-    int a = 5; // log the case
+    LOG(WARNING) << "JSONProtocolWriteHandler::handleJSONMessage: "
+                 << "decoder.decode failed.";
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
 
     return;
@@ -626,7 +645,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::handleJSONMessage(
     resObj = jsonRes.getObject("Result");
   }catch(const std::exception& exp)
   {
-    int a = 5; // lof the exception
+    LOG(WARNING) << "JSONProtocolWriteHandler::handleJSONMessage: "
+                 << "cannot find 'Result' field";
     errorFound = true; 
   }
 
@@ -652,7 +672,9 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::handleJSONMessage(
 
   }catch(const std::exception& exp)
   {
-    int a = 5; // log this
+    DLOG(INFO) << "JSONProtocolWriteHandler::handleJSONMessage: "
+               << "'Rados_Objs' or 'Data_Manifest' does not exist. "
+               << "Checking for 'Error_Type'";
     errorFound = true;
   }
 
@@ -670,7 +692,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::handleJSONMessage(
     }catch(const std::exception& exp)
     {
       // something went wrong
-      int a = 5; // log the case
+      LOG(WARNING) << "JSONProtocolWriteHandler::handleJSONMessage: "
+                   << "can find neither 'Rados_Objs' nor 'Error_Type'.";
 
       RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
     }
@@ -708,7 +731,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::processObjects(const JSONResult::J
   // make sure it is not empty
   if(!radosObjs || radosObjs.end())
   {
-    int a = 5; // log this
+    LOG(WARNING) << "JSONProtocolWriteHandler::processObjects: "
+                 << "!radosObjs || radosObjs.end()";
     return CommonCode::IOStatus::ERR_INTERNAL;
   }
 
@@ -734,7 +758,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::processObjects(const JSONResult::J
       // process them for future use
       if(radosSize <= radosOffset)
       {
-        int a = 5; // log this case
+        LOG(ERROR) << "JSONProtocolWriteHandler::processObjects: "
+                   << "radosSize <= radosOffset";
         throw std::exception();
       }
 
@@ -742,7 +767,7 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::processObjects(const JSONResult::J
         JSONProtocolWriteHandler::RadosObjWrite(
           std::move(radosPool), std::move(radosID), 
           (radosSize - radosOffset), radosOffset,
-          (radosWrite)?false:true, globalOffset)));
+          (radosWrite) ? false : true, globalOffset)));
 
       // upgrade the global offset
       globalOffset += (radosSize - radosOffset);
@@ -753,7 +778,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::processObjects(const JSONResult::J
 
   }catch(const std::exception& exp)
   {
-    int a = 5; // log this case
+    LOG(WARNING) << "JSONProtocolWriteHandler::processObjects: "
+                 << "exception reading the received JSON message.";
     radosWrites_.clear(); // clear the retrieved objects
     objsRet = CommonCode::IOStatus::ERR_INTERNAL;
   }
@@ -804,7 +830,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
 
   if(radosIter == std::end(radosWrites_))
   {
-    int a = 5; // log this case
+    LOG(WARNING) << "JSONProtocolWriteHandler::writeData: "
+                 << "radosIter == std::end(radosWrites_).";
     return 0;
   }
 
@@ -833,7 +860,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
   if(!willWrite)
   {
     // log this case as an error
-    int a = 0;
+    LOG(WARNING) << "JSONProtocolWriteHandler::writeData: "
+                 << "willWrite == 0";
 
     return 0;
   }
@@ -872,7 +900,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
 
   if(radosIter == std::end(radosWrites_))
   {
-    int a = 5; // log this case
+    LOG(WARNING) << "JSONProtocolWriteHandler::writeData: "
+                 << "radosIter == std::end(radosWrites_)";
     return 0;
   }
 
@@ -904,7 +933,8 @@ JSONRemoteProtocol::JSONProtocolWriteHandler::writeData(
   if(!willWrite)
   {
     // log this case as an error
-    int a = 0;
+    LOG(WARNING) << "JSONProtocolWriteHandler::writeData: "
+                 << "willWrite == 0";
 
     return 0;
   }
@@ -1002,7 +1032,8 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::handleJSONMessage(
   if(errorFound)
   {
     // set the internal error and return
-    int a = 5; // log the case
+    LOG(WARNING) << "JSONProtocolAuthHandler::handleJSONMessage: "
+                 << "decoder.decode failed.";
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
    
     return;
@@ -1021,7 +1052,8 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::handleJSONMessage(
   
   } catch(const std::exception& exp)
   {
-    int a = 5; // log the exception
+    LOG(WARNING) << "JSONProtocolAuthHandler::handleJSONMessage: " 
+                 << "cannot find 'Result' field.";
     errorFound = true;
   }
 
@@ -1051,7 +1083,8 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::handleJSONMessage(
 
   }catch(const std::exception& exp)
   {
-    int a = 5; // log the exception
+    DLOG(INFO) << "JSONProtocolAuthHandler::handleJSONMessage: " 
+               << "'Account' field not found. Trying 'Error_Type'.";
     errorFound = true;
   }
 
@@ -1071,7 +1104,8 @@ JSONRemoteProtocol::JSONProtocolAuthHandler::handleJSONMessage(
       {
         // need to log since there is a problem with the 
         // protocol
-        int a = 0; // log the logical error
+        LOG(WARNING) << "JSONProtocolAuthHandler::handleJSONMessage: "
+                     << "can find neither 'Account' nor 'Error_Type'.";
         RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
    
       }   
@@ -1140,7 +1174,8 @@ JSONRemoteProtocol::JSONProtocolDeleteHandler::handleJSONMessage(
   else
   {
     // not a JSON file
-    int a = 0; // log this as an error 
+    LOG(WARNING) << "JSONProtocolDeleteHandler::handleJSONMessage: "
+                 << "decoder.decode failed."; 
 
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
 

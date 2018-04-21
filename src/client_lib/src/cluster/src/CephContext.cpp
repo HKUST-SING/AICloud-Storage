@@ -3,7 +3,8 @@
 #include <cassert>
 #include <limits>
 
-
+//Google lib
+#include <glog/logging.h>
 
 // Project lib
 #include "cluster/CephContext.h"
@@ -121,6 +122,7 @@ CephContext::initAndConnect()
   // if cannot initialize the handle, return false
   if(ret < 0)
   {
+    LOG(WARNING) << "Cannot initialize the cluster handle";
     return false; // cannot initialize the handle
   }
 
@@ -130,6 +132,7 @@ CephContext::initAndConnect()
   
   if(ret < 0)
   {
+    LOG(WARNING) << "Cannot read Rados configuration file";
     cluster_.shutdown(); // close the handle first
     return false;
   }
@@ -150,6 +153,8 @@ CephContext::initAndConnect()
 
   // mark the Ceph context as initliazed
   init_ = true;
+
+  DLOG(INFO) << "Successfully started a ceph context";
 
   return true; // successfully initialized the cluster handle
 }
@@ -277,7 +282,7 @@ CephContext::readObject(const std::string& oid,
     
     if(!addRes)
     { // something went wrong
-      int a = 5; // log this
+      LOG(ERROR) << "Cannot add a new Rados Context (cannot connect)";
  
       return 0;
     }
@@ -294,9 +299,10 @@ CephContext::readObject(const std::string& oid,
 
   if(!readOpSize)
   {
-    int a = 5; // need to log if there is any problem
+    LOG(WARNING) << "Cannot read data from handler";
   }
-
+  
+  
   return readOpSize;
 }
 
@@ -324,7 +330,8 @@ CephContext::writeObject(const std::string& oid,
     
     if(!addRes)
     { // something went wrong
-      int a = 5; // log this
+      LOG(ERROR) << "Cannot add a new Cpeh Context " 
+                 << "(cannot connect to cluster).";
  
       return 0;
     }
@@ -343,7 +350,7 @@ CephContext::writeObject(const std::string& oid,
 
   if(!writeOpSize)
   {
-    int a = 5; // need to log if there is any problem
+    LOG(WARNING) << "CephContext cannot write data";
   }
 
   return writeOpSize;
@@ -376,7 +383,7 @@ CephContext::writeObject(const std::string& oid,
     
     if(!addRes)
     { // something went wrong
-      int a = 5; // log this
+      LOG(ERROR) << "Cannot connect to the Ceph cluster";
  
       return 0;
     }
@@ -395,7 +402,7 @@ CephContext::writeObject(const std::string& oid,
 
   if(!writeOpSize)
   {
-    int a = 5; // need to log if there is any problem
+    LOG(WARNING) << "Ceph handler cannot write data";
   }
 
   return writeOpSize;
@@ -473,6 +480,8 @@ CephContext::RadosOpHandler::stopRadosOpHandler()
   // notify everyone that it has been completed
   done_.store(true, std::memory_order_release);
   const unsigned int pendOps = activeIOs_.load(std::memory_order_relaxed);
+
+  DLOG(INFO) << "RadosOpHandler:stopRadosOpHandler";
 
   if(!pendOps)
   {
@@ -623,7 +632,7 @@ CephContext::RadosOpHandler::readRadosObject(librados::IoCtx* ioCtx,
   if(ret < 0) // failure occurred
   {
     // log it first;
-    int a = 0; // for logging
+    LOG(WARNING) << "ioCtx->aio_read returned < 0";
     
     // delete all allocated fields
     args->release();
@@ -631,9 +640,11 @@ CephContext::RadosOpHandler::readRadosObject(librados::IoCtx* ioCtx,
     return 0; // notify that cannot read 
   }
 
-  return canReadAtOnce; // return number of bytes to be read
 
-  
+  DLOG(INFO) << "RadosOpHandler::readRadosObject: has read "
+             << canReadAtOnce << " bytes";
+
+  return canReadAtOnce; // return number of bytes to be read  
 }
 
 
@@ -653,7 +664,7 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
   if(canWriteAtOnce == 0)
   {
     // log it before returning
-    int a = 5;
+    LOG(WARNING) << "maximumDataOperationSize == 0";
     return 0;
   }
 
@@ -690,8 +701,6 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
  
   // copy the data to a librados::bufferlist
   opCtx->opData.append(rawData, static_cast<const unsigned int>(canWriteAtOnce));
-
-
 
 
   int ret = 0; // Rados  op result flag
@@ -733,13 +742,16 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
     
 
     // log it first;
-    int a = 0; // for logging
+    LOG(ERROR) << "RadosOpHandler: cannot write after many attempts";
     
     // delete all allocated fields
     args->release();
 
     return 0; // notify that cannot read 
   }
+
+  DLOG(INFO) << "RadosOpHandler::writeRadosObject: has written "
+             << canWriteAtOnce << " bytes";
 
   return canWriteAtOnce; // return number of bytes to be read
 }
@@ -762,7 +774,7 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
   if(canWriteAtOnce == 0)
   {
     // log it before returning
-    int a = 5;
+    LOG(WARNING) << "maximumDataOperationSize == 0";
     return 0;
   }
 
@@ -828,7 +840,7 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
   if(ret < 0) // failure occurred
   {
     // log it first;
-    int a = 0; // for logging
+    LOG(ERROR) << "RadosOpHandler: cannot write after multiple attempts";
     
     // delete all allocated fields
     args->radosCtx->userCtx = nullptr;
@@ -837,11 +849,11 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
     return 0; // notify that cannot write 
   }
 
+  DLOG(INFO) << "RadosOpHandler::writeRadosObject: has written " 
+             << canWriteAtOnce << " bytes";
+
   return canWriteAtOnce; // return number of bytes to be read
 }
-
-
-
 
 
 } // namesapce singaistorageipc
