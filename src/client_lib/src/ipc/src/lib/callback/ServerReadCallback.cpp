@@ -107,8 +107,22 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 		/**
 		 * Set the size of share memory.
 		 */
-		ftruncate(readfd,readSMSize_);
-		ftruncate(writefd,writeSMSize_);
+		bool haserr = false;
+		if(ftruncate(readfd,readSMSize_) == -1){
+			haserr = true;
+		}
+		if(ftruncate(writefd,writeSMSize_) == -1){
+			haserr = true;
+		}
+		if(haserr){
+			LOG(WARNING) << "cannot set share memory's size properly";
+			close(readfd);
+			close(writefd);
+			readSMName_ = nullptr;
+			writeSMName_ = nullptr;
+			sendStatus(task.tranID_,CommonCode::IOStatus::ERR_INTERNAL);
+			return;
+		}
 
 		/**
 		 * Map the share memory to the virtual address.
