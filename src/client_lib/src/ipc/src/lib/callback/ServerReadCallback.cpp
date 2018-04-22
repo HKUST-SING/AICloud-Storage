@@ -107,17 +107,16 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 		/**
 		 * Set the size of share memory.
 		 */
-		bool haserr = false;
-		if(ftruncate(readfd,readSMSize_) == -1){
-			haserr = true;
-		}
-		if(ftruncate(writefd,writeSMSize_) == -1){
-			haserr = true;
-		}
-		if(haserr){
+		if(ftruncate(readfd,readSMSize_) == -1
+		  ||ftruncate(writefd,writeSMSize_) == -1)
+		{
 			LOG(WARNING) << "cannot set share memory's size properly";
 			close(readfd);
 			close(writefd);
+			shm_unlink(readSMName_);
+			shm_unlink(writeSMName_);
+			delete(readSMName_);
+			delete(writeSMName_);
 			readSMName_ = nullptr;
 			writeSMName_ = nullptr;
 			sendStatus(task.tranID_,CommonCode::IOStatus::ERR_INTERNAL);
