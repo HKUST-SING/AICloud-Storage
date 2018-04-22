@@ -81,7 +81,9 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 		int readfd;
 		while((readfd = shm_open(readSMName,
 			O_CREAT|O_EXCL|O_RDWR,
-			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == EEXIST){
+			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == -1 &&
+			errno == EEXIST)
+		{
 			/*
 			 * The object already exists. Change another name.
 			 */
@@ -94,7 +96,9 @@ void ServerReadCallback::callbackAuthenticationRequest(Task task)
 		int writefd;
 		while((writefd = shm_open(writeSMName,
 			O_CREAT|O_EXCL|O_RDWR,
-			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == EEXIST){
+			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)) == -1 &&
+			errno == EEXIST)
+		{
 			/*
 			 * The object already exists. Change another name.
 			 */
