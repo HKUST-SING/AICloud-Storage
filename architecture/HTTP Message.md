@@ -5,10 +5,10 @@
 ```http
 GET /auth HTTP/1.1
 Host: {server_address:port}
-Keep-Alive: timeout={value larger than heartbeat}\r\n\r\n
+Keep-Alive: timeout={value larger than heartbeat}
 X-Auth-User: {username}
 X-Auth-Key:  {password}
-X-Tran-Id:   {transaction id}
+X-Tran-Id:   {transaction id}\r\n\r\n
 ```
 
 
