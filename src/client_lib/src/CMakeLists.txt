@@ -41,8 +41,14 @@ add_subdirectory(remote)
 add_subdirectory(ipc)
 
 
-#Add executable
+# Add executable
+# Enable logging by default
+OPTION(SING_ENABLE_LOG "Compile source code with logging." ON)
 add_executable(rados_cli rados_client.cpp)
+
+if(SING_ENABLE_LOG)
+  target_compile_definitions(rados_cli PRIVATE SING_ENABLE_LOG=1)
+endif(SING_ENABLE_LOG)
 
 # Link to all dependencies
 target_link_libraries(rados_cli PRIVATE 
