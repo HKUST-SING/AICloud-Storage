@@ -53,12 +53,13 @@ ServerChannel::initChannel()
 	return true;
 }
 
-void closeChannel()
+void
+ServerChannel::closeChannel()
 {
 	LOG(INFO) << "start to close channel";
 
 	try{
-		ioc_.post([this](){socket_->close();socket_->release(nullptr);});
+		ioc_.post([this](){socket_->close();socket_->release();});
 		socketThread_.join();
 	}
 	catch(std::exception& e){
