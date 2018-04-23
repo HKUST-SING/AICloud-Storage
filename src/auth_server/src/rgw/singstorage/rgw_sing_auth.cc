@@ -188,7 +188,8 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
 
 
-  assert(key && user && tranID);
+  //assert(key && user && tranID);
+  assert(tranID);
 
   s->prot_flags |= RGW_REST_SWIFT; // use SWIFT flags as it matches
                                    // our settings and no need to
@@ -201,11 +202,12 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   RGWAccessKey* sing_key;
   map<string, RGWAccessKey>::iterator siter;
   string tenant_path; // tenant path
-
+  
 
 
   if(!key || !user) 
   {
+    ret = -EACCES;
     goto done_get_sing_auth; // no authentication possible
   }
     
@@ -217,8 +219,9 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   // desing. Later, we need to change and move to our own system.
   if((ret = rgw_get_user_info_by_swift(store, user_str, info)) < 0)
   {
-    // internal error 
-    err_code = rgw::singstorage::SINGErrorCode::INTERNAL_ERR; 
+    // user error (no such user) 
+    //err_code = rgw::singstorage::SINGErrorCode::INTERNAL_ERR; 
+    ret = -EACCES;
     goto done_get_sing_auth;
   }
 
@@ -296,9 +299,9 @@ RGWHandler_SINGSTORAGE_Auth::init(RGWRados* store,
                                   rgw::io::BasicClient* cio)
 {
   state->dialect    =  "singstore-auth";
-  state->formatter  =  new JSONFormatter;
+  state->formatter  =  new JSONFormatter(false);
   state->format     =  RGW_FORMAT_JSON;
-  state->op         =  OP_GET; /* Not sure about this */
+  //state->op         =  OP_GET; /* Not sure about this */
 
   return RGWHandler::init(store, state, cio);
 
