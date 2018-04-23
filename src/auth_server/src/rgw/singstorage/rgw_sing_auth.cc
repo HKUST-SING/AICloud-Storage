@@ -260,7 +260,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 done_get_sing_auth:
 
   // add the HTTP headers
-  dump_header(s, "HTTP_X_TRAN_ID", tranID); 
+  dump_header(s, "X-Tran-Id", tranID); 
   set_req_state_err(s, ret);
   dump_errno(s);
 
