@@ -45,6 +45,35 @@ static uint32_t getWindowSize(const uint32_t headSeq,
 }
 
 
+
+SecurityModule::FollySocketCallback::FollySocketCallback(SecurityModule* sec, const uint32_t tranID)
+: secMod_(sec),
+  tranID_(tranID)
+{}
+
+
+void
+SecurityModule::FollySocketCallback::writeSuccess() noexcept
+{
+  DLOG(INFO) << "Sent a message to a remote server";
+}
+
+void
+SecurityModule::FollySocketCallback::writeErr(
+                         const size_t bytesWritten,
+                         const folly::AsyncSocketException& exp) noexcept
+{
+
+  LOG(WARNING) << "SecurityModule::FollySocketCallback::writeErr: "
+               << "bytesWritten: " << bytesWritten
+               << ", err_type: " << exp.getType() 
+               << ", err_code: " << exp.getErrno(); 
+
+  // enqueue the failure to the failure queue
+  secMod_->socketError(tranID_);
+}
+
+
 SecurityModule::SecurityModule(std::unique_ptr<ServerChannel>&& comm)
 : Security(std::move(comm)),
   nextID_(0),

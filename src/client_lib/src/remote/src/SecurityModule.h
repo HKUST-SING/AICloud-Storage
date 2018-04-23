@@ -175,29 +175,22 @@ namespace singaistorageipc
         public:
           FollySocketCallback() = delete;
           
-          FollySocketCallback(SecurityModule* sec,
-                              const uint32_t tranID)
-          : secMod_(sec),
-            tranID_(tranID)
-          {}
+          FollySocketCallback(SecurityModule* const sec,
+                              const uint32_t tranID);
 
-          void writeSuccess() noexcept override
-          {/* do nothing */}
+          ~FollySocketCallback() = default;
+
+          inline void writeSuccess() noexcept override;
 
     
-          void writeErr(size_t bytesWritten, 
+          inline void writeErr(const size_t bytesWritten, 
                         const folly::AsyncSocketException& exp)
-                            noexcept override 
-          {
-
-            // enqueue the failure to the failure queue
-            secMod_->socketError(tranID_);
-          }
+                            noexcept override;
             
 
           private:
-            SecurityModule* secMod_; // security module
-            const uint32_t  tranID_; // transaction ID (mesage id)
+            SecurityModule* const secMod_; // security module
+            const uint32_t        tranID_; // transaction ID (mesage id)
 
       }; // class FollySocketCallback
 
