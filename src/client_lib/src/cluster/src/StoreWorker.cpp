@@ -715,7 +715,7 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
   assert(opCtx);
   assert(opCtx->userCtx); // must not be nullptr
 
-  StoreWorker::UserCtx* const procCtx = reinterpret_cast<StoreWorker::UserCtx* const>(opCtx->userCtx);
+  StoreWorker::UserCtx* const procCtx = static_cast<StoreWorker::UserCtx* const>(opCtx->userCtx);
 
   assert(procCtx);
 
@@ -875,7 +875,7 @@ StoreWorker::issueRadosWrite(StoreWorker::OpItr& iter)
   StoreWorker::UserCtx* const procCtx = new StoreWorker::UserCtx(iter->first, 0);
    
   auto resData = opIter.prot->writeData(objWrite->getDataBuffer(),
-                                 reinterpret_cast<void*>(procCtx));
+                                 static_cast<void*>(procCtx));
 
   if(!resData)
   {
@@ -903,7 +903,7 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
   assert(opCtx); // must not be nullptr
   assert(opCtx->userCtx); // must not be nullptr
 
-  StoreWorker::UserCtx* const procCtx = reinterpret_cast<StoreWorker::UserCtx* const>(opCtx->userCtx);
+  StoreWorker::UserCtx* const procCtx = static_cast<StoreWorker::UserCtx* const>(opCtx->userCtx);
 
   assert(procCtx);
 
@@ -1089,7 +1089,7 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
       ++(opIter.tranID);
 
       auto readBytes = opIter.prot->readData(MAX_IO_SIZE, 
-                              reinterpret_cast<void*>(userCtx)); 
+                              static_cast<void*>(userCtx)); 
 
       if(readBytes == 0)
       { // internal error

@@ -522,7 +522,7 @@ CephContext::RadosOpHandler::radosAsyncCompletionCallback(
 {
   // we cast void to the passed context
   CephContext::RadosOpHandler::CmplCtx* opCtx =\
-      reinterpret_cast<CephContext::RadosOpHandler::CmplCtx*>(args);
+      static_cast<CephContext::RadosOpHandler::CmplCtx*>(args);
 
   assert(opCtx != nullptr); // make sure no failure
 
@@ -580,7 +580,7 @@ CephContext::RadosOpHandler::aioRadosCallbackFunc(librados::completion_t cb,
 {
  
   const CephContext::RadosOpHandler::CmplCtx* tmpCtx =\
-          reinterpret_cast<const CephContext::RadosOpHandler::CmplCtx*>(args); // cast the pointer (Context) 
+          static_cast<const CephContext::RadosOpHandler::CmplCtx*>(args); // cast the pointer (Context) 
 
   // call the method to handle the operation 
   tmpCtx->objPtr->radosAsyncCompletionCallback(cb, args);
@@ -607,7 +607,7 @@ CephContext::RadosOpHandler::readRadosObject(librados::IoCtx* ioCtx,
   
   librados::AioCompletion* readCompletion =\
             librados::Rados::aio_create_completion(\
-              reinterpret_cast<void*>(args), 
+              static_cast<void*>(args), 
               CephContext::RadosOpHandler::aioRadosCallbackFunc, 
               nullptr);
 
@@ -684,7 +684,7 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
   
   librados::AioCompletion* writeCompletion =\
             librados::Rados::aio_create_completion(
-              reinterpret_cast<void*>(args), nullptr, 
+              static_cast<void*>(args), nullptr, 
               CephContext::RadosOpHandler::aioRadosCallbackFunc);
 
 
@@ -793,7 +793,7 @@ CephContext::RadosOpHandler::writeRadosObject(librados::IoCtx* ioCtx,
   
   librados::AioCompletion* writeCompletion =\
             librados::Rados::aio_create_completion(
-              reinterpret_cast<void*>(args), nullptr, 
+              static_cast<void*>(args), nullptr, 
               CephContext::RadosOpHandler::aioRadosCallbackFunc);
 
   // create an operation context
