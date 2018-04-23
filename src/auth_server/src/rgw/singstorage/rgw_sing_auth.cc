@@ -183,9 +183,9 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   int ret = -EPERM;
   uint64_t err_code = rgw::singstorage::SINGErrorCode::USER_ERR; // no such username  
 
-  const char* key    = s->info.env->get("HTTP_X_AUTH_KEY");
-  const char* user   = s->info.env->get("HTTP_X_AUTH_USER");
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* key    = s->info.env->get("HTTP_X_AUTH_KEY", nullptr);
+  const char* user   = s->info.env->get("HTTP_X_AUTH_USER", nullptr);
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
 
 
   //assert(key && user && tranID);

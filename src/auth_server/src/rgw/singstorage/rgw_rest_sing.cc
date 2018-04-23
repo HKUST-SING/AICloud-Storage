@@ -453,7 +453,7 @@ RGWDeleteObj_ObjStore_SING::send_response()
   }
 
   // get transaction ID
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   
   assert(tranID); // make sure there is a transaction ID
 
@@ -610,7 +610,7 @@ RGWGetObjLayout_SING::send_response()
 {
 
 
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
   dump_header(s, "X-Tran-Id", tranID);
@@ -1069,7 +1069,7 @@ RGWPutObj_ObjStore_SING::init_processing()
 void
 RGWPutObj_ObjStore_SING::do_error_response()
 {
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
   dump_header(s, "X-Tran-Id", tranID);
@@ -1293,7 +1293,7 @@ RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest)
 
 {
 
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
   dump_header(s, "X-Tran-Id", tranID);
@@ -1701,7 +1701,7 @@ void
 RGWPost_Manifest_SING::send_response()
 {
   
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID");
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
   dump_header(s, "X-Tran-Id", tranID);
