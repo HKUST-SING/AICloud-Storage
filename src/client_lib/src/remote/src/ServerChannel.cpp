@@ -27,7 +27,8 @@ using tcp = boost::asio::ip::tcp;
 namespace singaistorageipc{
 
 bool
-ServerChannel::initChannel(){
+ServerChannel::initChannel()
+{
 	tcp::endpoint ep(boost::asio::ip::address::from_string(
 							cxt_.remoteServerAddress_.c_str()), cxt_.port_);	
 	LOG(INFO) << "start to initial channel";
@@ -50,6 +51,22 @@ ServerChannel::initChannel(){
 	socketThread_ = std::move(tmpthread);
 	LOG(INFO) << "initial channel successfully";
 	return true;
+}
+
+void closeChannel()
+{
+	LOG(INFO) << "start to close channel";
+
+	try{
+		ioc_.post([this](){socket_->close();socket_->release(nullptr);});
+		socketThread_.join();
+	}
+	catch(std::exception& e){
+		LOG(ERROR) << "cannot close the socket conneting to the remote server.\n"
+				   << "the reason is: " << e.what();
+	}
+
+	LOG(INFO) << "finish to close channel";
 }
 
 folly::AsyncSocketException::AsyncSocketExceptionType

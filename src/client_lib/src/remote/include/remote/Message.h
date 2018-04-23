@@ -191,6 +191,7 @@ class ReceivePool{
 public:
   explicit ReceivePool() = default;
   ~ReceivePool(){
+  	boost::mutex::scoped_lock lock(mutex_);
     pool_.clear();
   }
 
