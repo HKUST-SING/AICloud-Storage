@@ -22,11 +22,6 @@
 namespace singaistorageipc
 {
 
-
-// Define a function for Rados callbacks 
-extern void aioRadosCallbackFunc(librados::completion_t cb, void* args);
-
-
 class CephContext
 {
 /**
@@ -111,19 +106,15 @@ class CephContext
 
 
   private:
-
-    // Friend function to access the private class
-    friend void aioRadosCallbackFunc(librados::completion_t cb,
-                                         void* args); 
-
+   
     class RadosOpHandler
     {
 
       private:
 
-        // friend function for accessing provate fields 
-        // of the class
-        friend void aioRadosCallbackFunc(librados::completion_t cb,
+        // Function for Rados callbacks 
+        // (must be static)
+        static void aioRadosCallbackFunc(librados::completion_t cb, 
                                          void* args); 
 
         typedef struct CmplCtx
