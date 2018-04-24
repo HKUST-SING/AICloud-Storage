@@ -506,6 +506,7 @@ class DeleteMessage(InterMessage):
 		"".join([str(chr(ch_item)) for ch_item in vals[0::1]])
 
 
+
 @InterMessage.register_subclass(MSG_RELEASE)
 class ReleaseMessage(InterMessage):
 	"""
