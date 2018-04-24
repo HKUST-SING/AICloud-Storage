@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import singstorage
 
 
@@ -15,7 +17,7 @@ try:
 	user.read_raw_data(rados_obj)
 
 except Exception as exp:
-	print exp
+	print (exp)
 
 finally:
 	if user:

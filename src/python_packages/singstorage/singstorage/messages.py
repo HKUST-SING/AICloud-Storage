@@ -25,16 +25,28 @@ MSG_DELETE     =    6
 
 
 # 'status_type' for MSG_STATUS messages
-STAT_SUCCESS     = 0   # notifies success
-STAT_CLOSE       = 1   # require to close IPC and release resources
-STAT_AUTH_USER   = 2   # authentication problem (username)
-STAT_AUTH_PASS   = 3   # authentication problem (password)
-STAT_PATH	     = 3   # data path problem ('no such path')
-STAT_DENY	     = 4   # denied access to the data at 'path'
-STAT_QUOTA       = 5   # user has exceeded his/her data quota
-STAT_PROT        = 6   # the used protocol is not supported
-STAT_AMBG        = 254 # cannot understand previously sent request
-STAT_INTER       = 255 # internal system error (release resources)
+# keep it consistent with the client library
+# ("include/CommonCode.h")
+STAT_SUCCESS    = 0   # notifies success
+ERR_AUTH_USER   = 1   # authentication problem (username)
+ERR_AUTH_PASS   = 2   # authentication problem (password)
+ERR_PATH	    = 3   # data path problem ('no such path')
+ERR_DENY	    = 4   # denied access to the data at 'path'
+ERR_QUOTA       = 5   # user has exceeded his/her data quota
+ERR_DATA_LARGE  = 6   # data too big to write at once
+ERR_DATA_SMALL  = 7   # data to small to write at once (buffer)
+ERR_CONTENT     = 8   # message content cannot be understood
+ERR_PARAMS      = 9   # parameters cannot be understood
+ERR_PROT        = 10  # the used protocol is not supported
+ERR_LOCK        = 11  # cannot acquire lock on 'path'
+STAT_PART_READ  = 12  # there is more data to read
+STAT_PART_WRITE = 13  # there is a merging write 
+                       # (few writes merged into one)
+STAT_CLOSE      = 14  # require to close IPC and release resources
+
+
+ERR_AMBG        = 254 # cannot understand previously sent request
+ERR_INTER       = 255 # internal system error (release resources)
 
 
 

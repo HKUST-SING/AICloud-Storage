@@ -334,10 +334,10 @@ class SocketIPC(ControlIPC):
 				tmp_logger.warn("Received status to close is not SUCCESS. status: {0}".format(res.op_status))
 
 				# check for ambiguous status
-				if res.op_status == sing_msgs.STAT_AMBG:
+				if res.op_status == sing_msgs.ERR_AMBG:
 				
 					# send one more time
-					tmp_logger.warn("received STAT_AMG")
+					tmp_logger.warn("received ERR_AMG")
 
 					self.send_request(sing_msgs.MSG_CLOSE)
 

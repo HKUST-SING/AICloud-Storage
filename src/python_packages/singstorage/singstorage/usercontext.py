@@ -451,18 +451,18 @@ class UserContext(object):
 		# some error occured
 		if res.msg_type == sing_msgs.MSG_STATUS:
 			# throw an exception
-			if res.op_status == sing_msgs.STAT_PATH:
+			if res.op_status == sing_msgs.ERR_PATH:
 				raise sing_errs.PathError(rados_obj.get_data_path(),
 										  False)
 
-			elif res.op_status == sing_msgs.STAT_DENY:
+			elif res.op_status == sing_msgs.ERR_DENY:
 				raise sing_errs.PathError(rados_obj.get_data_path(),
 										  True)
 
-			elif res.op_status == sing_msgs.STAT_QUOTA:
+			elif res.op_status == sing_msgs.ERR_QUOTA:
 				raise sing_errs.QuotaError(obj_len, 0)
 
-			elif res.op_status == sing_msgs.STAT_PROT:
+			elif res.op_status == sing_msgs.ERR_PROT:
 				protocol = rados_obj.get_data_path().split(":")
 				raise sing_errs.ProtError(protocol[0])
 
@@ -607,11 +607,11 @@ class UserContext(object):
 		if res.msg_type == sing_msgs.MSG_STATUS:
 			tmp_logger.error("read_raw_data: == MSG_STATUS")
 			
-			if res.op_status == STAT_PATH:
+			if res.op_status == ERR_PATH:
 				raise sing_errs.PathError(rado_obj.get_data_path(),
                                           False)
 		
-			elif res.op_status == STAT_DENY:
+			elif res.op_status == ERR_DENY:
 				raise sing_errs.PathError(rados_obj.get_data_path(),
 										  True)
 
@@ -638,7 +638,7 @@ class UserContext(object):
 		if read_bytes != res.data_length:
 			# an error, notify the service
 			self._ctrl.send_request(sing_msgs.MSG_STATUS, mark_id,
-									status_type=sing_msgs.STAT_INTER)
+									status_type=sing_msgs.ERR_INTER)
 
 			tmp_logger.error("read_raw_data: read_bytes != res.data_length")
 			self.close()
@@ -681,7 +681,7 @@ class UserContext(object):
 
 				# an error, notify the service
 				self._ctrl.send_request(sing_msgs.MSG_STATUS, mark_id, 
-									status_type=sing_msgs.STAT_INTER)
+									status_type=sing_msgs.ERR_INTER)
 
 				tmp_logger.error("read_raw_data: read_bytes != res.data_length")
 				self.close()
@@ -723,18 +723,18 @@ class UserContext(object):
 
 
 		# other possible cases
-		if res.op_status == sing_msgs.STAT_PATH:
+		if res.op_status == sing_msgs.ERR_PATH:
 			raise sing_errs.PathError(rados_obj.get_data_path(),
 									  False)
 
-		elif res.op_status == sing_msgs.STAT_DENY:
+		elif res.op_status == sing_msgs.ERR_DENY:
 			raise sing_errs.PathError(rados_obj.get_data_path(),
 									  True)
 
-		elif res.op_status == sing_msgs.STAT_QUOTA:
+		elif res.op_status == sing_msgs.ERR_QUOTA:
 			raise sing_errs.QuotaError(obj_len, 0)
 
-		elif res.op_status == sing_msgs.STAT_PROT:
+		elif res.op_status == sing_msgs.ERR_PROT:
 			protocol = rados_obj.get_data_path().split(":")
 			raise sing_errs.ProtError(protocol[0])
 
