@@ -22,6 +22,7 @@ MSG_WRITE      =    3
 MSG_CON_REPLY  =    4
 MSG_CLOSE      =    5
 MSG_DELETE     =    6
+MSG_RELEASE    =    7
 
 
 # 'status_type' for MSG_STATUS messages
@@ -503,4 +504,59 @@ class DeleteMessage(InterMessage):
 		# decode a binary string to a Python string
 		self.data_path =\
 		"".join([str(chr(ch_item)) for ch_item in vals[0::1]])
+
+
+@InterMessage.register_subclass(MSG_RELEASE)
+class ReleaseMessage(InterMessage):
+	"""
+		Shared memory release notification message.
+	"""
+	def __init__(self, data_path="", merge_id=0):
+		super(ReadMessage, self).__init__(MSG_RELEASE, 
+										  len(data_path) + 6)
+		self.data_path = data_path
+		self.merge_id  = merge_id
+
+
+	def encode_msg(self):
+		"""
+			Encode the content of the message into binary form.
+		"""
+		msg_beg, vals = super(ReleaseMessage, self).encode_msg()
+		string_val    = "B"*len(self.data_path)
+		code_val      = "".join([msg_beg, "H", string_val, "I"])
+		vals.append(len(self.data_path)) # append length value
+		
+		# encode chars
+		for char_name in self.data_path:
+			vals.append(ord(char_name))
+		
+		# append merge ID
+		vals.append(self.merge_id)
+
+		# done
+		return struct.pack(code_val, *vals)
+
+
+
 	
+	def decode_msg(self, message):
+		"""
+			Decode the passsed binary message into the fields
+			of the message.
+		"""
+		path_length = struct.unpack("=H", message[0:2:1])
+		path_length = path_length[0] # tuple to int
+		chars = "B"*path_length
+		# now unpack the rest of the chars
+		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
+		
+		# decode a binary string to a Python string
+		self.data_path =\
+		"".join([str(chr(ch_item)) for ch_item in vals[0::1]])
+
+		# decode the merge ID
+		tmp_bit  = struct.unpack("=I", 
+						message[2+path_length:6+path_length:1])
+		self.merge_id = tmp_bit[0] # tuple to int
+
