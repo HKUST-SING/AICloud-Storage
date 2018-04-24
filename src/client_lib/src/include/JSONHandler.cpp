@@ -33,12 +33,9 @@ JSONResult::getObject(const std::string& objname)
 
   // just do simple search
   bpt::ptree* objPtr = nullptr;
-  try
-  {
-    objPtr = &(objRoot_.get_child(objname));
-  }
-  catch(std::exception& exp)
-  {}
+ 
+  // may throw exception 
+  objPtr = &(objRoot_.get_child(objname));
 
 
   return JSONResult::JSONIter(objPtr);
@@ -172,14 +169,9 @@ JSONResult::JSONIter::getObject(const std::string& objKey)
 
   // look for the object
   JSONTree* treePtr = nullptr;
-  try
-  {
-    treePtr = &(objTree_->get_child(objKey));
-  }
-  catch(const std::exception& exp)
-  {
-    treePtr = nullptr;
-  }
+  
+  // may throw exception
+  treePtr = &(objTree_->get_child(objKey));
 
   return JSONIter(treePtr);
 
