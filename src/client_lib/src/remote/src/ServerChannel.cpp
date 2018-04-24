@@ -47,7 +47,7 @@ ServerChannel::initChannel()
 	 */
 	std::thread tmpthread([&]{
 			restReceiver_.startReceive();
-			ioc_.run();});
+			ioc_->run();});
 	socketThread_ = std::move(tmpthread);
 	LOG(INFO) << "initial channel successfully";
 	return true;
@@ -59,7 +59,7 @@ ServerChannel::closeChannel()
 	LOG(INFO) << "start to close channel";
 
 	try{
-		ioc_.stop();
+		ioc_->stop();
 		socketThread_.join();
 		socket_->close();
 		socket_->release();

@@ -40,6 +40,10 @@ public:
 	explicit RESTReceiver(std::shared_ptr<tcp::socket> socket, 
 		std::shared_ptr<ReceivePool> receivePool)
 		:socket_(socket),receivePool_(receivePool){}
+	RESTReceiver(RESTReceiver&& other)
+	:socket_(std::move(other.socket_)),
+	 receivePool_(std::move(other.receivePool_))
+	{}
 
 	~RESTReceiver() = default;
 

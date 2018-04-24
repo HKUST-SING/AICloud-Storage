@@ -44,6 +44,10 @@ public:
 	
 	explicit RESTSender(std::shared_ptr<tcp::socket> socket)
 		:socket_(socket){}
+	RESTSender(RESTSender&& other)
+        :socket_(std::move(other.socket_)),
+         reqMap_(std::move(other.reqMap_))
+	{}
 
 	~RESTSender(){
 		socket_ = nullptr;

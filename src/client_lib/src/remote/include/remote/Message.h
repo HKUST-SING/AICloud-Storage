@@ -190,6 +190,11 @@ public:
 class ReceivePool{
 public:
   explicit ReceivePool() = default;
+  ReceivePool(ReceivePool *other)
+  :pool_(std::move(other->pool_)),
+   mutex_()
+  {}
+    
   ~ReceivePool(){
   	boost::mutex::scoped_lock lock(mutex_);
     pool_.clear();
