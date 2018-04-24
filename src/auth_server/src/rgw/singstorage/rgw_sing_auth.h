@@ -35,7 +35,7 @@ class SignedMachineEngine : public rgw::auth::Engine
   private:
     using result_t = rgw::auth::Engine::result_t;
     static const constexpr std::string::size_type AUTH_KEY_LENGTH = 
-                           std::string::size_type(256);
+                           std::string::size_type(32);
     
     CephContext* const cct_;
     RGWRados* const store_;
