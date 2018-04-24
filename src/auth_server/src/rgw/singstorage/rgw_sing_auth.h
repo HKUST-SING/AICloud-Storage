@@ -34,36 +34,24 @@ class SignedMachineEngine : public rgw::auth::Engine
 
   private:
     using result_t = rgw::auth::Engine::result_t;
-    static const constexpr std::string::size_type AUTH_KEY_LENGTH = 
-                           std::string::size_type(32);
+    static constexpr const size_t AUTH_KEY_LENGTH = 32;
     
     CephContext* const cct_;
     RGWRados* const store_;
-    const rgw::auth::TokenExtractor* const extractor_;
     const rgw::auth::LocalApplier::Factory* const apl_factory_;
 
-   
-    bool is_applicable(const std::string& token) const noexcept;
-    result_t authenticate(const std::string& token, 
-                          const req_state*s ) const;
-
-
-    std::pair<std::string, std::string> extract_auth_data(
-                           const std::string& token) const;
-
-    bool valid_shared_key(const std::string& secret) const;
+    bool valid_shared_key(const req_state* const state) const;
+    bool is_applicable(const req_state* const state) const;
 
 
 
   public:
     SignedMachineEngine(CephContext* const cct,
                         RGWRados* const store,
-                        const rgw::auth::TokenExtractor* const extractor,
                         const rgw::auth::LocalApplier::Factory* const apl_factory)
 
     : cct_(cct),
       store_(store),
-      extractor_(extractor),
       apl_factory_(apl_factory)
       {}
 
@@ -72,11 +60,11 @@ class SignedMachineEngine : public rgw::auth::Engine
       return "rgw::auth::singstorage::SignedMachineEngine";
     }
 
+    ~SignedMachineEngine() = default;
+
 
     /* public interface used by the processors */
-    result_t authenticate(const req_state* const st) const override {
-     return authenticate(extractor_->get_token(st), st);
-   }
+    result_t authenticate(const req_state* const st) const override;
 
 
 }; // class SignedMachineEngine 
@@ -90,37 +78,15 @@ class DefaultStrategy : public rgw::auth::Strategy,
   /** 
    *  A simpler version of the rgw::auth::swift::DefaultStrategy.
    *  We don't use RemoteAppliers and also we don't inherit from
-   *  the rgw::auth::TokenExtractor - we prefer composition.
+   *  the rgw::auth::TokenExtractor - don't need it.
    */
 
 
   private:
- 
-   class SimpleTokenExtractor : public rgw::auth::TokenExtractor
-   {
-     /** 
-      * Class Implements the TokenExtractor interface
-      * from the rgw_auth.h file.
-      */
 
-     public:
-       SimpleTokenExtractor()
-       : rgw::auth::TokenExtractor()
-        {}
-
-       ~SimpleTokenExtractor() {}
-
-       virtual std::string get_token(const req_state* state) const
-       {
-         return state->info.env->get("HTTP_X_AUTH_TOKEN", "");
-       }
-     
-   }; // class SimpleTokenExtractor
-
-  SimpleTokenExtractor* token_extr_;
-  RGWRados* const store_; // Rados Engine
-  using aplptr_t = rgw::auth::IdentityApplier::aplptr_t;
-  const rgw::auth::singstorage::SignedMachineEngine machine_engine_;
+    RGWRados* const store_; // Rados Engine
+    using aplptr_t = rgw::auth::IdentityApplier::aplptr_t;
+    const rgw::auth::singstorage::SignedMachineEngine machine_engine_;
 
 
   /** 
@@ -145,16 +111,11 @@ class DefaultStrategy : public rgw::auth::Strategy,
   public:
     DefaultStrategy(CephContext* const cct, 
                     RGWRados* const store)
-
-    : token_extr_(new SimpleTokenExtractor()),
-      store_(store),
+    : store_(store),
       machine_engine_(cct, store, 
-             static_cast<rgw::auth::TokenExtractor*>(token_extr_),
              static_cast<rgw::auth::LocalApplier::Factory*>(this))
 
-     {
-       assert(token_extr_); /// make sure there was no memory problem
-       
+     { 
        using Control = rgw::auth::Strategy::Control;
 
        // since all the engines have been initialized in the 
@@ -170,12 +131,7 @@ class DefaultStrategy : public rgw::auth::Strategy,
 
 
 
-   ~DefaultStrategy()
-    {
-      // delete the token extractor
-      delete token_extr_;
-      token_extr_ = nullptr;
-    }      
+   ~DefaultStrategy() = default; 
 
 
 

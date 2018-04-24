@@ -4,6 +4,7 @@
  * the system uses a lot of the swift code to authenticate users.
  */
 
+#include <cstring>
 
 #include "../rgw_client_io.h"
 #include "../rgw_http_client.h"
@@ -40,32 +41,21 @@ static std::string extract_swift_subuser_sing(const std::string& swift_user_name
 
 
 
-
-
-
 bool
-SignedMachineEngine::is_applicable(const std::string& token) const noexcept
+SignedMachineEngine::is_applicable(const req_state* const state) const
 {
-
-  if(token.empty())
-  {
-    return false;
-  }
-  else
-  {
-    return (token.compare(0, 10, "AUTH_rgwk") == 0);
-  }
-
-
+  return (state->info.env->get("HTTP_X_AUTH_USER", nullptr) != nullptr);
 }
 
 
-
 bool
-SignedMachineEngine::valid_shared_key(const std::string& secret) const
+SignedMachineEngine::valid_shared_key(const req_state* const state) const
 {
 
-  if(secret.length() != SignedMachineEngine::AUTH_KEY_LENGTH)
+  const char* secret = state->info.env->get("HTTP_X_AUTH_KEY", nullptr);
+  
+  if(   secret == nullptr 
+     || std::strlen(secret) != SignedMachineEngine::AUTH_KEY_LENGTH)
   {
     return false; // wrong shared key
   }
@@ -76,94 +66,50 @@ SignedMachineEngine::valid_shared_key(const std::string& secret) const
 
 }
 
-std::pair<std::string, std::string>
-SignedMachineEngine::extract_auth_data(const std::string& token) const
-{
-
-  // Logic is very simple: the fields until the first colon is
-  // the username, everything after the semicolon is the secret 
-  // shared key
-
-
-  std::string usr_key = token.substr(strlen("AUTH_rgwtk"));
-  
-  auto con_pos = usr_key.find(':'); // find the first occurrence of ':'
-
-  // check if the it is not the end
-  if(con_pos == std::string::npos ||
-     con_pos == std::string::size_type(0) ||
-     ++con_pos == std::string::npos)
-  {
-    // return an empty pair
-    return std::move(std::make_pair<std::string, std::string>("", ""));
-  }
-
-
-  // retrieve the username and the secret shared key from
-  // the token field
-  std::string username(std::move(token.substr(0, con_pos)));
-  std::string key(std::move(token.substr(con_pos)));
-
-  // return the parsed values
-  return std::move(std::make_pair<std::string, std::string>(std::move(username), std::move(key)));
-
-
-}
-
 
 SignedMachineEngine::result_t
-SignedMachineEngine::authenticate(const std::string& token,
-                                  const req_state* const state) const
-
+SignedMachineEngine::authenticate(const req_state* const state) const
 {
 
-  if(!is_applicable(token))
+  if(!valid_shared_key(state))
    {
      return result_t::deny(-EPERM);
    }
 
-  // extract information from the token
-  // (username and secret shared key)
 
-  std::pair<std::string, std::string> vals = std::move(extract_auth_data(token));
-
-  // check if the parsed values are valid
-  if(!vals.first.length() || !vals.second.length())
-  {
-    return result_t::deny(-EPERM); // something wring internally
-  }
-
-
-  // check if the shared secret key is valid
-  if(!valid_shared_key(vals.second))
-  {
-    // wrong secret key
-    return result_t::deny(-EPERM); 
-  }
-
-
-  // process the request
-  RGWUserInfo user_info;
-
-
-  int ret = rgw_get_user_info_by_swift(store_, vals.first, user_info);
-  if (ret < 0)
-  {
-    throw ret;
-  }
-  
-
-  // found a valid user
-  const auto siter = user_info.swift_keys.find(vals.first);
-
-  if(siter == std::end(user_info.swift_keys))
+  // check if there is a user name
+  if(!is_applicable(state))
   {
     return result_t::deny(-EPERM);
   }
 
 
+  // process the request
+  RGWUserInfo user_info;
+  
+  // there must be a user since we have passed 
+  // the 'is_applicable()' method.
+  std::string user_str(state->info.env->get("HTTP_X_AUTH_USER", ""));
+
+  int ret = rgw_get_user_info_by_swift(store_, user_str, user_info);
+  if (ret < 0)
+  {
+    throw ret;
+  }
+  
+  // found a valid user and its info 
+  // has been retrieved
+  // check if it has any secret keys
+  const auto siter = user_info.swift_keys.find(user_str);
+  
+  // user has no Swift keys --> cannot perform IO
+  if(siter == user_info.swift_keys.end())
+  {
+    return result_t::deny(-EPERM);
+  }
+
   auto apl = apl_factory_->create_apl_local(cct_, state, user_info,
-                 extract_swift_subuser_sing(vals.first));
+                 extract_swift_subuser_sing(user_str));
 
 
   return result_t::grant(std::move(apl));
