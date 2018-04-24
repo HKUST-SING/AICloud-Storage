@@ -206,7 +206,8 @@ class JSONDecoder
   public:
 
     /* Ensure a constant data buffer is created */
-    using ConstBuffer = typename std::conditional<std::is_pointer<T>::value,                        std::add_pointer_t<std::add_const_t<std::remove_pointer_t<T>>>, std::add_const_t<T>>::type;
+    using ConstBuffer = typename std::conditional<std::is_pointer<T>::value, 
+      typename std::add_pointer<typename std::add_const<typename std::remove_pointer<T>::type>::type>::type, typename std::add_const<T>::type>::type;
 
 
     JSONDecoder() = default;    
