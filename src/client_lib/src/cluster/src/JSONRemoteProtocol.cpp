@@ -2,6 +2,9 @@
 #include <exception>
 #include <algorithm>
 #include <cassert>
+#include <sstream>
+#include <cctype>
+
 
 
 // Google libs
@@ -1179,10 +1182,106 @@ JSONRemoteProtocol::JSONProtocolDeleteHandler::handleJSONMessage(
 
     RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
 
+    return; // no more processing
+
   }
 
 
+  auto& jsonRes = decoder.getResult();
+  JSONIter resObj;
+  bool failFound  = false;
+ 
+  // try to look for error messages
+  try
+  {
+    resObj = jsonRes.getObject("Result");
+  } catch(const std::exception& exp)
+  {
+    LOG(WARNING) << "JSONProtocolDeleteHandler::handleJSONMessage: "
+                 << "'Result' NOT found.";
+
+    failFound = true;
+  }
+  
+  if(failFound)
+  {
+    // set status to ERR_INTERNAL
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+    return;
+
+  }
+ 
+
+  try
+  {
+    std::string resMsg = resObj->getValue<std::string>("Response_Status");
+    RemoteProtocol::ProtocolHandler::ioStat_ = responseStatus(resMsg);  
+    
+  } catch(const std::exception& exp)
+  {
+    LOG(WARNING) << "JSONProtocolDeleteHandler::handleJSONMessage: "
+                 << "cannot find 'Response_Status'.";
+
+    failFound = true;
+  }
+
+   if(failFound)
+  {
+    // set status to ERR_INTERNAL
+    RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
+
+   }
+ 
+
 }
 
+CommonCode::IOStatus
+JSONRemoteProtocol::JSONProtocolDeleteHandler::responseStatus(
+                                  const std::string& resMsg) const
+{
+
+  // try to extract the response code from the message
+  std::stringstream ss("", std::ios_base::app | std::ios_base::out); 
+  
+  // go over the result string an look for a number
+  for(const auto& val : resMsg)
+  {
+    if(std::isdigit(val))
+    {
+      ss << val; // append all digits
+    }
+  }
+
+  if(ss.str().empty())
+  { // no digits (error)
+    return CommonCode::IOStatus::ERR_INTERNAL;
+  }
+
+  // convert into a value
+  auto resCode = std::stoul(ss.str(), nullptr, 10);
+  
+  // 200 means its a success
+  // 400 menas no such path/file
+  // other values is an internal error
+  
+  switch(resCode)
+  {
+    case 200:
+    {
+      return CommonCode::IOStatus::STAT_SUCCESS;
+    }
+    case 400:
+    {
+      return CommonCode::IOStatus::ERR_PATH;
+    }
+    default:
+      break;
+
+  }//switch
+  
+  return CommonCode::IOStatus::ERR_INTERNAL;
+
+}
 
 } // namesapce singaitstoraipc

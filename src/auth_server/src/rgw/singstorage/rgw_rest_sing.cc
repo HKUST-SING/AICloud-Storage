@@ -60,7 +60,8 @@ static void bulkdelete_respond(const unsigned num_deleted,
                                const int prot_flags,                  /* in  */
                                ceph::Formatter& formatter)            /* out */
 {
-  formatter.open_object_section("delete");
+  formatter.open_object_section("");       // empty object
+  formatter.open_object_section("Result"); // 'Result' object
 
   string resp_status;
   string resp_body;
@@ -84,10 +85,10 @@ static void bulkdelete_respond(const unsigned num_deleted,
     dump_errno(200, resp_status);
   }
 
-  encode_json("Number Deleted", num_deleted, &formatter);
-  encode_json("Number Not Found", num_unfound, &formatter);
-  encode_json("Response Body", resp_body, &formatter);
-  encode_json("Response Status", resp_status, &formatter);
+  encode_json("Number_Deleted", num_deleted, &formatter);
+  encode_json("Number_Not_Found", num_unfound, &formatter);
+  encode_json("Response_Body", resp_body, &formatter);
+  encode_json("Response_Status", resp_status, &formatter);
 
   formatter.open_array_section("Errors");
   for (const auto fail_desc : failures) {
@@ -104,9 +105,10 @@ static void bulkdelete_respond(const unsigned num_deleted,
     encode_json("Status", status, &formatter);
     formatter.close_section();
   }
-  formatter.close_section();
 
-  formatter.close_section();
+  formatter.close_section(); // close 'Errors'
+  formatter.close_section(); // close 'Result'
+  formatter.close_section(); // close '' (empty object)
 }
 
 

@@ -1,6 +1,7 @@
 #pragma once
 
 // C++ std lib
+#include <string>
 
 
 // Project lib
@@ -322,7 +323,11 @@ class JSONRemoteProtocol : public RemoteProtocol
         void handleJSONMessage(JSONDecoder<const uint8_t*>& dec, 
                                std::shared_ptr<IOResponse> ioRes,
                                const Task& task);
+
  
+
+      private:
+        CommonCode::IOStatus responseStatus(const std::string& resMsg) const;
         
 
     }; // class  JSONProtocolDeleteHandler
