@@ -351,7 +351,9 @@ StoreWorker::initialize()
   }
   
   // compute the SHA-256 digest
-  initSha = SHA256_Update(&shaCtx, (unsigned char*)WORKER_SHARED_SECRET, 
+  initSha = SHA256_Update(&shaCtx, 
+                          reinterpret_cast<const unsigned char*>\
+                          (WORKER_SHARED_SECRET), 
                           std::strlen(WORKER_SHARED_SECRET));
 
   if(!initSha)
@@ -366,6 +368,9 @@ StoreWorker::initialize()
   {
     return false; // cannot compute the digest
   }
+
+  // set the last character to '\0'
+  workerSecret[SHA256_DIGEST_LENGTH] = '\0'; // terminate string
 
   
   Worker::initDone(); // done initializing

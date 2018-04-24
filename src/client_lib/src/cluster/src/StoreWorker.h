@@ -460,11 +460,13 @@ class StoreWorker: public Worker
     std::map<std::string, OpContext>                 activeOps_;    
 
 
-    unsigned char workerSecret[SHA256_DIGEST_LENGTH]; // shared
+    unsigned char workerSecret[SHA256_DIGEST_LENGTH + 1]; 
+                                                      // shared
                                                       // secret
                                                       // between
                                                       // the workers
-                                                      // the auth server
+                                                      // and the auth
+                                                      // server
                                              
 
     CephContext* cephCtx_;     // for ceph communication  
