@@ -50,6 +50,12 @@
 | `char*`    | path_value              |
 
 
+| Data type  | Release                 |
+| ---------- | ----------------------- |
+| `uint16_t` | path_length (in bytes)  |
+| `char*`    | path_value              |
+| `uint32_t` | merge ID                |
+
 
 ## Inter-Connecting Message
 
