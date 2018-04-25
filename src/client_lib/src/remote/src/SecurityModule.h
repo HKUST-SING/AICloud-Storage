@@ -248,13 +248,6 @@ namespace singaistorageipc
                      IOResult&& res) override;
 
 
-       /**
-        * Start processing the incoming requests.
-        */
-
-       virtual void startService() override;
-
-
        
        /** 
         * It is possible that the write operation 
@@ -272,6 +265,13 @@ namespace singaistorageipc
        */
       ~SecurityModule() override;
 
+
+       /**
+        * For ensuring that the object is destroyed in
+        * a safe way (no problems with the destructor).
+        * (This method is supposed to be used to avoid
+        * dagling pointers in the class).
+        */
        void destroy() override;
 
       /**
@@ -279,6 +279,12 @@ namespace singaistorageipc
        * to terminate/finish processing.
        */
       virtual void joinService() override;
+
+
+      /**
+       * Start the worker thread for this module.
+       */
+      virtual void doStartService() override;
 
 
 

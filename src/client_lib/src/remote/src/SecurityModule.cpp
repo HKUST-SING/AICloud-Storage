@@ -199,7 +199,7 @@ void
 SecurityModule::processRequests()
 {
 
-  while(!Security::done_.load(std::memory_order_acquire))
+  while(!Security::done_.load(std::memory_order_relaxed))
   {
     //process the requests
 
@@ -742,7 +742,7 @@ SecurityModule::dequeueSocketErrors(std::vector<uint32_t>& errors)
 
 
 void
-SecurityModule::startService()
+SecurityModule::doStartService()
 {
   std::lock_guard<std::mutex> tmpLock(termLock_);
 
@@ -776,7 +776,7 @@ SecurityModule::destroy()
   }
  
 
-  // wait until the state is done
+  // wait until the worker thread is done
   { 
     std::unique_lock<std::mutex> tmpLock(termLock_);
    

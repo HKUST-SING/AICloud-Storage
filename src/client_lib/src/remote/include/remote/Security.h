@@ -64,7 +64,7 @@ class Security
      Security(std::unique_ptr<ServerChannel>&& comm,
               std::unique_ptr<SecureKey>&& secretKey = nullptr,
               std::unique_ptr<Cache>&&     userCache = nullptr)
-     : done_(false),
+     : done_(true),
        channel_(std::move(comm)),
        secret_(std::move(secretKey)),
        cache_(std::move(userCache))
@@ -163,7 +163,7 @@ class Security
       const auto startVal = done_.load(std::memory_order_acquire);
       if(!startVal) // the service must be started
       {
-        done_.store(true, std::memory_order_release); // stop the service
+        done_.store(true, std::memory_order_relaxed); // stop the service
         joinService();                                // wait to complete
       }
     }
@@ -181,7 +181,11 @@ class Security
   /**
    * For starting the service.
    */
-   virtual void startService() = 0;
+   inline void startService()
+   {
+     done_.store(false, std::memory_order_relaxed);
+     doStartService(); // start the implementation
+   }
 
 
   /** 
@@ -215,17 +219,23 @@ class Security
     /**
      * For destroyng a Security module.
      * The destructor is made protected in order to
-     * avoid destroyng an object without calling
-     * required steps.
+     * avoid destroying an object without calling
+     * required steps (the use of the method must
+     * ensure clean destruction of the object).
      */
     virtual void destroy() = 0;
 
 
+    /**
+     * For derived classes to initialize their
+     * internal structures.
+     */
+    virtual void doStartService() = 0;
+
     /** 
      * For joining the service.
      */ 
-    virtual void joinService()
-    {}
+    virtual void joinService() = 0;
 
 
   public:
