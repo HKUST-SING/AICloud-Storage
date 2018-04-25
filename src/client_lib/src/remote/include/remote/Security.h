@@ -28,6 +28,18 @@ namespace singaistorageipc
 *   |___|   \_|     |---
 **************************************************************/
 
+
+// forward declaration for security functions
+class Security;
+
+namespace securitymodule
+{
+  // specific functions to the security module.
+  void destroySecurity(Security* const obj);
+
+}
+
+
 class Security
 {
 
@@ -41,6 +53,9 @@ class Security
 
 
   public:
+
+     // for deleteting an object
+     using SecurityDeleter = void (*) (Security* const obj);
 
      Security() = delete;
      Security(const Security&) = delete;
@@ -59,14 +74,7 @@ class Security
      Security& operator=(Security&&); // support assignment
      
     
-     virtual ~Security() // shall be virtual
-     {
-       channel_.reset(nullptr); // destroy the managed channel
-       secret_.reset(nullptr);  // destroy the managed secret key
-       cache_.reset(nullptr);   // destroy the user data cache
-     }
-
-  
+       
     /**
      * Connection interface to the storage service. 
      * This method is used to perform initial user authentication
@@ -152,7 +160,12 @@ class Security
 
     inline void stopService(void)
     {
-      done_.store(true); // stop the service
+      const auto startVal = done_.load(std::memory_order_acquire);
+      if(!startVal) // the service must be started
+      {
+        done_.store(true, std::memory_order_release); // stop the service
+        joinService();                                // wait to complete
+      }
     }
    
     /**
@@ -170,13 +183,6 @@ class Security
    */
    virtual void startService() = 0;
 
-  /** 
-   * For joining the service.
-   */ 
-  virtual void joinService()
-  {}
-  
-
 
   /** 
    * For creating a security module chosen by the client.
@@ -184,14 +190,42 @@ class Security
    * @return : unique pointer to a security module 
    */
 
-   static std::shared_ptr<Security> createSecurityModule(
+   static std::shared_ptr<Security> createSharedSecurityModule(
         const char* secType,
         std::unique_ptr<ServerChannel>&& channel,
         std::unique_ptr<SecureKey>&& secKey = nullptr,
         std::unique_ptr<Cache>&& cache = nullptr);
 
 
+  protected:
+    virtual ~Security() // shall be virtual
+    {
+       channel_.reset(nullptr); // destroy the managed channel
+       secret_.reset(nullptr);  // destroy the managed secret key
+       cache_.reset(nullptr);   // destroy the user data cache
+    }
 
+
+     /**
+      * Friend function for destroying an instnace of the
+      * Security class.
+      */
+    friend void securitymodule::destroySecurity(Security* const obj);
+
+    /**
+     * For destroyng a Security module.
+     * The destructor is made protected in order to
+     * avoid destroyng an object without calling
+     * required steps.
+     */
+    virtual void destroy() = 0;
+
+
+    /** 
+     * For joining the service.
+     */ 
+    virtual void joinService()
+    {}
 
 
   public:

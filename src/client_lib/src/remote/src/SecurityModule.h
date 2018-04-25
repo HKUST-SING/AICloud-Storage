@@ -6,6 +6,7 @@
 #include <thread>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
 
 
 // Project lib
@@ -206,9 +207,6 @@ namespace singaistorageipc
       // supported constructors
       SecurityModule(std::unique_ptr<ServerChannel>&& comm);
 
- 
-      ~SecurityModule() override;
-
 
       bool initialize() override
       {
@@ -256,12 +254,6 @@ namespace singaistorageipc
 
        virtual void startService() override;
 
-       /**
-        * The calling thread waits the security module
-        * to terminate/finish processing.
-        */
-       virtual void joinService() override;
-
 
        
        /** 
@@ -270,6 +262,24 @@ namespace singaistorageipc
         * the taks issuer about it (INTERNAL ERROR).
         */
        void socketError(const uint32_t errTranID);
+
+
+
+    protected:
+      /**
+       * The Security class keeps the destructor protected,
+       * maintain the level of visibility.
+       */
+      ~SecurityModule() override;
+
+       void destroy() override;
+
+      /**
+       * The calling thread waits the security module
+       * to terminate/finish processing.
+       */
+      virtual void joinService() override;
+
 
 
     private: // private utility methods
@@ -365,7 +375,7 @@ namespace singaistorageipc
 
       std::thread                     workerThread_; // worker thread
       ConcurrentQueue<TaskWrapper, std::deque<TaskWrapper>> tasks_; // queue of messages to send 
-      std::map<uint32_t, TaskWrapper> responses_; // reponse futures
+      std::map<uint32_t, TaskWrapper> responses_; // futures for respones
       std::deque<TaskWrapper>         recvTasks_; // for dequeueing
         
  
@@ -374,16 +384,19 @@ namespace singaistorageipc
       
 
       /************** For locally failed write operations *************/
-      std::mutex                      errLock_;   // error lock
-      std::deque<uint32_t>            sockErrs_;  // failed write socket
-                                                  // messages
+      std::mutex                      errLock_;  // error lock
+      std::deque<uint32_t>            sockErrs_; // failed write socket
+                                                 // messages
 
-      
-            
+      uint32_t                        nextID_; // next transaction ID
+      uint32_t                        backID_; // oldest transaction ID 
 
+      std::mutex                      termLock_; // for clean 
+                                                 // termination
 
-      uint32_t nextID_; // next transaction ID
-      uint32_t backID_; // oldest transaction ID 
+      std::condition_variable         termVar_;  // for clean term
+      bool                            active_;   // active module                       
+
 
   }; // class SecurityModule
 

@@ -77,14 +77,15 @@ SecurityModule::FollySocketCallback::writeErr(
 SecurityModule::SecurityModule(std::unique_ptr<ServerChannel>&& comm)
 : Security(std::move(comm)),
   nextID_(0),
-  backID_(0)
+  backID_(0),
+  active_(false)
 {}
 
 
 
 SecurityModule::~SecurityModule()
 {
-  
+
 }
 
 
@@ -198,7 +199,7 @@ void
 SecurityModule::processRequests()
 {
 
-  while(!Security::done_.load(std::memory_order_relaxed))
+  while(!Security::done_.load(std::memory_order_acquire))
   {
     //process the requests
 
@@ -234,7 +235,7 @@ SecurityModule::processRequests()
   }// while
 
 
-  // terminate all incoming requests
+  // release the system resources
   closeSecurityModule();
 
 }
@@ -245,6 +246,11 @@ SecurityModule::closeSecurityModule()
 {
 
 
+  // close the channel
+  // (the channel must close all its sockets before)
+  channel_->closeChannel();
+
+
   // go over all pending reqeusts firs and reply them
   for(auto& pendTask : pendTrans_)
   {
@@ -252,10 +258,6 @@ SecurityModule::closeSecurityModule()
   }
 
   pendTrans_.clear(); // clear the pending transactions
-
-
-  // close the channel
-  channel_->closeChannel();
 
 
   // now handle all error tasks
@@ -269,8 +271,14 @@ SecurityModule::closeSecurityModule()
   recvTasks_.clear();
   responses_.clear();
 
-}
 
+  // mark the service as completed
+  {
+    std::lock_guard<std::mutex> tmpLock(termLock_);
+    active_ = false;
+    termVar_.notify_one(); // notify a thread
+  } // lock scope
+}
 
 
 void
@@ -736,10 +744,12 @@ SecurityModule::dequeueSocketErrors(std::vector<uint32_t>& errors)
 void
 SecurityModule::startService()
 {
+  std::lock_guard<std::mutex> tmpLock(termLock_);
+
   std::thread tmpThread(&SecurityModule::processRequests, this);
-  
   // move the reference to the class attribute
-   workerThread_ = std::move(tmpThread);
+  workerThread_ = std::move(tmpThread);
+  active_ = true; 
 }
 
 void
@@ -750,9 +760,35 @@ SecurityModule::joinService()
   workerThread_.join(); // wait the worker thread to
                         // terminate
 
-  channel_->closeChannel(); // stop the channel
-
 }
 
+
+void
+SecurityModule::destroy()
+{
+  // make sure the service has been stopped
+  const auto flag = Security::done_.load(std::memory_order_acquire);
+  
+  if(!flag)
+  {
+    // stop the service
+    Security::stopService();  
+  }
+ 
+
+  // wait until the state is done
+  { 
+    std::unique_lock<std::mutex> tmpLock(termLock_);
+   
+    while(active_)
+    {
+      termVar_.wait(tmpLock);
+    }
+
+  } // lock scope 
+
+  // done (now it is safe to destroy the object)
+
+}
 
 } // namespace singaistorageipc
