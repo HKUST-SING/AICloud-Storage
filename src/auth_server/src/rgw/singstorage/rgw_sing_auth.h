@@ -146,6 +146,21 @@ class DefaultStrategy : public rgw::auth::Strategy,
 
 
 class RGW_SINGSTORAGE_Auth_Get: public RGWOp {
+
+private:
+    /**
+     * A utility method for checking if the map stores
+     * the hashed version of the key.
+     * Need to make sure that the key is in the map
+     *
+     * @param: auth_keys : a map of authentication keys
+	 * @param: hashed auth key
+     *
+     * @return : true if found
+     */
+	bool search_key(const std::map<std::string, RGWAccessKey>& auth_keys,
+                    const char* hash_val) const noexcept;
+
 public:
   RGW_SINGSTORAGE_Auth_Get() {}
   ~RGW_SINGSTORAGE_Auth_Get() override {}

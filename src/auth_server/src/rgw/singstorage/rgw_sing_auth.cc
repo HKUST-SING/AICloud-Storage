@@ -6,6 +6,10 @@
 
 #include <cstring>
 
+// OpenSSL
+#include <openssl/sha.h>
+
+
 #include "../rgw_client_io.h"
 #include "../rgw_http_client.h"
 #include "../rgw_rest.h"
@@ -122,6 +126,69 @@ SignedMachineEngine::authenticate(const req_state* const state) const
 } /* namespace auth */
 } /* namespace rgw */
 
+
+
+
+bool
+RGW_SINGSTORAGE_Auth_Get::search_key(const std::map<std::string, RGWAccessKey>& auth_keys, const char* hash_val) const noexcept
+{
+
+  // make sure the key of the proper length
+  if(hash_val == nullptr || std::strlen(hash_val) != static_cast<size_t>(SHA256_DIGEST_LENGTH))
+  {
+    return false; // the length is not correct
+  }
+
+  // change the pointer type
+  const unsigned char* compare_hash = reinterpret_cast<const unsigned char*>  (hash_val);
+
+
+  // compute sha256 hash value 
+  unsigned char key_secret[SHA256_DIGEST_LENGTH + 1];
+  SHA256_CTX sha_tmp_ctx;
+  int hash_res = 0;  
+
+  // loop over all keys and compute their hash
+  for(const auto& map_item : auth_keys)
+  {
+    hash_res = SHA256_Init(&sha_tmp_ctx);
+    
+    if(!hash_res)
+    {
+      return false; // some internal error
+    }   
+
+    hash_res = SHA256_Update(&sha_tmp_ctx, 
+      reinterpret_cast<const unsigned char*>(map_item.first.c_str()),
+      map_item.first.length());
+
+    if(!hash_res)
+    {
+      return false; // some internal error
+    }
+
+    hash_res = SHA256_Final(key_secret, &sha_tmp_ctx);
+
+    if(!hash_res)
+    {
+      return false; // some internal error
+    }
+
+    // do simple string comparison
+    key_secret[SHA256_DIGEST_LENGTH] = '\0'; // make a string
+    
+    if(std::strcmp(compare_hash, key_secret) == 0)
+    {
+      return true;
+    }
+   
+  }// for
+
+
+  return false; // didn't find a match
+}
+
+
 void 
 RGW_SINGSTORAGE_Auth_Get::execute()
 {
@@ -129,9 +196,9 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   int ret = -EPERM;
   uint64_t err_code = rgw::singstorage::SINGErrorCode::USER_ERR; // no such username  
 
-  const char* key    = s->info.env->get("HTTP_X_AUTH_KEY", nullptr);
+  const char* key    = s->info.env->get("HTTP_X_AUTH_KEY",  nullptr);
   const char* user   = s->info.env->get("HTTP_X_AUTH_USER", nullptr);
-  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
+  const char* tranID = s->info.env->get("HTTP_X_TRAN_ID",   nullptr);
 
 
   //assert(key && user && tranID);
@@ -146,7 +213,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   RGWUserInfo info;
   bufferlist bl; 
   RGWAccessKey* sing_key;
-  map<string, RGWAccessKey>::iterator siter;
+  //map<string, RGWAccessKey>::iterator siter;
   string tenant_path; // tenant path
   
 
@@ -172,8 +239,10 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   }
 
 
-  siter = info.swift_keys.find(user_str);
-  if(siter == info.swift_keys.end()) // no such user found
+  // the sent auth value is a hashed password
+  // need to go over all strings an hash them
+ 
+  if(!search_key(info.swift_keys, key)) // no such user found
   {
     goto done_get_sing_auth;
   }
