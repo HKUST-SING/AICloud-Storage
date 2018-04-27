@@ -22,6 +22,7 @@ namespace rgw {
 namespace auth {
 namespace singstorage { 
 
+
 class SignedMachineEngine : public rgw::auth::Engine
 
 {
@@ -34,7 +35,7 @@ class SignedMachineEngine : public rgw::auth::Engine
 
   private:
     using result_t = rgw::auth::Engine::result_t;
-    static constexpr const size_t AUTH_KEY_LENGTH = 32;
+    //static constexpr const size_t AUTH_KEY_LENGTH = 32;
     
     CephContext* const cct_;
     RGWRados* const store_;
@@ -158,8 +159,21 @@ private:
      *
      * @return : true if found
      */
-	bool search_key(const std::map<std::string, RGWAccessKey>& auth_keys,
-                    const char* hash_val) const noexcept;
+     bool search_key(const std::map<std::string, RGWAccessKey>& auth_keys,
+                     const char* hash_val) const noexcept;
+
+
+    /**
+     * The method checks if hash of the swift key matches the 
+     * received authentication key.
+     *
+     * @param: swift_key : string which needs to be hashed
+     * @param: hash_val  : received hashed password
+     *
+     * @return: true if hash_val == sha256(swift_key) 
+     */
+     bool check_key(const char* swift_key, const char* hash_val) const noexcept;
+
 
 public:
   RGW_SINGSTORAGE_Auth_Get() {}

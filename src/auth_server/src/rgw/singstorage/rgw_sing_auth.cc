@@ -6,9 +6,6 @@
 
 #include <cstring>
 
-// OpenSSL
-#include <openssl/sha.h>
-
 
 #include "../rgw_client_io.h"
 #include "../rgw_http_client.h"
@@ -25,6 +22,13 @@
 #define AUTH_USER 0x01 // no such user found
 #define AUTH_PASS 0x02 // password is incorrect
 #define AUTH_ERR  0x10 // some internal error
+
+
+
+// OpenSSL
+#include <openssl/sha.h>
+static constexpr const size_t SING_AUTH_HASH_KEY_LEN = static_cast<const size_t>(SHA256_DIGEST_LENGTH);
+
 
 
 namespace rgw {
@@ -59,7 +63,7 @@ SignedMachineEngine::valid_shared_key(const req_state* const state) const
   const char* secret = state->info.env->get("HTTP_X_AUTH_KEY", nullptr);
   
   if(   secret == nullptr 
-     || std::strlen(secret) != SignedMachineEngine::AUTH_KEY_LENGTH)
+     || std::strlen(secret) != SING_AUTH_HASH_KEY_LEN)
   {
     return false; // wrong shared key
   }
@@ -134,13 +138,10 @@ RGW_SINGSTORAGE_Auth_Get::search_key(const std::map<std::string, RGWAccessKey>& 
 {
 
   // make sure the key of the proper length
-  if(hash_val == nullptr || std::strlen(hash_val) != static_cast<size_t>(SHA256_DIGEST_LENGTH))
+  if(hash_val == nullptr || std::strlen(hash_val) != SING_AUTH_HASH_KEY_LEN)
   {
     return false; // the length is not correct
   }
-
-  // change the pointer type
-  const unsigned char* compare_hash = reinterpret_cast<const unsigned char*>  (hash_val);
 
 
   // compute sha256 hash value 
@@ -177,7 +178,7 @@ RGW_SINGSTORAGE_Auth_Get::search_key(const std::map<std::string, RGWAccessKey>& 
     // do simple string comparison
     key_secret[SHA256_DIGEST_LENGTH] = '\0'; // make a string
     
-    if(std::strcmp(compare_hash, key_secret) == 0)
+    if(std::strcmp(hash_val, reinterpret_cast<const char*>(key_secret)) == 0)
     {
       return true;
     }
@@ -187,6 +188,60 @@ RGW_SINGSTORAGE_Auth_Get::search_key(const std::map<std::string, RGWAccessKey>& 
 
   return false; // didn't find a match
 }
+
+
+
+bool
+RGW_SINGSTORAGE_Auth_Get::check_key(const char* swift_key, const char* hash_val) const noexcept
+{
+
+  // need to check if the hash of swift_key matches
+  // hash_val
+  if(swift_key == nullptr || hash_val == nullptr || 
+     std::strlen(hash_val) != SING_AUTH_HASH_KEY_LEN)
+  {
+    return false; // not a match
+  }
+
+  // compute the hash of the swift_key
+  unsigned char swift_hash_val[SHA256_DIGEST_LENGTH + 1];
+
+  SHA256_CTX sha_ctx_tmp;
+  int hash_res = SHA256_Init(&sha_ctx_tmp);
+
+  if(!hash_res)
+  {
+    return false; // need to log this
+  }
+
+  hash_res = SHA256_Update(&sha_ctx_tmp,
+             reinterpret_cast<const unsigned char*>(swift_key),
+             std::strlen(swift_key));
+
+  if(!hash_res)
+  {
+    return false; // need to log this case
+  }
+  
+
+  // finally, compute digest
+  hash_res = SHA256_Final(swift_hash_val, &sha_ctx_tmp);
+
+  if(!hash_res)
+  {
+    return false; // need to log this case
+  }
+
+  // do string comparison
+  swift_hash_val[SHA256_DIGEST_LENGTH] = '\0'; // make a C string
+  
+  return (std::strcmp(hash_val, 
+          reinterpret_cast<const char*>(swift_hash_val)) == 0) ; 
+
+
+}
+
+
 
 
 void 
@@ -213,7 +268,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   RGWUserInfo info;
   bufferlist bl; 
   RGWAccessKey* sing_key;
-  //map<string, RGWAccessKey>::iterator siter;
+  map<string, RGWAccessKey>::iterator siter;
   string tenant_path; // tenant path
   
 
@@ -229,7 +284,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 
 
   // use SWIFT authentication procedure as it matches our current
-  // desing. Later, we need to change and move to our own system.
+  // design. Later, we need to change and move to our own system.
   if((ret = rgw_get_user_info_by_swift(store, user_str, info)) < 0)
   {
     // user error (no such user) 
@@ -239,18 +294,24 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   }
 
 
-  // the sent auth value is a hashed password
-  // need to go over all strings an hash them
- 
-  if(!search_key(info.swift_keys, key)) // no such user found
+
+  siter = info.swift_keys.find(user_str);
+  if(siter == info.swift_keys.end()) // no such user found
   {
     goto done_get_sing_auth;
   }
 
+  // the sent auth value is a hashed password
+  // need to go over all strings an hash them
+ 
 
   sing_key = &siter->second;
- 
-  if(sing_key->key.compare(key) != 0)
+
+  // the sent auth value is a hashed password
+  // need to check if the value matches the retrieved
+  // key (compute hash and compare) 
+
+  if(!check_key(sing_key->key.c_str(), key))
   {
     //dout (0) << "NOTICE: RGW_SING_Auth_Get::execute(): bad singstorage key" << dendl;
     err_code = rgw::singstorage::SINGErrorCode::PASSWD_ERR;
