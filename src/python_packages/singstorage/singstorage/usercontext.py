@@ -713,7 +713,7 @@ class UserContext(object):
 		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS) 
 		
 		# STATUS message must be received
-		assert res.msg_type == sing_msgs>MSG_STATUS, "Delete receives some different message"
+		assert res.msg_type == sing_msgs.MSG_STATUS, "Delete receives some different message"
 		assert res.msg_id == mark_id, "STATUS id != message id"
 
 
