@@ -607,11 +607,11 @@ class UserContext(object):
 		if res.msg_type == sing_msgs.MSG_STATUS:
 			tmp_logger.error("read_raw_data: == MSG_STATUS")
 			
-			if res.op_status == ERR_PATH:
+			if res.op_status == sing_msgs.ERR_PATH:
 				raise sing_errs.PathError(rado_obj.get_data_path(),
                                           False)
 		
-			elif res.op_status == ERR_DENY:
+			elif res.op_status == sing_msgs.ERR_DENY:
 				raise sing_errs.PathError(rados_obj.get_data_path(),
 										  True)
 
