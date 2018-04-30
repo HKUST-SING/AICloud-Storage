@@ -718,7 +718,7 @@ class UserContext(object):
 
 
 		# if status is success, return
-		if res.op_status == sing_msg.STAT_SUCCESS:
+		if res.op_status == sing_msgs.STAT_SUCCESS:
 			return	
 
 
