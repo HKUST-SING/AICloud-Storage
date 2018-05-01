@@ -18,7 +18,16 @@
 | ---------- | ----------------------- |         
 | `uint16_t` | path_length (in bytes)  |        
 | `char*`    | path_value              |                
-| `uint32_t` | properties (bitmap/flag)|        
+| `uint32_t` | properties (bitmap/flag)|  
+
+## Read Operation Property Table
+
+| Read Properites | Property Value |
+| --------------- | -------------- | 
+| Pending Read    |  `0x00000000`  |
+| New Read Op     |  `0x00000001`  |         
+|    Read Error   |  `0x00000002`  |
+
 
 | Data type  | Write                  |         
 | ---------- | ---------------------- |         
@@ -27,6 +36,15 @@
 | `uint32_t` | properties (bitmap)    |         
 | `uint64_t` | starting address       |
 | `uint64_t` | data_length (in bytes) |
+
+
+## Write Operation Property Table
+
+| Write Properties | Property Value |
+| ---------------- | -------------- |
+|  Pending Write   |  `0x00000000`  | 
+|   New Write Op   |  `0x00000001`  |
+|   Write Error    |  `0x00000002`  |
 
 
 | Data type  | Status      |
