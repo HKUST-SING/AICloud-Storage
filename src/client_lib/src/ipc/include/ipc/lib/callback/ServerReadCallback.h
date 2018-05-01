@@ -202,6 +202,7 @@ private:
     std::unordered_map<uint32_t,folly::Future<Task>> futurePool_;
 
     void sendStatus(uint32_t id, CommonCode::IOStatus type);
+    void close();
 
     /**
      * Const default value

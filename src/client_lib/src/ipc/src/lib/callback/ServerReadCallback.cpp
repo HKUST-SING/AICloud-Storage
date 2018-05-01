@@ -813,7 +813,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept
 	}	
 }
 
-void ServerReadCallback::readEOF() noexcept
+void ServerReadCallback::close()
 {
 	DLOG(INFO) << "start to close ServerReadCallback";
 	readBuffer_.clear();
@@ -862,6 +862,16 @@ void ServerReadCallback::readEOF() noexcept
 	unallocatedRequest_.clear();
 
 	DLOG(INFO) << "closed ServerReadCallback";
+}
+
+void ServerReadCallback::readEOF() noexcept
+{
+	Task task(username_,""
+			 ,CommonCode::IOOpCode::OP_CLOSE
+			 ,0,0,0,socket_->getFd());
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
+	future.get();
+	close();
 }
 
 }
