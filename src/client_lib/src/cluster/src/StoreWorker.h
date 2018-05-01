@@ -8,6 +8,7 @@
 #include <utility>
 #include <cstdint>
 #include <map>
+#include <unordered_map>
 #include <cstdint>
 #include <memory>
 #include <deque>
@@ -147,6 +148,8 @@ class StoreWorker: public Worker
     } WorkerContext; // struct WorkerContext
 
 
+    struct UserCtx; // structure of user contexts
+
     typedef struct OpContext
     {
       std::shared_ptr<RemoteProtocol::ProtocolHandler>   prot;
@@ -155,7 +158,8 @@ class StoreWorker: public Worker
       uint32_t                                         backID;
       uint64_t                                         totalOpSize;
       std::list<std::pair<uint32_t, librados::bufferlist>> pendData;
-      std::list<UpperRequest> pendRequests; // used by replies
+      std::list<UpperRequest>           pendRequests; // used by replies
+      std::unordered_map<void*, struct UserCtx* const> issuedOps; // Rados ops
       
 
       OpContext();
@@ -176,7 +180,13 @@ class StoreWorker: public Worker
 
        bool appendRequest(UpperRequest&& val);
 
+       bool insertUserCtx(struct UserCtx* const opCtx);
+       bool removeUserCtx(struct UserCtx* const opCtx);
+
        void closeContext();
+
+       bool isActive() const noexcept;
+
 
        private:
          bool active;
@@ -186,17 +196,21 @@ class StoreWorker: public Worker
 
     typedef struct UserCtx
     {
-      std::string path; // data path (key)
-      uint32_t    opID; // Rados operation id
+      std::string      path;  // data path (key)
+      uint32_t         opID;  // Rados operation id
+      volatile bool    valid; // is a valid operation
 
       UserCtx()
       : path(""), 
-        opID(0)
+        opID(0),
+        valid(true)
       {}
       
-      UserCtx(const std::string& pVal, const uint32_t tranID = 0)
+      UserCtx(const std::string& pVal, const uint32_t tranID = 0,
+              const bool opState = true)
       : path(pVal),
-        opID(tranID)
+        opID(tranID),
+        valid(opState)
       {}
 
        
@@ -323,6 +337,23 @@ class StoreWorker: public Worker
 
      
 
+     /**
+      * Process an IO cancel operation. Still method
+      * is called when the python module experiences
+      * some internal errors and needs to terminate its
+      * IO operations.
+      */
+     void processAbortOp(UpperRequest&& task);
+
+
+     /**
+      * Process a close operation. This method is
+      * called if user of the python package closes
+      * its operations. Need to clean up all the resources
+      * related to this user as no more needed.
+      */
+     void processCloseOp(UpperRequest&& task);
+
 
     
      /**
@@ -340,10 +371,23 @@ class StoreWorker: public Worker
       * Helper function for handling errors to the user.
       *
       * @param req  : refernece to the user context 
-      * @param stat : error code number
+      * @param stat : op status code
       */
-     inline void notifyUserError(UpperRequest& req, 
+     inline void notifyUserStatus(UpperRequest&& req, 
                                  const Status stat = Status::ERR_INTERNAL);
+
+
+     /**
+      * This method checks if the task has credentials to
+      * perform IO locally.
+      *
+      * @param opTask: operation task
+      * @param valTask: a validator task
+      *
+      * return true on successful validation
+      */
+
+     inline bool checkOpAuth(const Task& opTask, const Task& valTask);
 
 
       /**
@@ -354,11 +398,13 @@ class StoreWorker: public Worker
        *
        * @param : pathVal : operation data path
        * @param : opType  : operation type
+       * @param : sockfd  : a key for operation
        *
        * @return : possible to send the request
        */
       bool createOperationContext(const std::string& pathVal,
-                                  const OpCode opType);
+                                  const OpCode opType,
+                                  const int sockfd);
 
     /** 
      * Terminate the worker. Worker cleans itslef up
@@ -456,7 +502,7 @@ class StoreWorker: public Worker
 
 
     // serializes WRITES and READS to the same path
-    std::map<std::string, std::deque<UpperRequest> > pendTasks_;
+    std::map<std::string, std::list<UpperRequest> >  pendTasks_;
     std::map<std::string, OpContext>                 activeOps_;    
 
 

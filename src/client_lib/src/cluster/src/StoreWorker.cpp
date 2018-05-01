@@ -91,6 +91,7 @@ StoreWorker::OpContext::OpContext(struct StoreWorker::OpContext&& other)
   totalOpSize(other.totalOpSize),
   pendData(std::move(other.pendData)),
   pendRequests(std::move(other.pendRequests)),
+  issuedOps(std::move(other.issuedOps)),
   active(other.active)
 {}
  
@@ -106,6 +107,13 @@ StoreWorker::OpContext::~OpContext()
 
 }
  
+
+bool
+StoreWorker::OpContext::isActive() const noexcept
+{
+  return active;
+}
+
 
 bool
 StoreWorker::OpContext::insertReadBuffer(librados::bufferlist&& buffer,
@@ -181,6 +189,47 @@ StoreWorker::OpContext::appendRequest(StoreWorker::UpperRequest&& req)
   return false;
 }
 
+
+bool
+StoreWorker::OpContext::insertUserCtx(
+             struct StoreWorker::UserCtx* const opCtx)
+{
+
+  void* opKey = static_cast<void*>(opCtx);
+  assert(opKey); // make sure non-null
+  auto resPair = issuedOps.emplace(opKey, opCtx);
+
+  assert(resPair.second);
+
+  return resPair.second; // need to make sure is true
+
+}
+
+
+bool
+StoreWorker::OpContext::removeUserCtx(
+             struct StoreWorker::UserCtx* const opCtx)
+{
+  void* opKey = static_cast<void*>(opCtx);
+  assert(opKey); // non-nullptr
+  
+  auto delItr = issuedOps.find(opKey);
+  
+  if(delItr == issuedOps.end())
+  {
+    LOG(WARNING) << "StoreWorker::OpContext::removeUserCtx: "
+                 << "cannot find user context in the issuedOps.";
+
+    return false;
+  }
+
+  // found
+  // erase it
+  issuedOps.erase(delItr);
+
+  return true; // succeeded
+}
+
   
 void
 StoreWorker::OpContext::closeContext()
@@ -214,6 +263,17 @@ StoreWorker::OpContext::closeContext()
   }
 
   pendRequests.clear();
+
+
+  // set all Rados Operations
+  // to be invalid
+  for(auto& acOp : issuedOps)
+  {
+    acOp.second->valid = false; // mark the operation as
+                                // no more valid 
+  }
+
+  issuedOps.clear();
 
   active = false;
 }
@@ -482,6 +542,7 @@ StoreWorker::processTasks()
 {
 
   std::deque<UpperRequest> passedTasks;
+ 
 
   // process tasks from the concurretn queue
   while(!Worker::done_.load(std::memory_order_relaxed))
@@ -550,14 +611,42 @@ StoreWorker::processTasks()
           processNewWriteOp(std::move(tmpTask));
           
           break; // one task has been completed
-        }    
+        }
+
+        case CommonCode::IOOpCode::OP_ABORT:
+		{
+          processAbortOp(std::move(tmpTask));
+			
+          break; // one task has been completed
+		}
+
+        case CommonCode::IOOpCode::OP_CLOSE:
+        {
+          processCloseOp(std::move(tmpTask));
+
+          break; // one task has been processed
+        }
+
+        case CommonCode::IOOpCode::OP_EXIT:
+        {
+          // signal to terminate the worker
+          Worker::done_.store(true, std::memory_order_release);
+          
+          goto store_close_label; // leave the loop as
+                                  // soon as possible
+
+          break; // one op completed 
+        }
 
         default:
         {
-          Worker::done_.store(true, std::memory_order_release); 
-                                        // completed processing
+          DLOG(WARNING) << "StoreWorker::processTasks: "
+          << "switch found no operation.";
+  
+          break;
         }
       } // switch
+
 
     } // for (new tasks)
    
@@ -571,6 +660,10 @@ StoreWorker::processTasks()
 
 
   } // while
+
+
+// jump label for fast termination
+store_close_label:
 
   /* closing procedures come here */
   closeStoreWorker();
@@ -627,7 +720,7 @@ StoreWorker::handlePendingTasks()
     opCode = headOp.second.opType_;
 
     ctxRes = createOperationContext(headOp.second.path_,
-                                    opCode);
+                                    opCode, headOp.second.sock_);
 
     if(!ctxRes)
     {
@@ -643,10 +736,10 @@ StoreWorker::handlePendingTasks()
 
 
   // discard all empty lists
-  auto delBeg = pendTasks_.begin();
-  decltype(pendTasks_.begin()) prevItr;
+  auto delBeg = pendTasks_.cbegin();
+  decltype(pendTasks_.cbegin()) prevItr;
 
-  while(delBeg != pendTasks_.begin())
+  while(delBeg != pendTasks_.cend())
   {
     if(delBeg->second.empty())
     {
@@ -724,20 +817,39 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
 
   assert(procCtx);
 
+
+  // need to make sure that this Rados operation
+  // is still valid
+  if(!procCtx->valid)
+  { // the IO operation has been cancelled
+    delete procCtx; // handled the operation
+    return; 
+  }
+
+
   //find an active write operation
   auto writeIter = activeOps_.find(procCtx->path);
   const uint64_t writeOpSize = static_cast<const uint64_t>(procCtx->opID);
-  delete procCtx; // don't need anymore  
+ 
 
   if(writeIter == activeOps_.end())
   {
     LOG(ERROR) << "StoreWorker::processCompletedRadosWrite: " 
                << "writeIter == activeOps_.end()";
+
+    delete procCtx; 
     return;
   }
 
   // found an active write operation
   auto& opIter = writeIter->second;
+
+
+  // remove the user context from the list
+  // of pending Rados operations
+  opIter.removeUserCtx(procCtx);
+  delete procCtx;
+
 
   if(opCtx->opStatus != Status::STAT_SUCCESS)
   { // terminate the operation
@@ -877,7 +989,7 @@ StoreWorker::issueRadosWrite(StoreWorker::OpItr& iter)
   assert(objWrite);
 
   // must always be a valid context
-  StoreWorker::UserCtx* const procCtx = new StoreWorker::UserCtx(iter->first, 0);
+  StoreWorker::UserCtx* const procCtx = new StoreWorker::UserCtx(iter->first, 0, true);
    
   auto resData = opIter.prot->writeData(objWrite->getDataBuffer(),
                                  static_cast<void*>(procCtx));
@@ -897,6 +1009,10 @@ StoreWorker::issueRadosWrite(StoreWorker::OpItr& iter)
     // 4GB of data at once
     procCtx->opID = static_cast<uint32_t>(resData); 
     objWrite->updateDataBuffer(resData);
+
+    // enqueue the context to the list
+    // of active Rados ops
+    opIter.insertUserCtx(procCtx);
   } 
   
 }
@@ -912,6 +1028,16 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
 
   assert(procCtx);
 
+  // might be that the Rados Operation
+  // has been cancelled
+  if(!procCtx->valid)
+  {
+    // no need to handle this Rados Operation
+    delete procCtx;
+    return;
+  }
+
+
   // find an active operation
   auto readIter = activeOps_.find(procCtx->path);
   if(readIter == activeOps_.end())
@@ -925,6 +1051,9 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
   }
 
   auto& opIter = readIter->second;
+  // remove the context from the map of issued Rados ops
+  opIter.removeUserCtx(procCtx);
+
 
   if(opCtx->opStatus != Status::STAT_SUCCESS)
   { // terminate the operation
@@ -1088,7 +1217,7 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
     {
       // need to read more data
       StoreWorker::UserCtx* userCtx = new StoreWorker::UserCtx(
-               pendItr->first, opIter.tranID);
+               pendItr->first, opIter.tranID, true);
 
       // update transaction ID
       ++(opIter.tranID);
@@ -1105,6 +1234,11 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
         activeOps_.erase(pendItr);
           
       }
+      else
+      {
+        // need to enqueue the user context
+        opIter.insertUserCtx(userCtx);
+      }
     }//if  doneReading()
   }//else (STAT_PARTIAL_READ)
   
@@ -1113,24 +1247,40 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
 
 
 void
-StoreWorker::notifyUserError(StoreWorker::UpperRequest& req, 
+StoreWorker::notifyUserStatus(StoreWorker::UpperRequest&& req, 
                              const StoreWorker::Status stat)
 {
   // just simple error notification
   Task probTask(std::move(req.second));
   probTask.opStat_ = stat;
-  req.first.setValue(probTask);
+  req.first.setValue(std::move(probTask));
 }
 
+
+bool
+StoreWorker::checkOpAuth(const Task& opTask, const Task& valTask)
+{
+
+  return (opTask.username_ == valTask.username_ && 
+          opTask.sock_ == opTask.sock_);
+
+}
 
 
 bool
 StoreWorker::createOperationContext(const std::string& pathVal,
-                                    const StoreWorker::OpCode opType)
+                                    const StoreWorker::OpCode opType,
+                                    const int sockFd)
 {
   auto insRes = activeOps_.emplace(std::make_pair(
                                    std::string(pathVal),
                                    StoreWorker::OpContext()));
+
+  if(insRes.second)
+  {
+    // keep a reference to the socket
+    insRes.first->second.totalOpSize = static_cast<const uint64_t>(sockFd);
+  }
 
   return insRes.second;
 }
@@ -1171,7 +1321,7 @@ StoreWorker::processWriteOp(StoreWorker::UpperRequest&& task)
   if(ctxIter == activeOps_.end())
   {
     //error (reject operation)
-    notifyUserError(task, StoreWorker::Status::ERR_DENY);
+    notifyUserStatus(std::move(task), StoreWorker::Status::ERR_DENY);
   }
   else
   {
@@ -1181,9 +1331,9 @@ StoreWorker::processWriteOp(StoreWorker::UpperRequest&& task)
     // need to make sure that the same user
     // is accessing
     if(opIter.object.getObjectOpType() != OpCode::OP_WRITE
-       || opIter.object.getTask().username_ != task.second.username_)
+       || !checkOpAuth(task.second, opIter.object.getTask()))
     {
-      notifyUserError(task, Status::ERR_DENY);
+      notifyUserStatus(std::move(task), Status::ERR_DENY);
       return;
     }    
 
@@ -1210,19 +1360,19 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
   if(ctxIter == activeOps_.end())
   {
     //error (reject operation)
-    notifyUserError(task, StoreWorker::Status::ERR_DENY);
+    notifyUserStatus(std::move(task), StoreWorker::Status::ERR_DENY);
   }
   else
   {
-    // found an active write operation
+    // found an active read operation
     auto& opIter = ctxIter->second;
 
     // need to make sure that the same user
     // is accessing
     if(opIter.object.getObjectOpType() != OpCode::OP_READ
-       || opIter.object.getTask().username_ != task.second.username_)
+       || !checkOpAuth(task.second, opIter.object.getTask()))
     {
-      notifyUserError(task, Status::ERR_DENY);
+      notifyUserStatus(std::move(task), Status::ERR_DENY);
       return;
     }   
 
@@ -1252,14 +1402,135 @@ StoreWorker::processDeleteOp(StoreWorker::UpperRequest&& task)
   if(opIter == pendTasks_.end())
   { // insert a deque
     std::string pathVal(task.second.path_);
-    std::deque<UpperRequest> tmpDeque;
-    auto insRes = pendTasks_.insert(std::move(std::pair<std::string, std::deque<UpperRequest> >(std::move(pathVal), std::move(tmpDeque))));
+    std::list<UpperRequest> tmpDeque;
+    auto insRes = pendTasks_.insert(std::move(std::pair<std::string, std::list<UpperRequest> >(std::move(pathVal), std::move(tmpDeque))));
     assert(insRes.second);
     opIter= insRes.first;
   }
 
   opIter->second.push_back(std::move(task));
 
+}
+
+
+void
+StoreWorker::processAbortOp(StoreWorker::UpperRequest&& task)
+{
+  // need to find any pending operation
+  auto iterVal = activeOps_.find(task.second.path_);
+  
+  if(iterVal == activeOps_.end())
+  {
+    DLOG(WARNING) << "StoreWorker::processAbortOp: "
+                  << "data path has not been found";
+
+    notifyUserStatus(std::move(task), Status::ERR_INTERNAL);
+  }
+  else
+  {
+    // need to terminate all the operations
+    auto& opIter = iterVal->second;
+    
+    // check if the termination matches
+    // the operation tuple
+    if(!checkOpAuth(task.second, opIter.object.getTask()))
+    { // not authorized to abort
+      notifyUserStatus(std::move(task), Status::ERR_DENY);
+    }
+    else
+    { // terminate the operation
+      opIter.closeContext();
+      activeOps_.erase(iterVal);
+      notifyUserStatus(std::move(task), Status::STAT_SUCCESS);
+    }
+    
+  }
+
+}
+
+
+void
+StoreWorker::processCloseOp(StoreWorker::UpperRequest&& task)
+{
+
+  // first need to make sure to terminate
+  // an active op
+  auto pendOp = activeOps_.find(task.second.path_);
+  if(pendOp != std::end(activeOps_))
+  {
+    // need to make sure that the operation
+    // can be closed  
+    bool closeOp = false;
+    try
+    {
+      closeOp = checkOpAuth(task.second, pendOp->second.object.getTask());
+    }
+    catch(const std::exception& exp)
+    {
+      // no task has been found
+      // check only the socket
+      const int sockfd = static_cast<const int>(pendOp->second.totalOpSize);
+      closeOp = (sockfd == task.second.sock_);
+    }
+    
+    if(closeOp)
+    { // need to close the operation
+      pendOp->second.closeContext();
+    }
+
+  }
+
+  // socker id
+  const int sockKey = task.second.sock_;
+
+  // iterate over the map and
+  // delete all request with sock_
+  auto curMap = pendTasks_.begin();
+  decltype(pendTasks_.begin()) prevMap;
+
+  while(curMap != pendTasks_.end())
+  {
+    auto begList  = curMap->second.begin();
+    auto prevList = curMap->second.begin();
+    // iterate over a list and remove all
+    // requests with sock_
+
+    while(begList != curMap->second.end())
+    {
+      if(sockKey == begList->second.sock_)
+      { // delete this request
+        prevList = begList;
+        ++begList;
+        notifyUserStatus(std::move(*prevList), Status::STAT_CLOSE);
+
+        curMap->second.erase(prevList);
+      }
+      else
+      {
+        // just increment the iterator
+        ++begList;
+      }
+    } //while
+
+    // check if the list becomes empty
+    if(curMap->second.empty())
+    { // delete it
+      prevMap = curMap;
+      ++curMap;
+      pendTasks_.erase(prevMap);
+    }
+    else
+    { // move to the next list
+      ++curMap;
+    }
+
+  }//while
+
+  // done processing all the 
+  // requests, just notify the original close 
+  // task as stat close
+  notifyUserStatus(std::move(task), Status::STAT_CLOSE);
+    
 }
 
 
@@ -1272,8 +1543,8 @@ StoreWorker::processNewWriteOp(StoreWorker::UpperRequest&& task)
   if(opIter == pendTasks_.end())
   { // insert a deque
     std::string pathVal(task.second.path_);
-    std::deque<UpperRequest> tmpDeque;
-    auto insRes = pendTasks_.insert(std::move(std::pair<std::string, std::deque<UpperRequest> >(std::move(pathVal), std::move(tmpDeque))));
+    std::list<UpperRequest> tmpDeque;
+    auto insRes = pendTasks_.insert(std::move(std::pair<std::string, std::list<UpperRequest> >(std::move(pathVal), std::move(tmpDeque))));
     assert(insRes.second);
     opIter= insRes.first;
   }
@@ -1348,13 +1619,27 @@ StoreWorker::handleRemoteResponses()
 void
 StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator& resIter, std::shared_ptr<RemoteProtocol::ProtocolHandler> handler)
 {
+
+ 
  if(handler->needCephIO())
  {
-   // context has been created
-   auto pendOp = activeOps_.find(resIter->uppReq->second.path_);
-   assert(pendOp != activeOps_.end());
-   
-   auto& ctxItr = pendOp->second;
+   // operation context must have been
+   // preallocated
+   auto pendOpCtx = activeOps_.find(resIter->uppReq->second.path_);
+   assert(pendOpCtx != activeOps_.end());
+
+   auto& ctxItr = pendOpCtx->second; // get reference
+
+   // need to check the operation context is still
+   // active
+   if(!ctxItr.isActive())
+   { // has been terminated locally
+     notifyUserStatus(std::move(*(resIter->uppReq)), Status::STAT_CLOSE);
+     activeOps_.erase(pendOpCtx); // no more operations
+     return;
+   }
+
+
 
    ctxItr.prot = handler; // reset the handler
    ctxItr.totalOpSize = handler->getTotalDataSize(); 
@@ -1368,7 +1653,7 @@ StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator
    if(handler->getOpType() == OpCode::OP_CHECK_WRITE)
    {
      Task permTask(std::move(ctxItr.object.getTask(true)));
-     permTask.opStat_ = Status::STAT_SUCCESS;
+     permTask.opStat_ = handler->getStatusCode();
      ctxItr.object.setResponse(std::move(permTask));
    } // done
 
@@ -1384,10 +1669,19 @@ StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator
        // notify the user about the success
        Task delSuccess(std::move(resIter->uppReq->second));
        delSuccess.opStat_ = Status::STAT_SUCCESS;
+       auto pendOpCtx = activeOps_.find(delSuccess.path_);
+       assert(pendOpCtx != activeOps_.end());
+
+       // need to check if the context
+       // is still active
+       if(!pendOpCtx->second.isActive())
+       {
+         // notify closed successfully
+         delSuccess.opStat_ = Status::STAT_CLOSE;
+       }
+
        // remove the operation from active ones
-       auto delOpItr = activeOps_.find(delSuccess.path_);
-       assert(delOpItr != activeOps_.end());
-       activeOps_.erase(delOpItr);
+       activeOps_.erase(pendOpCtx);
 
        resIter->uppReq->first.setValue(std::move(delSuccess));
 
@@ -1412,12 +1706,20 @@ StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator
        // the result
        Task commitSuccess(std::move(resIter->uppReq->second));
        commitSuccess.opStat_ = Status::STAT_SUCCESS;
-       auto writeOpItr = activeOps_.find(commitSuccess.path_);
-       assert(writeOpItr != activeOps_.end());
-       assert(writeOpItr->second.object.getObjectOpStatus() == Status::STAT_CLOSE);
-      
+
+       auto pendOpCtx = activeOps_.find(commitSuccess.path_);
+       assert(pendOpCtx != activeOps_.end());
+       assert(pendOpCtx->second.object.getObjectOpStatus() == Status::STAT_CLOSE);
+
+       // if the operation has been closed
+       if(!pendOpCtx->second.isActive())
+       {
+         // closed
+         commitSuccess.opStat_ = Status::STAT_CLOSE;
+       }
+
        // delete the operation
-       activeOps_.erase(writeOpItr);
+       activeOps_.erase(pendOpCtx);
        resIter->uppReq->first.setValue(std::move(commitSuccess)); // confirm success
        
        break;
