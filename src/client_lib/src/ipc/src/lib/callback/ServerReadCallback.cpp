@@ -443,7 +443,7 @@ void ServerReadCallback::handleReadRequest(
 	if(pro == 0x00000001){
 		isnewcoming = true;
 	}
-	else(pro == 0x00000002){
+	else if(pro == 0x00000002){
 		isabort = true;
 	}
 
@@ -660,6 +660,7 @@ void ServerReadCallback::handleWriteRequest(
 		contextmap->second.processingRequests_.erase(tranID);
 		break;
 	default:
+		break;
 	}
 
 	Task task(username_,path,op,write_msg.getStartingAddress(),
@@ -712,7 +713,7 @@ void ServerReadCallback::handleDeleteRequest(
 	 */
 	Task task(username_,path
 			 ,CommonCode::IOOpCode::OP_DELETE
-			 ,0,0,tranID,socket_->getFd());
+			 ,0,0,tranID,0,socket_->getFd());
 
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	future.via(folly::EventBaseManager::get()->getEventBase())
@@ -723,7 +724,7 @@ void ServerReadCallback::handleDeleteRequest(
 
 //===================== Close =======================
 
-void ServerReadCallback::callbackDeleteRequest(Task task)
+void ServerReadCallback::callbackCloseRequest(Task task)
 {
 	futurePool_.erase(task.tranID_);
 
@@ -748,7 +749,7 @@ void ServerReadCallback::handleCloseRequest(
 	 */
 	Task task(username_,""
 			 ,CommonCode::IOOpCode::OP_CLOSE
-			 ,0,0,close_msg.getID(),socket_->getFd());
+			 ,0,0,close_msg.getID(),0,socket_->getFd());
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	future.via(folly::EventBaseManager::get()->getEventBase())
  		  .then(&ServerReadCallback::callbackCloseRequest,this);
@@ -813,7 +814,7 @@ void ServerReadCallback::readDataAvailable(size_t len)noexcept
 	}	
 }
 
-void ServerReadCallback::close()
+void ServerReadCallback::release()
 {
 	DLOG(INFO) << "start to close ServerReadCallback";
 	readBuffer_.clear();
@@ -868,10 +869,10 @@ void ServerReadCallback::readEOF() noexcept
 {
 	Task task(username_,""
 			 ,CommonCode::IOOpCode::OP_CLOSE
-			 ,0,0,0,socket_->getFd());
+			 ,0,0,0,0,socket_->getFd());
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	future.get();
-	close();
+	release();
 }
 
 }
