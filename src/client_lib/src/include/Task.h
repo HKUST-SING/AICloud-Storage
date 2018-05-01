@@ -29,8 +29,8 @@ typedef struct Task
 
 	uint64_t objSize_; // used by Unix service and worker to determine object size
 	CommonCode::IOStatus opStat_;
-
-    uint32_t mergeID_;
+        uint32_t mergeID_;
+	int sock_;
 
     /**
      * Default constructor.
@@ -45,7 +45,8 @@ typedef struct Task
       workerID_(0),
       objSize_(0),
       opStat_(CommonCode::IOStatus::ERR_INTERNAL),
-      mergeID_(0)
+      mergeID_(0),
+      sock_(0)    
     {}
 
 
@@ -62,8 +63,9 @@ typedef struct Task
           tranID_(0),
           workerID_(0),
           objSize_(0),
-		  opStat_(opStat),
-          mergeID_(0)
+	  opStat_(opStat),
+          mergeID_(0),
+	  sock_(0)
 	{}
 
 	/**
@@ -82,7 +84,8 @@ typedef struct Task
           workerID_(workerID),
 		  objSize_(0),
           opStat_(CommonCode::IOStatus::ERR_INTERNAL),
-          mergeID_(0)
+          mergeID_(0),
+	  sock_(0)
 
     {}
 
@@ -102,7 +105,8 @@ typedef struct Task
 		  workerID_(workerID),
 		  objSize_(remSize),
           opStat_(opStat),
-          mergeID_(0)
+          mergeID_(0),
+	  sock_(0)
      {}
 
 	/** 
@@ -118,7 +122,8 @@ typedef struct Task
       workerID_(other.workerID_),
 	  objSize_(other.objSize_),
       opStat_(other.opStat_),
-      mergeID_(other.mergeID_)
+      mergeID_(other.mergeID_),
+      sock_(other.sock_)
     {}
 
 	/**
@@ -132,9 +137,10 @@ typedef struct Task
        dataSize_(other.dataSize_),
        tranID_(other.tranID_),
        workerID_(other.workerID_),
-	   objSize_(other.objSize_),
+       objSize_(other.objSize_),
        opStat_(other.opStat_),
-       mergeID_(other.mergeID_)
+       mergeID_(other.mergeID_),
+       sock_(other.sock_)
      {}
 
 
@@ -157,6 +163,7 @@ typedef struct Task
         objSize_  = other.objSize_;
         opStat_   = other.opStat_;
         mergeID_  = other.mergeID_;
+        sock_     = other.sock_;
       }
 
       return *this;
@@ -181,6 +188,7 @@ typedef struct Task
         objSize_  = other.objSize_;
         opStat_   = other.opStat_;
         mergeID_  = other.mergeID_;
+	sock_     = other.sock_;
       }
 
       return *this;
@@ -201,7 +209,7 @@ typedef struct Task
                && (opType_ == other.opType_) && (dataAddr_ == dataAddr_)
                && (dataSize_ == dataSize_) && (tranID_ == other.tranID_)
                && (workerID_ == workerID_) && (objSize_ == objSize_)
-               && (opStat_ == opStat_) && (mergeID_ == mergeID_));
+               && (opStat_ == opStat_) && (mergeID_ == mergeID_) && (sock_ == other.sock_));
      }
 
 
@@ -219,7 +227,7 @@ typedef struct Task
                || (opType_ != other.opType_) || (dataAddr_ != dataAddr_)
                || (dataSize_ != dataSize_) || (tranID_ != other.tranID_)
                || (workerID_ != workerID_) || (objSize_ != objSize_)
-               || (opStat_ != opStat_) || (mergeID_ != mergeID_));
+               || (opStat_ != opStat_) || (mergeID_ != mergeID_) || (sock_ != other.sock_));
      }
 
 
