@@ -13,19 +13,7 @@
 | `char*`    | username                                    |
 | `char[32]` | password (hash)                             |
 
-| Data type  | Read                    |        | Read Properites | Property Value |
-| ---------- | ----------------------- |        | --------------- | -------------- | 
-| `uint16_t` | path_length (in bytes)  |        | Pending Read    |  `0x00000000`  |
-| `char*`    | path_value              |        | New Read Op     |  `0x00000001`  |         
-| `uint32_t` | properties (bitmap/flag)|        |    Read Error   |  `0x00000002`  |
 
-| Data type  | Write                  |         | Write Properties | Property Value |
-| ---------- | ---------------------- |         | ---------------- | -------------- |
-| `uint16_t` | path_length (in bytes) |         |  Pending Write   |  `0x00000000`  | 
-| `char*`    | path_value             |         |   New Write Op   |  `0x00000001`  |
-| `uint32_t` | properties (bitmap)    |         |   Write Error    |  `0x00000002`  |
-| `uint64_t` | starting address       |
-| `uint64_t` | data_length (in bytes) |
 
 | Data type  | Status      |
 | ---------- | ----------- |
