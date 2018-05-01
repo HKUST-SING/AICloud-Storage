@@ -368,10 +368,10 @@ bool ServerReadCallback::passReadRequesttoTask(
 
 	Task task(username_,path,CommonCode::IOOpCode::OP_READ,
 		(uint64_t)readSM_+memoryoffset,
-		allocsize,tranID,contextmap->second.workerID_);
+		allocsize,tranID,contextmap->second.workerID_,socket_->getFd());
 	
 	/**
-	 * TODO: call worker to do the task
+	 * call worker to do the task
 	 */
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 
@@ -394,6 +394,35 @@ bool ServerReadCallback::doReadCredential(uint32_t tranID,const std::string &pat
 	return passReadRequesttoTask(tranID,contextmap);
 }
 
+void ServerReadCallback::callbackReadAbort(Task task)
+{
+	/**
+	 * Erase future from the pool.
+	 */
+	futurePool_.erase(task.tranID_);
+
+	DLOG(INFO) << "reply read abort";
+	sendStatus(task.tranID_,task.opStat_);
+}
+
+void ServerReadCallback::doReadAbort(
+	uint32_t tranID,	
+	const std::unordered_map<std::string,
+					ReadRequestContext>::iterator contextmap)
+{
+	Task task(username_,contextmap->first,CommonCode::IOOpCode::OP_ABORT,
+		0,0,tranID,contextmap->second.workerID_,socket_->getFd());
+	
+	/**
+	 * call worker to do the task
+	 */
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
+
+ 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 		  .then(&ServerReadCallback::callbackReadAbort,this);
+ 	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
+}
+
 void ServerReadCallback::handleReadRequest(
 	std::unique_ptr<folly::IOBuf> data)
 {
@@ -410,8 +439,12 @@ void ServerReadCallback::handleReadRequest(
 	// Whether this read request is an new request.
 	uint32_t pro = read_msg.getProperties();
 	bool isnewcoming = false;
-	if(pro == 1){
+	bool isabort = false;	
+	if(pro == 0x00000001){
 		isnewcoming = true;
+	}
+	else(pro == 0x00000002){
+		isabort = true;
 	}
 
 
@@ -463,16 +496,14 @@ void ServerReadCallback::handleReadRequest(
 		 * Check whether last response represent
 		 * the operation has finished.
 		 */
-		bool isfinish = false;
-		if(lastresponse.getStartingAddress() == 0
-			&& lastresponse.getDataLength() == 0){
-			isfinish = true;
+		if(isabort){
+			doReadAbort(tranID,contextmap);
 		}
-
-		if(isfinish){
+		else if(lastresponse.getStartingAddress() == 0
+				&& lastresponse.getDataLength() == 0){
 			finishThisReadRequest(path);
 		}
-		else{ //if(isfinish)
+		else{
 			/**
 			 * Release memory.
 			 */
@@ -561,6 +592,15 @@ void ServerReadCallback::callbackWriteCredential(Task task)
 	doWriteRequestCallback(task,1);
 }
 
+void ServerReadCallback::callbackWriteAbort(Task task)
+{
+	futurePool_.erase(task.tranID_);
+
+	DLOG(INFO) << "reply WRITE abort";
+		
+	sendStatus(task.tranID_,task.opStat_);
+}
+
 void ServerReadCallback::handleWriteRequest(
 	std::unique_ptr<folly::IOBuf> data)
 {
@@ -599,8 +639,11 @@ void ServerReadCallback::handleWriteRequest(
 	/**
 	 * Write data to ceph.
 	 */
-	bool isfirst;
-	if(pro == 1){
+	bool isfirst = false;
+	CommonCode::IOOpCode op = CommonCode::IOOpCode::OP_WRITE;
+	switch(pro)
+	{
+	case 0x00000001:
 		/**
 		 *	The flag set. It means this is the first 
 		 *	message of a new request. We need authenticate 
@@ -610,25 +653,26 @@ void ServerReadCallback::handleWriteRequest(
 		 *	Here, we just grant every request.
 		 */
 		isfirst = true;
-	}
-	else{
-		isfirst = false;
-	}
-
-	CommonCode::IOOpCode op;
-	if(isfirst){
 		op = CommonCode::IOOpCode::OP_CHECK_WRITE;
-	}
-	else{
-		op = CommonCode::IOOpCode::OP_WRITE;
+		break;
+	case 0x00000002:
+		op = CommonCode::IOOpCode::OP_ABORT;
+		contextmap->second.processingRequests_.erase(tranID);
+		break;
+	default:
 	}
 
 	Task task(username_,path,op,write_msg.getStartingAddress(),
-		write_msg.getDataLength(),tranID,contextmap->second.workerID_);
+		write_msg.getDataLength(),tranID,
+		contextmap->second.workerID_,socket_->getFd());
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	if(isfirst){
  	 	future.via(folly::EventBaseManager::get()->getEventBase())
  	 		  .then(&ServerReadCallback::callbackWriteCredential,this);
+	}
+	else if(op == CommonCode::IOOpCode::OP_ABORT){
+ 	 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 	 		  .then(&ServerReadCallback::callbackWriteAbort,this);
 	}
 	else{
  		future.via(folly::EventBaseManager::get()->getEventBase())
@@ -668,7 +712,7 @@ void ServerReadCallback::handleDeleteRequest(
 	 */
 	Task task(username_,path
 			 ,CommonCode::IOOpCode::OP_DELETE
-			 ,0,0,tranID);
+			 ,0,0,tranID,socket_->getFd());
 
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	future.via(folly::EventBaseManager::get()->getEventBase())
@@ -679,6 +723,16 @@ void ServerReadCallback::handleDeleteRequest(
 
 //===================== Close =======================
 
+void ServerReadCallback::callbackDeleteRequest(Task task)
+{
+	futurePool_.erase(task.tranID_);
+
+	/**
+	 * Reply the result.
+	 */
+	sendStatus(task.tranID_,task.opStat_);
+}
+
 void ServerReadCallback::handleCloseRequest(
 	std::unique_ptr<folly::IOBuf> data)
 {
@@ -688,8 +742,17 @@ void ServerReadCallback::handleCloseRequest(
 		LOG(WARNING) << "fail to parse CLOSE request";
 		return;
 	}
-	sendStatus(close_msg.getID(),
-		CommonCode::IOStatus::STAT_SUCCESS);
+
+	/**
+	 * Send the request to the worker.
+	 */
+	Task task(username_,""
+			 ,CommonCode::IOOpCode::OP_CLOSE
+			 ,0,0,close_msg.getID(),socket_->getFd());
+	folly::Future<Task> future = std::move(worker_->sendTask(task));
+	future.via(folly::EventBaseManager::get()->getEventBase())
+ 		  .then(&ServerReadCallback::callbackCloseRequest,this);
+ 	futurePool_.emplace(std::make_pair(task.tranID_,std::move(future)));
 }
 
 //================================================================

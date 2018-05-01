@@ -178,12 +178,13 @@ private:
      * Future callback
      */
     void callbackAuthenticationRequest(Task);
-//    void callbackReadCredential(Task);
     void callbackReadRequest(Task);
+    void callbackReadAbort(Task);
     void callbackWriteCredential(Task);
-    void callbackWriteRequest(Task);  
-//    void callbackDeleteCredential(Task);
-    void callbackDeleteRequest(Task);   
+    void callbackWriteRequest(Task);
+    void callbackWriteAbort(Task task);  
+    void callbackDeleteRequest(Task);  
+    void callbackCloseRequest(Task); 
 
     /**
      * Helper functions
@@ -193,6 +194,8 @@ private:
     bool passReadRequesttoTask(uint32_t, const std::unordered_map
 				<std::string,ReadRequestContext>::iterator);
     bool doReadCredential(uint32_t,const std::string&);
+    void doReadAbort(uint32_t, const std::unordered_map
+                <std::string,ReadRequestContext>::iterator);
     void sendWriteReply(std::string,uint32_t,uint32_t,bool);
     void doWriteRequestCallback(Task,uint32_t);
 
