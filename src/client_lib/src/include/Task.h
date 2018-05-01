@@ -54,10 +54,11 @@ typedef struct Task
 	 * Used for create a Task.
 	 * Dedicated for AUTH response
 	 */
-	Task(const std::string& username, const CommonCode::IOStatus opStat)
-		: username_(username),
+	Task(const std::string& username, const CommonCode::IOStatus opStat,
+	     const int sockId = 0)
+          : username_(username),
           path_(std::string("")),
-		  opType_(CommonCode::IOOpCode::OP_AUTH),
+          opType_(CommonCode::IOOpCode::OP_AUTH),
           dataAddr_(0),
           dataSize_(0),
           tranID_(0),
@@ -65,7 +66,7 @@ typedef struct Task
           objSize_(0),
 	  opStat_(opStat),
           mergeID_(0),
-	  sock_(0)
+	  sock_(sockId)
 	{}
 
 	/**
@@ -74,18 +75,18 @@ typedef struct Task
 	Task(const std::string& username, const std::string& path, 
         const CommonCode::IOOpCode opType, const uint64_t dataAddr, 
         const uint32_t dataSize, const uint32_t tranID,
-		const uint32_t workerID = 0)
-		: username_(username),
+		const uint32_t workerID, const int sockId)
+          : username_(username),
           path_(path),
           opType_(opType),
-		  dataAddr_(dataAddr),
+          dataAddr_(dataAddr),
           dataSize_(dataSize),
           tranID_(tranID),
           workerID_(workerID),
-		  objSize_(0),
+          objSize_(0),
           opStat_(CommonCode::IOStatus::ERR_INTERNAL),
           mergeID_(0),
-	  sock_(0)
+	  sock_(sockId)
 
     {}
 
@@ -95,15 +96,15 @@ typedef struct Task
 	Task(const std::string& username, const std::string& path, 
          const uint32_t tranID, const uint32_t workerID,
 		 const uint64_t remSize, const CommonCode::IOOpCode opCode,
-         const CommonCode::IOStatus opStat)
-		: username_(username),
+                 const CommonCode::IOStatus opStat)
+          : username_(username),
           path_(path),
           opType_(opCode),
           dataAddr_(0),
           dataSize_(0),
           tranID_(tranID),
-		  workerID_(workerID),
-		  objSize_(remSize),
+	  workerID_(workerID),
+	  objSize_(remSize),
           opStat_(opStat),
           mergeID_(0),
 	  sock_(0)
@@ -120,7 +121,7 @@ typedef struct Task
       dataSize_(other.dataSize_),
       tranID_(other.tranID_),
       workerID_(other.workerID_),
-	  objSize_(other.objSize_),
+      objSize_(other.objSize_),
       opStat_(other.opStat_),
       mergeID_(other.mergeID_),
       sock_(other.sock_)
