@@ -16,6 +16,8 @@ typedef struct CommonCode final
     OP_CLOSE        = 6,
     OP_APPEND       = 7,  // same as write only that append data
     OP_CHECK_WRITE  = 8,  // check if can write that many bytes
+    OP_ABORT        = 9,  // abort active IO operation
+    OP_EXIT         = 10, // exit the processing step
     OP_NOP          = 255 // no operation (for default initialization)
 
   }; // enum IOOpCode
