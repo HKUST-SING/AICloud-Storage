@@ -14,6 +14,20 @@
 | `char[32]` | password (hash)                             |
 
 
+| Data type  | Read                    |        
+| ---------- | ----------------------- |         
+| `uint16_t` | path_length (in bytes)  |        
+| `char*`    | path_value              |                
+| `uint32_t` | properties (bitmap/flag)|        
+
+| Data type  | Write                  |         
+| ---------- | ---------------------- |         
+| `uint16_t` | path_length (in bytes) |          
+| `char*`    | path_value             |       
+| `uint32_t` | properties (bitmap)    |         
+| `uint64_t` | starting address       |
+| `uint64_t` | data_length (in bytes) |
+
 
 | Data type  | Status      |
 | ---------- | ----------- |
