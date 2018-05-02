@@ -14,11 +14,15 @@ namespace singaistorageipc{
 
 class IPCContext{
 public:
-	IPCContext(std::string s, int backlog){
+	IPCContext(std::string s, int backlog,
+				std::shared_ptr<Security> sec,
+				std::shared_ptr<WorkerPool> worker){
 		addr_ = folly::SocketAddress::makeFromPath(s);
 		backlog_ = backlog;
 		socketsMap_ = std::make_shared<
 						std::unordered_map<int,PersistentConnection>>();
+		sec_ = sec;
+		worker_ = worker;
 	};
 
 	folly::SocketAddress addr_;
