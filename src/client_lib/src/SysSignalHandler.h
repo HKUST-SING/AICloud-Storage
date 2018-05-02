@@ -6,6 +6,7 @@
 
 #include <csignal>
 
+// Facebook folly
 #include <folly/io/async/AsyncSignalHandler.h>
 #include <folly/io/async/EventBase.h>
 
@@ -22,15 +23,15 @@ public:
 	
 	void signalReceived(int signum) noexcept override{
 		LOG(INFO) << "receive signal";
-		if(signum != SIGINT){
-			/**
-			 * We don't handle other signal here.
-			 */
-			return;
-		}
 		auto evb = getEventBase();
 		evb->terminateLoopSoon();
+
+		// Stop each module.
+		// The order reverts from the initialization.
+		ipcserver_->stop();
 	}
+private:
+	std::unique_ptr<IPCServer> ipcserver_;
 };
 
 }
