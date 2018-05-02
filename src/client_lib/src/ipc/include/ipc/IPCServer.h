@@ -27,19 +27,16 @@ namespace singaistorageipc{
 class IPCServer final{
 public:
 	IPCServer() = delete;
-	IPCServer(IPCContext context)
+	IPCServer(IPCContext context,folly::EventBase *evb)
 	:context_(context),
-	evb_(folly::EventBaseManager::get()->getEventBase()),
+	evb_(evb),
 	scb_(context_.bufferSize_,context_.minAllocBuf_,
 	    context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
         context_.socketsMap_,context_.sec_,context_.worker_),
 	ccb_(context_.socketsMap_),
-	sighandler_(evb_)
-	{
-		socket_ = folly::AsyncServerSocket::newSocket(evb_);
-		sighandler_.registerSignalHandler(SIGINT);
-	};
+	socket_(folly::AsyncServerSocket::newSocket(evb_))
+	{};
 
 	void start();
     void stop();
@@ -49,7 +46,6 @@ private:
 	folly::EventBase *evb_;
 	ServerAcceptCallback scb_;
 	ClientConnectionCallback ccb_;
-	SysSignalHandler sighandler_;
 	std::shared_ptr<folly::AsyncServerSocket> socket_;
 };
 

@@ -8,7 +8,6 @@
 
 #include <folly/io/async/AsyncSignalHandler.h>
 #include <folly/io/async/EventBase.h>
-#include <folly/io/async/AsyncServerSocket.h>
 
 namespace singaistorageipc{
 
@@ -18,15 +17,17 @@ public:
 
 	~SysSignalHandler() override{
 	};
+
+	int runProcess(int argc, const char **argv);
 	
 	void signalReceived(int signum) noexcept override{
+		LOG(INFO) << "receive signal";
 		if(signum != SIGINT){
 			/**
 			 * We don't handle other signal here.
 			 */
 			return;
 		}
-		LOG(INFO) << "receive SIGINT signal, processing termination";
 		auto evb = getEventBase();
 		evb->terminateLoopSoon();
 	}
