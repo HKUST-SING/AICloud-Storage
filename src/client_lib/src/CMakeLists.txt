@@ -19,6 +19,7 @@ find_package(FacebookFolly REQUIRED)
 #Ceph librados has to be included as well
 find_package(CephRados REQUIRED)
 
+
 # Google logging library
 find_package(Glog REQUIRED)
 add_library(glog::glog UNKNOWN IMPORTED)
@@ -28,11 +29,20 @@ set_target_properties(glog::glog PROPERTIES
              IMPORTED_LOCATION
              ${GLOG_LIBRARIES})
 
-# Boost library required
+
+# Boost libraries required
 find_package(Boost 1.66 REQUIRED)
 add_library(Boost::boost INTERFACE IMPORTED)
-set_property(TARGET Boost::boost PROPERTY
-             INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
+set_target_properties(Boost::boost PROPERTIES
+             INTERFACE_INCLUDE_DIRECTORIES 
+             ${Boost_INCLUDE_DIRS}
+            )
+
+
+
+
+# explicit folly requirements
+list(APPEND FOLLY_REQS "ssl" "crypto" "rt" "pthread" "glog" "event" "dl" "double-conversion")
 
 # Build our targets
 add_subdirectory(include)
@@ -50,8 +60,12 @@ if(SING_ENABLE_LOG)
   target_compile_definitions(rados_cli PRIVATE SING_ENABLE_LOG=1)
 endif(SING_ENABLE_LOG)
 
+
 # Link to all dependencies
-target_link_libraries(rados_cli PRIVATE 
+target_link_libraries(rados_cli 
+                          PRIVATE
                           singstorage::clusterlib 
                           singstorage::remotelib
-                          singstorage::ipclib)
+                          singstorage::ipclib
+                          ${FOLLY_REQS}
+                     )

@@ -6,8 +6,9 @@ project(includeproj VERSION 0.1 LANGUAGES C CXX)
 
 # Define the library for linking with others
 
-add_library(jsonlib 
-    JSONHandler.cpp)
+add_library(jsonlib
+    JSONHandler.cpp
+    )
 
 
 add_library(singstorage::jsonlib ALIAS jsonlib)
@@ -40,5 +41,4 @@ target_link_libraries(jsonlib
     PUBLIC
       Boost::boost
       glog::glog
-    )
-    
+    )    

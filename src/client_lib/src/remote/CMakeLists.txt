@@ -6,7 +6,7 @@ project(remoteproj VERSION 0.1 LANGUAGES C CXX)
 
 # Find extra boost coponents
 find_package(Boost 1.66 REQUIRED COMPONENTS
-             system)
+             system context)
 
 
 # required by GCC
@@ -61,5 +61,8 @@ target_link_libraries(remotelib
       Boost::boost
       glog::glog
       ${Boost_SYSTEM_LIBRARY}
+      ${Boost_CONTEXT_LIBRARY}
       ${CMAKE_THREAD_LIBS_INIT}
+      ${CMAKE_DL_LIBS}
+      ${FOLLY_REQS}
     )

@@ -60,5 +60,6 @@ target_link_libraries(clusterlib
       glog::glog
       OpenSSL::Crypto
       ${CMAKE_THREAD_LIBS_INIT}
+      ${CMAKE_DL_LIBS}
     )
     

@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(ipcproj VERSION 0.1 LANGUAGES C CXX)
 
 
+
+# Find extra boost coponents
+find_package(Boost 1.66 REQUIRED COMPONENTS
+             system context)
+
+
 # Need to link to OpenSSL
 find_package(OpenSSL REQUIRED)
 
@@ -50,5 +56,9 @@ target_link_libraries(ipclib
       FacebookFolly::FacebookFolly
       glog::glog
       OpenSSL::Crypto
+      ${Boost_SYSTEM_LIBRARY}
+      ${Boost_CONTEXT_LIBRARY}
+      ${CMAKE_DL_LIBS}
+      ${FOLLY_REQS}
     )
     

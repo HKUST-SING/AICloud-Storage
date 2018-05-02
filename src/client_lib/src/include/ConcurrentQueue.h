@@ -85,6 +85,21 @@ ConcurrentQueue<T, Container>::ConcurrentQueue()
   
 }
 
+template<class T, class Container>
+ConcurrentQueue<T, Container>::~ConcurrentQueue()
+{
+
+  if(!empty())
+  {
+    while(!queue_.empty())
+    {
+      queue_.pop();
+    }
+  }
+
+}
+
+
 
 template <class T, class Container>
 T ConcurrentQueue<T, Container>::pop()
