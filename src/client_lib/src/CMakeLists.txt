@@ -16,6 +16,10 @@ include(GNUInstallDirs)
 find_package(FacebookFolly REQUIRED)
 
 
+# explicit folly requirements
+list(APPEND FOLLY_REQS "ssl" "crypto" "rt" "pthread" "glog" "event" "dl" "double-conversion")
+
+
 #Ceph librados has to be included as well
 find_package(CephRados REQUIRED)
 
@@ -40,10 +44,6 @@ set_target_properties(Boost::boost PROPERTIES
 
 
 
-
-# explicit folly requirements
-list(APPEND FOLLY_REQS "ssl" "crypto" "rt" "pthread" "glog" "event" "dl" "double-conversion")
-
 # Build our targets
 add_subdirectory(include)
 add_subdirectory(cluster)
@@ -67,5 +67,4 @@ target_link_libraries(rados_cli
                           singstorage::clusterlib 
                           singstorage::remotelib
                           singstorage::ipclib
-                          ${FOLLY_REQS}
                      )

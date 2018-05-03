@@ -215,7 +215,11 @@ int main(const int argc, const char* argv[])
   // start the security service
   securityPtr->startService();
   
-  
+
+  auto workerPool = WorkerPool::createWorkerPool("Default", 0, 0);
+
+  // creating and starting the IPC components 
+    
 
   return EXIT_SUCCESS;
 }

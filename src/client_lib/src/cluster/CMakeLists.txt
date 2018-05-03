@@ -17,6 +17,7 @@ add_library(clusterlib
     src/CephContext.cpp
     src/DataObject.cpp
     src/Worker.cpp
+    src/WorkerPool.cpp
     src/StoreWorker.cpp
     src/RemoteProtocol.cpp
     src/JSONRemoteProtocol.cpp)

@@ -653,6 +653,32 @@ WriteObject::getTask(const bool moveVal)
 }
 
 
+const WriteObject::UserCtx&
+WriteObject::getUserContext() const
+{
+  if(validCtx_)
+  {
+    return useCtx_;
+  }
+
+  throw std::logic_error("Invalid User Context.");
+
+}
+
+
+WriteObject::UserCtx&
+WriteObject::getUserContext(const bool boolVal)
+{
+  if(validCtx_)
+  {
+    return useCtx_;
+  }
+
+  throw std::logic_error("Invalid User Context.");
+
+}
+
+
 
 void
 WriteObject::updateDataBuffer(const uint64_t discard)
@@ -825,6 +851,34 @@ ReadObject::getTask(const bool moveVal)
 
   throw std::logic_error("Invalid User Context");
 }
+
+
+const ReadObject::UserCtx&
+ReadObject::getUserContext() const
+{
+  if(validCtx_)
+  {
+    return useCtx_;
+  }
+
+  throw std::logic_error("Invalid User Context.");
+}
+
+
+ReadObject::UserCtx&
+ReadObject::getUserContext(const bool boolVal)
+{
+  if(validCtx_)
+  {
+    validCtx_ = false;
+
+    return useCtx_;
+  }
+
+  throw std::logic_error("Inalid User Context.");
+
+}
+
 
 
 const char*

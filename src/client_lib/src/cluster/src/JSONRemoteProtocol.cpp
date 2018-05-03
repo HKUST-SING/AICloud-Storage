@@ -56,6 +56,9 @@ namespace singaistorageipc
 JSONRemoteProtocol::JSONRemoteProtocol()
 {}
 
+JSONRemoteProtocol::~JSONRemoteProtocol()
+{ 
+}
 
 bool
 JSONRemoteProtocol::doInitialize()
@@ -230,11 +233,16 @@ const Task& task)
 }
 
 
+JSONRemoteProtocol::JSONProtocolStatusHandler::~JSONProtocolStatusHandler()
+{}
+
+
 JSONRemoteProtocol::JSONProtocolVoidHandler::JSONProtocolVoidHandler(CephContext& cephCont, const CommonCode::IOOpCode opCode)
 : RemoteProtocol::ProtocolHandler(cephCont, opCode, false)
 {
   RemoteProtocol::ProtocolHandler::ioStat_ = CommonCode::IOStatus::ERR_INTERNAL;
 }
+
 
 
 JSONRemoteProtocol::JSONProtocolReadHandler::JSONProtocolReadHandler(CephContext& cephCont)
