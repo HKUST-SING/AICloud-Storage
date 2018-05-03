@@ -187,7 +187,7 @@ class Worker
      *
      * @return : worker
      */
-    static std::shared_ptr<Worker> createRadosWorker(const char* type,
+    static std::unique_ptr<Worker> createRadosWorker(const char* type,
                                      std::unique_ptr<CephContext>&& ctx,
                                      std::unique_ptr<RemoteProtocol>&& prot,
                                      const uint32_t id,
@@ -204,7 +204,7 @@ class Worker
      *
      * @return : worker
      */
-    static std::shared_ptr<Worker> createRadosWorker(
+    static std::unique_ptr<Worker> createRadosWorker(
                                      const std::string& type,
                                      std::unique_ptr<CephContext>&& ctx,
                                      std::unique_ptr<RemoteProtocol>&& prot,

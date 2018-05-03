@@ -11,7 +11,7 @@
 namespace singaistorageipc
 {
 
-std::shared_ptr<Worker>
+std::unique_ptr<Worker>
 Worker::createRadosWorker(const char* type,
                     std::unique_ptr<CephContext>&&    ctx,
                     std::unique_ptr<RemoteProtocol>&& prot,
@@ -21,14 +21,14 @@ Worker::createRadosWorker(const char* type,
   // only one type is now supported
   // later might support more
 
-  return std::make_shared<StoreWorker>(std::move(ctx),
+  return std::make_unique<StoreWorker>(std::move(ctx),
                                        std::move(prot),
                                        id, sec);
 
 }
 
 
-std::shared_ptr<Worker>
+std::unique_ptr<Worker>
 Worker::createRadosWorker(const std::string& type,
                     std::unique_ptr<CephContext>&&    ctx,
                     std::unique_ptr<RemoteProtocol>&& prot,
@@ -38,7 +38,7 @@ Worker::createRadosWorker(const std::string& type,
   // only one type is now supported
   // later might support more
 
-  return std::make_shared<StoreWorker>(std::move(ctx), 
+  return std::make_unique<StoreWorker>(std::move(ctx), 
                                        std::move(prot),
                                        id, sec);
 
