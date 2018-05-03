@@ -14,11 +14,10 @@ namespace singaistorageipc{
 
 class IPCContext{
 public:
-	IPCContext(std::string s, int backlog,
+	IPCContext(std::string s, 
 				std::shared_ptr<Security> sec,
 				std::shared_ptr<WorkerPool> worker){
 		addr_ = folly::SocketAddress::makeFromPath(s);
-		backlog_ = backlog;
 		socketsMap_ = std::make_shared<
 						std::unordered_map<int,PersistentConnection>>();
 		sec_ = sec;
@@ -27,7 +26,7 @@ public:
 
 	folly::SocketAddress addr_;
 
-	int backlog_;
+	int backlog_{10};
 
 	/**
      * Suggested buffer size, allocated for read operations,
@@ -46,8 +45,8 @@ public:
 	 */
 	uint64_t newAllocSize_{1024};
 
-	uint32_t readSMSize_{1000*1000}; // 1M
-	uint32_t writeSMSize_{1000*1000};
+	uint32_t readSMSize_{500*1000*1000}; // 500M
+	uint32_t writeSMSize_{500*1000*1000};
 
 	class PersistentConnection{
     public:

@@ -10,7 +10,6 @@
 /**
  * External dependence
  */
-#include <folly/io/async/EventBaseManager.h>
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/AsyncServerSocket.h>
 
@@ -20,7 +19,6 @@
 #include "lib/callback/ServerAcceptCallback.h"
 #include "lib/callback/ClientConnectionCallback.h"
 #include "IPCContext.h"
-#include "SysSignalHandler.h"
 
 namespace singaistorageipc{
 
