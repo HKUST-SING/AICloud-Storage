@@ -57,13 +57,14 @@ void signal_shutdown()
   while(cnt < count)
   {
     r = write(signal_fd[0],buf,count - cnt);
-    if(r < 0)
+    if(r <= 0)
     {
 	if(errno == EINTR)
 	{
 	  continue;
 	}
-	r = -errno;
+	if(r != 0)
+	  r = -errno;
 	break;
     }
     cnt += r;
@@ -355,6 +356,10 @@ int main(const int argc, const char* argv[])
   {
     printError(std::strerror(errno));
   }
+  std::signal(SIGTERM,handle_sigterm); 
+  std::signal(SIGINT ,handle_sigterm);
+  std::signal(SIGSEGV,handle_sigterm);
+
 
 
   std::map<std::string, std::string>  configMap;
@@ -446,11 +451,6 @@ int main(const int argc, const char* argv[])
 
 
   configMap.clear(); // release the map resources
-
-
-  std::signal(SIGTERM,handle_sigterm); 
-  std::signal(SIGINT ,handle_sigterm);
-  std::signal(SIGSEGV,handle_sigterm);
 
   wait_shutdown();
 
