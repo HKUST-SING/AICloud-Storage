@@ -16,7 +16,14 @@
 #include <csignal>
 #include <cerrno>
 #include <cstring>
+
+
+// Unix/Linux system headers
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <syslog.h>
+
 
 // Facebook folly
 #include <folly/io/async/EventBase.h>
@@ -110,7 +117,7 @@ static void wait_shutdown()
   if(r < 0)
   { 
     #ifdef SING_ENABLE_LOG
-    LOG(WARNING) << "read signal reutrn with error";
+    LOG(WARNING) << "read signal return with error";
     #endif
   }
 }
@@ -139,7 +146,7 @@ void printUsage(const char* programName)
 {
 
   std::cout << "Usage: " << programName << " service_config_file "
-            << "cephC_config_file" << std::endl;
+            << "ceph_config_file" << std::endl;
 
 }
 
@@ -154,9 +161,33 @@ void enableLogging(const char* programName,
 // log only if explicitly specialiazed
 #ifdef SING_ENABLE_LOG
   // use Google logging for the project.
- FLAGS_stderrthreshold = google::FATAL;
- google::InitGoogleLogging(programName);
- std::cout << "\nLogging IS enabled.\n" <<  std::endl;
+  if(infoLogFile)
+  {
+    google::SetLogDestination(google::GLOG_INFO, 
+                              infoLogFile);
+  }
+
+  if(warnLogFile)
+  {
+    google::SetLogDestination(google::GLOG_WARNING, 
+                              warnLogFile);
+  }
+
+  if(errorLogFile)
+  {
+    google::SetLogDestination(google::GLOG_ERROR, 
+                              errorLogFile);
+  }
+
+  if(fatalLogFile)
+  {
+    google::SetLogDestination(google::GLOG_FATAL, 
+                              fatalLogFile);
+  }
+
+  FLAGS_stderrthreshold = google::GLOG_FATAL;
+  google::InitGoogleLogging(programName);
+  std::cout << "\nLogging IS enabled.\n" <<  std::endl;
 
 #else
   std::cout << "\nLogging IS NOT enabled.\n" << std::endl;
@@ -251,95 +282,223 @@ int readConfigFiles(std::map<std::string, std::string>& values,
 }
 
 
-void printError(const char* errMsg)
+void logError(const char* errFile, const char* errMsg)
 {
-  std::cout << errMsg << std::endl;
-  std::exit(EXIT_SUCCESS);
+  // log the error
+  if(errFile && errMsg)
+  { // log the message
+  
+    std::ofstream logFile(errFile, std::ios_base::app);
+   
+    if(!logFile.is_open())
+    { // try to explicitly open the log file
+     
+      try
+      {
+        logFile.open(errFile, std::ios_base::app);
+      } catch(const std::exception& exp)
+      {
+        // nothing to do
+      }
+    }//if
+
+
+    if(logFile.is_open())
+    { // need to log the message
+      logFile << errMsg << '\n';
+      // flush the data
+      logFile.flush(); // make sure data is written
+
+      logFile.close(); // close the file
+    }//if
+
+  }//if
+    
+
+  std::exit(EXIT_FAILURE);
 }
 
 void updateIPCContext(IPCContext &ctx, const std::map<std::string,std::string> &vals)
 {
 	std::stringstream keyStr;
 
-         keyStr << "ipc_backlog";
+    keyStr << "ipc_backlog";
          
-         auto ipcIter = vals.find(keyStr.str());
-         if(ipcIter != vals.end())
-         {
-           ctx.backlog_ = std::stoi(ipcIter->second);
-         }
+    auto ipcIter = vals.find(keyStr.str());
+    
+    if(ipcIter != vals.end())
+    {
+      ctx.backlog_ = std::stoi(ipcIter->second);
+    }
          
-         keyStr.clear();
-         keyStr.str(std::string());
+    keyStr.clear();
+    keyStr.str(std::string());
         
-         keyStr << "ipc_buffsersize";
+    keyStr << "ipc_buffsersize";
 
-         ipcIter = vals.find(keyStr.str());
+    ipcIter = vals.find(keyStr.str());
 
-         if(ipcIter != vals.end())
-         {
-           keyStr.clear();
-           keyStr.str(ipcIter->second);
-           keyStr >> ctx.bufferSize_;
-         }         
+    if(ipcIter != vals.end())
+    {
+      keyStr.clear();
+      keyStr.str(ipcIter->second);
+      keyStr >> ctx.bufferSize_;
+    }         
          
-         keyStr.clear();
-         keyStr.str(std::string());
+    keyStr.clear();
+    keyStr.str(std::string());
 
-         keyStr << "ipc_minallocbuf";
+    keyStr << "ipc_minallocbuf";
          
-         ipcIter = vals.find(keyStr.str());
+    ipcIter = vals.find(keyStr.str());
 
-         if(ipcIter != vals.end())
-         {
-           keyStr.clear();
-           keyStr.str(ipcIter->second);
-           keyStr >> ctx.minAllocBuf_;
-         }
+    if(ipcIter != vals.end())
+    {
+      keyStr.clear();
+      keyStr.str(ipcIter->second);
+      keyStr >> ctx.minAllocBuf_;
+    }
 
-         keyStr.clear();
-         keyStr.str(std::string());
+    keyStr.clear();
+    keyStr.str(std::string());
 
-         keyStr << "ipc_newallocsize";
+    keyStr << "ipc_newallocsize";
          
-         ipcIter = vals.find(keyStr.str());
+    ipcIter = vals.find(keyStr.str());
 
-         if(ipcIter != vals.end())
-         {
-           keyStr.clear();
-           keyStr.str(ipcIter->second);
-           keyStr >> ctx.newAllocSize_;
-         }
+    if(ipcIter != vals.end())
+    {
+      keyStr.clear();
+      keyStr.str(ipcIter->second);
+      keyStr >> ctx.newAllocSize_;
+    }
 
-         keyStr.clear();
-         keyStr.str(std::string());
+    keyStr.clear();
+    keyStr.str(std::string());
          
-         keyStr << "ipc_readsmsize";
+    keyStr << "ipc_readsmsize";
          
-         ipcIter = vals.find(keyStr.str());
+    ipcIter = vals.find(keyStr.str());
 
-         if(ipcIter != vals.end())
-         {
-           keyStr.clear();
-           keyStr.str(ipcIter->second);
-           keyStr >> ctx.readSMSize_;
-         }
+    if(ipcIter != vals.end())
+    {
+      keyStr.clear();
+      keyStr.str(ipcIter->second);
+      keyStr >> ctx.readSMSize_;
+    }
 
-         keyStr.clear();
-         keyStr.str(std::string());
+    keyStr.clear();
+    keyStr.str(std::string());
 
-         keyStr << "ipc_writesmsize";
+    keyStr << "ipc_writesmsize";
          
-         ipcIter = vals.find(keyStr.str());
+    ipcIter = vals.find(keyStr.str());
 
-         if(ipcIter != vals.end())
-         {
-           keyStr.clear();
-           keyStr.str(ipcIter->second);
-           keyStr >>  ctx.writeSMSize_;
-         }
+    if(ipcIter != vals.end())
+    {
+      keyStr.clear();
+      keyStr.str(ipcIter->second);
+      keyStr >>  ctx.writeSMSize_;
+    }
 
 }
+
+
+void cleanUpWorkers(std::shared_ptr<WorkerPool> pool,
+                    std::shared_ptr<Security> sec,
+                    const char* logFile,
+                    const char* errMsg)
+
+{
+  pool->stopPool();
+  sec->stopService();
+
+  logError(logFile, errMsg);
+
+}
+
+
+void initWorkers(const char* errorLogFile,
+                 std::shared_ptr<WorkerPool> pool, 
+                 const char* cephConfig, 
+                 const std::map<std::string, std::string>& configs,
+                 std::shared_ptr<Security> sec)
+{
+
+  std::stringstream keyStr("ceph_username");
+  
+  auto confIter = configs.find(keyStr.str());
+
+  if(confIter == configs.end())
+  {
+    cleanUpWorkers(pool, sec, errorLogFile,
+                   "Cannot find ceph username.");
+  }
+
+  std::string cephUser(confIter->second);
+
+  keyStr.clear();
+  keyStr.str(std::string());
+  keyStr << "ceph_clustername";
+ 
+  confIter = configs.find(keyStr.str());
+
+  if(confIter == configs.end())
+  {
+    cleanUpWorkers(pool, sec, errorLogFile,
+                   "Cannot find ceph cluster name.");
+  }
+
+  std:: string cephCluster(confIter->second);
+
+  keyStr.clear();
+  keyStr.str(std::string());
+  keyStr << "ceph_flags";
+
+  uint64_t flagVal = 0;
+  
+  confIter = configs.find(keyStr.str()); 
+  if(confIter != configs.end())
+  {
+    keyStr.clear();
+    keyStr.str(confIter->second);
+    keyStr >> flagVal; // write the flags
+  } 
+
+  keyStr.clear();
+  keyStr.str(std::string());
+  keyStr << "auth_worker_protocol";     
+
+  confIter = configs.find(keyStr.str());
+  
+  if(confIter == configs.end())
+  {
+    // must set communication protocol
+    cleanUpWorkers(pool, sec, errorLogFile,
+        "Protocl between a worker and an authentication server is not provided.");
+  }
+
+  std::string commProt(confIter->second);
+  
+
+  // initialize the worker pool
+  auto initRes = pool->initialize(cephConfig, 
+                                  cephUser,
+                                  cephCluster,
+                                  flagVal,
+                                  commProt.c_str(),
+                                  sec);
+
+  if(initRes == false)
+  {
+    cleanUpWorkers(pool, sec, errorLogFile,
+        "Cannot initialize the worker pool.");
+  }
+
+
+  // sucessfully initialized all the workers
+}
+
 
 int main(const int argc, const char* argv[])
 {
@@ -351,27 +510,80 @@ int main(const int argc, const char* argv[])
 	return EXIT_SUCCESS;
   }
 
-  // create the socket pair for signal handler
-  if(signal_fd_init() < 0)
+
+  std::string logFile;
+
   {
-    printError(std::strerror(errno));
+    // need to read the system configuration file
+    // twice.
+    std::map<std::string, std::string>  configMap;
+    auto readRes = readConfigFiles(configMap, (argv+1), argc-1);
+  
+    if(!readRes)
+    {
+      std::cout << "Cannot read configuration files in the parent process."
+                << std::endl;
+
+      return EXIT_SUCCESS;
+    }
+
+    // need to make sure that the error file exists
+    auto errorIter = configMap.find(std::string("error_log_file"));
+  
+    if(errorIter == configMap.end())
+    {
+      std::cout << "There is no error_log_file in the configuration file"
+                << std::endl;
+ 
+      return EXIT_SUCCESS;
+    } 
+
+    logFile = errorIter->second; // get the log file
+  }// done checking
+
+
+
+
+  // create a child process to run the
+  // program in background
+  pid_t pidVal = fork();
+
+  if(pidVal < 0)
+  {
+    logError(logFile.c_str(), 
+             "Cannot fork a new process.");
   }
-  std::signal(SIGTERM,handle_sigterm); 
-  std::signal(SIGINT ,handle_sigterm);
-  std::signal(SIGSEGV,handle_sigterm);
 
+  if(pidVal > 0)
+  { // parent process just terminates
+    exit(EXIT_SUCCESS);
+  }
 
-
+  // child process running 
+  // read configuration file one more time
   std::map<std::string, std::string>  configMap;
 
   auto readRes = readConfigFiles(configMap, (argv+1), argc-1);
+  assert(readRes); // ensure no error
+ 
   
-  if(!readRes)
+  auto confIter = configMap.find(std::string("erro_log_file"));
+  assert(confIter != configMap.end());
+
+
+  // global log file where all errors are logged
+  const std::string childLogFile(confIter->second);
+
+
+
+  // child process must become the seassion leader
+  if(setsid() < 0)
   {
-    printError("Cannot read configuration files.");
+    logError(childLogFile.c_str(),
+        "Child cannot become the session leader.");
   }
 
-  decltype(configMap.begin()) confIter;
+  // all process-related initialization has completed
   
   confIter = configMap.find(std::string("info_log_file"));
   const char* infoLog = (confIter != configMap.end()) ? confIter->second.c_str() : nullptr;
@@ -399,7 +611,8 @@ int main(const int argc, const char* argv[])
   confIter = configMap.find("auth_server_ip");
   if(confIter == configMap.end())
   {
-    printError("Cannot find 'auth_server_address'");
+    logError(childLogFile.c_str(),
+        "Cannot find 'auth_server_address'");
   }
   
   std::string auth_ip(confIter->second);
@@ -407,7 +620,8 @@ int main(const int argc, const char* argv[])
   confIter = configMap.find("auth_server_port");
   if(confIter == configMap.end())
   {
-    printError("Cannot find 'auth_server_port'");
+    logError(childLogFile.c_str(),
+      "Cannot find 'auth_server_port'");
   }
 
   const unsigned short portNo = static_cast<const unsigned short> (std::stoi(confIter->second));
@@ -435,12 +649,18 @@ int main(const int argc, const char* argv[])
 
   auto workerPool = WorkerPool::createWorkerPool("Default", 0, 0);
 
+  initWorkers( childLogFile.c_str(),
+      workerPool, argv[2], configMap, securityPtr);
+                                      
+
   // creating and starting the IPC components 
   confIter = configMap.find("ipc_socket");
   if(confIter == configMap.end())
   {
-    printError("Cannot find 'ipc_socket'");
+    logError(childLogFile.c_str(),
+      "Cannot find 'ipc_socket'");
   }
+
   IPCContext ipccxt(confIter->second,securityPtr,workerPool);
   updateIPCContext(ipccxt,configMap);  
  
@@ -452,7 +672,25 @@ int main(const int argc, const char* argv[])
 
   configMap.clear(); // release the map resources
 
-  wait_shutdown();
+
+  
+  // create the socket pair for signal handler
+  if(signal_fd_init() == 0)
+  { 
+    std::signal(SIGTERM,handle_sigterm); 
+    std::signal(SIGINT ,handle_sigterm);
+    std::signal(SIGSEGV,handle_sigterm);
+
+    // wait for termination 
+    wait_shutdown();
+
+  }
+  else
+  {
+    logError(childLogFile.c_str(),
+      "Cannot create a pair of sockets.");
+  }
+
 
   evb.terminateLoopSoon();
   ipcserverthread.join();
