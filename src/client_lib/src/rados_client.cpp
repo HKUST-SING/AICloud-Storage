@@ -58,63 +58,82 @@ void signal_shutdown()
 {
   int val = 0;
   void* buf = &val;
-  size_t count = sizeof(val);
-  size_t cnt = 0;
-  ssize_t r;
-  while(cnt < count)
+  size_t bufsize = sizeof(val);
+  ssize_t res;
+  
+  // write to the socket
+  do
   {
-    r = write(signal_fd[0],buf,count - cnt);
-    if(r <= 0)
-    {
-	if(errno == EINTR)
-	{
-	  continue;
-	}
-	if(r != 0)
-	  r = -errno;
-	break;
-    }
-    cnt += r;
-    buf = (char*)buf + r;
-  }
+    res = write(signal_fd[1], buf, bufsize);
+    
 
-  if(r < 0)
+    if(res < 0)
+    {
+	  if(errno == EINTR)
+	  {
+	    continue;
+	  }
+
+      // some other error
+	  res = -errno;
+	  break;
+    }
+
+    if(res == 0)
+    {
+      break; // EOF
+    }
+    
+    // update write data
+    bufsize -= res;
+    buf      = (char*)buf + res;
+
+  } while(bufsize > 0);
+
+  if(res < 0)
   {
     #ifdef SING_ENABLE_LOG
-    LOG(WARNING) << "ERROR: " << __func__ << ": write() returned" << std::strerror(errno);
+    LOG(WARNING) << "ERROR: " << __func__ << ": write() returned: '" << std::strerror(errno) << "'";
     #endif
-    exit(0);
+    //std::exit(EXIT_SUCCESS); // may don't need?
   }
 }
+
 
 static void wait_shutdown()
 {
   int val;
   void* buf = &val;
-  size_t count = sizeof(val);
-  size_t cnt = 0;
-  ssize_t r;
-  while(cnt < count)
-  {
-    r = read(signal_fd[1],buf,count - cnt);
-    if(r <= 0)
-    {
-	if(r == 0)
-	{
-	  break;
-	}
-	if(errno == EINTR)
-	{
-	  continue;
-	}
-	r = -errno;
-	break;
-    }
-    cnt += r;
-    buf = (char*)buf + r;
-  }
+  size_t bufsize = sizeof(val);
+  ssize_t res;
 
-  if(r < 0)
+  do
+  {
+    res = read(signal_fd[0], buf, bufsize);
+
+    if(res <= 0)
+    {
+	  if(res == 0)
+	  {
+	    break; // EOF
+	  }
+
+	  if(errno == EINTR)
+	  {
+	    continue;
+	  }
+
+	  res = -errno;
+	  break;
+    }
+
+    bufsize -= res;
+    buf = (char*)buf + res;
+
+  } while(bufsize > 0);
+
+
+  if(res < 0)
   { 
     #ifdef SING_ENABLE_LOG
     LOG(WARNING) << "read signal return with error";
@@ -305,7 +324,7 @@ void logError(const char* errFile, const char* errMsg)
 
     if(logFile.is_open())
     { // need to log the message
-      logFile << errMsg << '\n';
+      logFile << '\n' << errMsg << '\n';
       // flush the data
       logFile.flush(); // make sure data is written
 
