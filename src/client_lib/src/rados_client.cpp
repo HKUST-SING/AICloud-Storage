@@ -333,8 +333,7 @@ void logError(const char* errFile, const char* errMsg)
 
   }//if
     
-
-  std::exit(EXIT_FAILURE);
+  std::exit(EXIT_SUCCESS); // terminate in a proper way
 }
 
 void updateIPCContext(IPCContext &ctx, const std::map<std::string,std::string> &vals)
