@@ -32,6 +32,7 @@ namespace singaistorageipc
       {
         MSG_SERVER = 1, 
         MSG_WORKER = 2,
+        MSG_TERM   = 3,  // to terminate the module
         MSG_EMPTY  = 255 // no message
       }; // who sent the request - server of worker
 
@@ -210,7 +211,7 @@ namespace singaistorageipc
 
       bool initialize() override
       {
-        return channel_->initChannel();
+        return true;
       }      
 
  
@@ -306,9 +307,11 @@ namespace singaistorageipc
 
       
       /**
-       * Process newly dequeued requests/tasks.
+       * Process requests from clients. Send message to 
+       * to an authentication server on behalf of the clients.
        */
-      void processNewTasks();
+      void processClientTasks();
+
 
 
       /** 
@@ -369,6 +372,12 @@ namespace singaistorageipc
                                   std::unique_ptr<Response>&& resValue);
 
 
+      /**
+       * Enqueue a terminal message to the security module
+       * so that it would immediately stop processing.
+       */
+      void signalTerminate();
+
 
       /** 
        * Stop the module and clean up all tasks.
@@ -382,7 +391,6 @@ namespace singaistorageipc
       std::thread                     workerThread_; // worker thread
       ConcurrentQueue<TaskWrapper, std::deque<TaskWrapper>> tasks_; // queue of messages to send 
       std::map<uint32_t, TaskWrapper> responses_; // futures for respones
-      std::deque<TaskWrapper>         recvTasks_; // for dequeueing
         
  
       std::map<uint32_t, bool>        complTrans_; // completed transactions      

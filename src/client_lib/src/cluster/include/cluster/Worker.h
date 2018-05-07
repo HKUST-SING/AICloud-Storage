@@ -74,7 +74,8 @@ class Worker
 
     inline void stopWorker() 
      {
-      done_.store(true); // stop the worker
+      done_.store(true, std::memory_order_release); // stop the worker
+      joinWorker();
      } 
               
   
@@ -210,6 +211,15 @@ class Worker
                                      std::unique_ptr<RemoteProtocol>&& prot,
                                      const uint32_t id,
                                      std::shared_ptr<Security> sec);
+
+
+  protected:
+    /**
+     * Method for subclasses to implement to terminate
+     * a worker in a clean way.
+     */
+    virtual void joinWorker()
+    {}
 
 
   protected:

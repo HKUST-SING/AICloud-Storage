@@ -302,7 +302,10 @@ class StoreWorker: public Worker
      * once the initialized worker has to start processing 
      * tasks.
      */ 
-    void processTasks() override;
+    virtual void processTasks() override;
+
+
+    virtual void joinWorker() override;
 
 
 

@@ -189,7 +189,7 @@ SecurityModule::sendIOResult(std::string&& dataPath,
   tasks_.push(std::move(tmpWrap));
 
   // return future
-  return std::move(futRes);
+  return futRes;
   
 }
 
@@ -199,16 +199,16 @@ void
 SecurityModule::processRequests()
 {
 
+
   while(!Security::done_.load(std::memory_order_relaxed))
   {
     //process the requests
-
     // try to get as many tasks as possible
-    tasks_.dequeue(recvTasks_);
+    tasks_.dequeue(pendTrans_);
     
-    if(recvTasks_.empty()) // nothing has been enqueued
+    if(pendTrans_.empty()) // nothing to process
     {
-      // check if the system has any pending tasks
+      // check if the system has any sent requests
       if(responses_.empty()) // no sent request
       {
 
@@ -217,19 +217,21 @@ SecurityModule::processRequests()
 
 
         // wait for a newly incoming task
-        recvTasks_.push_back(std::move(tasks_.pop()));
+        pendTrans_.push_back(std::move(tasks_.pop()));
         // process the new task
-        processNewTasks();
+        processClientTasks();
       
       }
       else
-      { // query if any already issued tasks have completed
+      {
+        // query if any already sent requests have completed
         queryServerChannel();
       }
+    
     }
-    else // process the new tasks
+    else // process the client tasks
     {
-      processNewTasks();
+      processClientTasks();
     }
 
   }// while
@@ -268,7 +270,6 @@ SecurityModule::closeSecurityModule()
   queryServerChannel();
 
   complTrans_.clear();
-  recvTasks_.clear();
   responses_.clear();
 
 
@@ -281,8 +282,10 @@ SecurityModule::closeSecurityModule()
 }
 
 
+
+
 void
-SecurityModule::processNewTasks()
+SecurityModule::processClientTasks()
 {
   // dequeue all task from recvTasks_ and
   // categorize them into either new tasks or
@@ -299,20 +302,13 @@ SecurityModule::processNewTasks()
 
   while(fullWindowSize) // should never happen
   {
+    LOG(WARNING) << "SecurityModule::processNewTasks: window is full";
 
     // the window may be full due to socket errors 
     const bool foundErrors = tryHandleSocketErrors(); 
     
     if(!foundErrors)
     {
-      // append to the pending task queue
-      std::move(recvTasks_.begin(), recvTasks_.end(), 
-              std::back_inserter(pendTrans_));
-
-      // clear the received tasks since they are in 
-      // undefined state now
-      recvTasks_.clear(); // now it is safe to reuse the container 
-
       return; // don't progress further (NO more transactions)
 
     }
@@ -328,24 +324,23 @@ SecurityModule::processNewTasks()
 
   // got some transactions to issue  
   bool sendRes = true;
-  decltype(responses_.emplace()) resPair; // resouce pair
 
-  while(windowSize > U32_ZERO && !recvTasks_.empty())
+
+  while(windowSize > U32_ZERO && !pendTrans_.empty())
   { // keep issueing tasks
 
-    auto issTask = std::move(recvTasks_.front()); // get reference 
+    auto issTask = std::move(pendTrans_.front()); // get reference 
                                                   // to the first
                                                   // item
 
-    // remove the front item 
-    //recvTasks_.pop_front();
+    // remove the task
+    pendTrans_.pop_front(); 
 
-
-    // send simple signal to terminate the security module
-    if(issTask.msg_->msgEnc_ == Message::MessageEncoding::ERR_ENC)
+    // need to make sure
+    // that it's not a terminal message
+    if(issTask.resType_ == SecurityModule::MessageSource::MSG_TERM)
     {
-      LOG(INFO) << "Received Message::MessageEncoding::ERR_ENC to close the Security module";
-      return; // signal to close the security module
+      return; // terminate as soon as possible
     }
 
 
@@ -359,23 +354,15 @@ SecurityModule::processNewTasks()
     if(sendRes)
     {
      // enqueue the request
-     resPair = responses_.emplace(std::make_pair(nextID_, std::move(issTask)));
-
-     if(!resPair.second)
-     {
-      LOG(WARNING) << "Cannot enqueue a new pending request to send";
-      recvTasks_.front() = std::move(issTask); // put it back
-     }
-     else
-     {
-       recvTasks_.pop_front(); // remove the front
-       ++nextID_;    // update transaction ID
-       --windowSize; // update the window size  
-     }     
+     auto resPair = responses_.emplace(nextID_, std::move(issTask));
+     assert(resPair.second); // make sure smoothly appended
+   
+     ++nextID_;    // update transaction ID
+     --windowSize; // update the window size  
+    
     }
     else // handle the error
     {
-      recvTasks_.pop_front();
       handleInternalError(issTask, CommonCode::IOStatus::ERR_INTERNAL);
 
       // no need to explicitly delete the task since
@@ -384,6 +371,7 @@ SecurityModule::processNewTasks()
     }// else
     
   }// while
+
 
 
   // query the server
@@ -752,10 +740,30 @@ SecurityModule::doStartService()
   active_ = true; 
 }
 
+
+
+void
+SecurityModule::signalTerminate()
+{
+
+  // create a tmp signal
+  SecurityModule::TaskWrapper tmpWrap;
+  tmpWrap.resType_ = SecurityModule::MessageSource::MSG_TERM;
+  // enqueue the signal
+  tasks_.push(std::move(tmpWrap));
+
+}
+
+
+
 void
 SecurityModule::joinService()
 {
 
+
+  // send a signal to the security moduel
+  // to terminate
+  signalTerminate();
   
   workerThread_.join(); // wait the worker thread to
                         // terminate

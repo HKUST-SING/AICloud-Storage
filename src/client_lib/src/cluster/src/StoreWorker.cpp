@@ -442,6 +442,21 @@ StoreWorker::initialize()
 }
 
 
+
+void
+StoreWorker::joinWorker()
+{
+
+  Task termTask;
+  
+  // enqueue a task to signal end of  processing
+  termTask.opType_ = OpCode::OP_EXIT;
+  writeStoreObj(termTask);
+
+}
+
+
+
 Future<Task> 
 StoreWorker::writeStoreObj(const Task& task)
 {
@@ -461,7 +476,7 @@ StoreWorker::writeStoreObj(const Task& task)
 
 
   // return the future   
-  return std::move(res);
+  return res;
 }
 
  
@@ -486,7 +501,7 @@ StoreWorker::readStoreObj(const Task& task)
 
 
   // return the future   
-  return std::move(res);
+  return res;
 
 }
 
@@ -511,7 +526,7 @@ StoreWorker::deleteStoreObj(const Task& task)
 
 
   // return the future   
-  return std::move(res);   
+  return res;   
 }
 
 
@@ -534,7 +549,7 @@ StoreWorker::completeReadStoreObj(const Task& task)
 
 
   // return the future   
-  return std::move(res);
+  return res;
 
 }
 
