@@ -222,7 +222,17 @@ class StoreWorker: public Worker
         std::pair<std::shared_ptr<RemoteProtocol::ProtocolHandler>,\
                                   WorkerContext*>;
 
-    using OpItr = std::map<std::string, StoreWorker::OpContext>::iterator;
+
+    // containers for pending requests 
+    using PendCont = std::map<std::string, std::list<StoreWorker::UpperRequest>>;
+    using PendItr  = PendCont::iterator;
+
+    // containers for active operations
+    using ActiveCont = std::map<std::string, StoreWorker::OpContext>;
+    using OpItr      = ActiveCont::iterator;
+
+
+   
 
   public:
 
@@ -406,6 +416,22 @@ class StoreWorker: public Worker
                                   const OpCode opType,
                                   const int sockfd);
 
+
+     /**
+      * Method creates a new list of pending taks for 'pathVal'.
+      * Such an operation is common, so is put in a method.
+      *
+      * @param: pathVal : data path value
+      *
+      * @return: std::pair<container_iterator, bool> 
+      * (bool is true on success, false on failure)
+      */
+
+      std::pair<PendItr, bool> createPendContainer(
+                                          const std::string& pathVal);
+
+
+
     /** 
      * Terminate the worker. Worker cleans itslef up
      * and terminates
@@ -502,8 +528,8 @@ class StoreWorker: public Worker
 
 
     // serializes WRITES and READS to the same path
-    std::map<std::string, std::list<UpperRequest> >  pendTasks_;
-    std::map<std::string, OpContext>                 activeOps_;    
+    PendCont       pendTasks_;
+    ActiveCont     activeOps_;    
 
 
     unsigned char workerSecret[SHA256_DIGEST_LENGTH + 1]; 

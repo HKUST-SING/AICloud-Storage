@@ -616,11 +616,11 @@ StoreWorker::processTasks()
         }
 
         case CommonCode::IOOpCode::OP_ABORT:
-		{
+        {
           processAbortOp(std::move(tmpTask));
 			
           break; // one task has been completed
-		}
+        }
 
         case CommonCode::IOOpCode::OP_CLOSE:
         {
@@ -1287,6 +1287,21 @@ StoreWorker::createOperationContext(const std::string& pathVal,
   return insRes.second;
 }
 
+
+std::pair<StoreWorker::PendItr, bool>
+StoreWorker::createPendContainer(const std::string& pathVal)
+{
+
+  std::string keyPath(pathVal);
+  std::list<UpperRequest> tmpCont;
+
+  auto insRes = pendTasks_.emplace(std::move(keyPath), std::move(tmpCont));
+  assert(insRes.second); // make sure it's true
+
+  return insRes;
+}
+
+
 void
 StoreWorker::sendRequestToServer(StoreWorker::UpperRequest&& task,
                                  const StoreWorker::OpCode opType)
@@ -1367,12 +1382,8 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
 
     if(opIter == pendTasks_.end())
     { // insert a new list of pending ops for this data object
-      std::string pathVal(task.second.path_);
-      std::list<UpperRequest> tmpList;
-      auto insRes = pendTasks_.emplace(std::move(pathVal), std::move(tmpList));
-      assert(insRes.second);
+      auto insRes = createPendContainer(task.second.path_);
       opIter = insRes.first; // set iterator to point at the new list
-
     }
 
     opIter->second.push_back(std::move(task));
@@ -1385,13 +1396,28 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
     auto& opIter = ctxIter->second;
 
     // need to make sure that the same user
-    // is accessing
+    // is accessing   
+    // if the user's do no match, then make the 
+    // operation as a pendTask
     if(opIter.object.getObjectOpType() != OpCode::OP_READ
-       || !checkOpAuth(task.second, opIter.object.getTask()))
+       || !checkOpAuth(task.second, opIter.object.getTask(false)))
     {
-      notifyUserStatus(std::move(task), Status::ERR_DENY);
-      return;
-    }   
+      //append to the pending tasks
+      auto pendIter = pendTasks_.find(task.second.path_);
+      // if it's empty (no pending operations)
+      // create one
+      if(pendIter == pendTasks_.end())
+      {
+     
+        auto insRes = createPendContainer(task.second.path_);
+        pendIter = insRes.first;
+ 
+      }// created a new list
+      
+      pendIter->second.push_back(std::move(task));
+
+      return; // a new pending task has been issued
+    }
 
     // set the read as a pending read
     opIter.object.setObjectOpStatus(Status::STAT_PARTIAL_READ);
@@ -1417,11 +1443,8 @@ StoreWorker::processDeleteOp(StoreWorker::UpperRequest&& task)
   // just append the operation to the pending deque
   auto opIter = pendTasks_.find(task.second.path_);
   if(opIter == pendTasks_.end())
-  { // insert a deque
-    std::string pathVal(task.second.path_);
-    std::list<UpperRequest> tmpList;
-    auto insRes = pendTasks_.emplace(std:: move(pathVal), std::move(tmpList));
-    assert(insRes.second);
+  { // insert a container
+    auto insRes = createPendContainer(task.second.path_);
     opIter= insRes.first;
   }
 
@@ -1558,11 +1581,8 @@ StoreWorker::processNewWriteOp(StoreWorker::UpperRequest&& task)
   // just append the operation to the pending deque
   auto opIter = pendTasks_.find(task.second.path_);
   if(opIter == pendTasks_.end())
-  { // insert a deque
-    std::string pathVal(task.second.path_);
-    std::list<UpperRequest> tmpList;
-    auto insRes = pendTasks_.emplace(std::move(pathVal), std::move(tmpList));
-    assert(insRes.second);
+  { // insert a container
+    auto insRes = createPendContainer(task.second.path_);
     opIter= insRes.first;
   }
 
