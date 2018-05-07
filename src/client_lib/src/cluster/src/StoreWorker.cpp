@@ -32,13 +32,15 @@ namespace singaistorageipc
 
 static bool initializeDataObject(DataObject* obj, 
                                  const CommonCode::IOOpCode opCode,
-                                 std::pair<Promise<Task>, Task>&& ctx)
+                                 std::pair<Promise<Task>, Task>&& ctx,
+                                 const uint64_t objSize)
 {
   switch(opCode)
   {
     case CommonCode::IOOpCode::OP_READ:
     {
       radosbuffermanagement::ReadObject* readObj = new radosbuffermanagement::ReadObject(std::move(ctx));
+      readObj->setObjectSize(objSize);
       obj->setReadObject(readObj);
       return true;
     }
@@ -1123,7 +1125,6 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
                   << "Status::STAT_PARTIAL_READ";
 
     Task resTask(opIter.object.getTask());
-    resTask.workerID_ = Worker::id_;
     resTask.opStat_   = opIter.object.getObjectOpStatus();
     
     opIter.object.setResponse(std::move(resTask));
@@ -1142,7 +1143,6 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
     while(readObj->availableBuffer())
     { // there is some data to be read locally
       Task resTask(std::move(readObj->getTask(true)));
-      resTask.workerID_ = Worker::id_;
       
       
       const uint64_t bufferSize = static_cast<const uint64_t>(resTask.dataSize_);      
@@ -1180,7 +1180,8 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
       if(readObj->isComplete())
       { // final read operation
 
-         resTask.opStat_ = Status::STAT_SUCCESS;
+         resTask.opStat_   = Status::STAT_SUCCESS;
+         resTask.objSize_  = 0; // no more reading (data)
          readObj->setResponse(std::move(resTask));
 
          // close the operation context
@@ -1193,7 +1194,8 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
       }
       else
       {
-        resTask.opStat_ = Status::STAT_PARTIAL_READ; // need to read more
+        resTask.opStat_  = Status::STAT_PARTIAL_READ; // need to read more
+        resTask.objSize_ = readObj->getRemainingObjectSize();
         readObj->setResponse(std::move(resTask));
 
         if(opIter.pendRequests.empty())
@@ -1359,8 +1361,23 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
   auto ctxIter = activeOps_.find(task.second.path_);
   if(ctxIter == activeOps_.end())
   {
-    //error (reject operation)
-    notifyUserStatus(std::move(task), StoreWorker::Status::ERR_DENY);
+    // need to issue a new READ request
+    auto opIter = pendTasks_.find(task.second.path_);
+
+
+    if(opIter == pendTasks_.end())
+    { // insert a new list of pending ops for this data object
+      std::string pathVal(task.second.path_);
+      std::list<UpperRequest> tmpList;
+      auto insRes = pendTasks_.emplace(std::move(pathVal), std::move(tmpList));
+      assert(insRes.second);
+      opIter = insRes.first; // set iterator to point at the new list
+
+    }
+
+    opIter->second.push_back(std::move(task));
+
+
   }
   else
   {
@@ -1402,8 +1419,8 @@ StoreWorker::processDeleteOp(StoreWorker::UpperRequest&& task)
   if(opIter == pendTasks_.end())
   { // insert a deque
     std::string pathVal(task.second.path_);
-    std::list<UpperRequest> tmpDeque;
-    auto insRes = pendTasks_.insert(std::move(std::pair<std::string, std::list<UpperRequest> >(std::move(pathVal), std::move(tmpDeque))));
+    std::list<UpperRequest> tmpList;
+    auto insRes = pendTasks_.emplace(std:: move(pathVal), std::move(tmpList));
     assert(insRes.second);
     opIter= insRes.first;
   }
@@ -1543,8 +1560,8 @@ StoreWorker::processNewWriteOp(StoreWorker::UpperRequest&& task)
   if(opIter == pendTasks_.end())
   { // insert a deque
     std::string pathVal(task.second.path_);
-    std::list<UpperRequest> tmpDeque;
-    auto insRes = pendTasks_.insert(std::move(std::pair<std::string, std::list<UpperRequest> >(std::move(pathVal), std::move(tmpDeque))));
+    std::list<UpperRequest> tmpList;
+    auto insRes = pendTasks_.emplace(std::move(pathVal), std::move(tmpList));
     assert(insRes.second);
     opIter= insRes.first;
   }
@@ -1646,7 +1663,8 @@ StoreWorker::processRemoteResult(std::list<StoreWorker::WorkerContext>::iterator
 
    auto initRes = initializeDataObject(&(ctxItr.object),
                                        handler->getOpType(),
-                                       std::move(*(resIter->uppReq)));
+                                       std::move(*(resIter->uppReq)),
+                                       handler->getTotalDataSize());
 
    assert(initRes);
    // need to inform the user about write success

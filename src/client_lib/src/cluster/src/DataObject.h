@@ -73,7 +73,7 @@ namespace radosbuffermanagement
       bool appendBuffer(const char* addr, const uint64_t len);
 
 
-      bool isComplete() const;
+      bool isComplete() const noexcept;
 
       librados::bufferlist& getDataBuffer();
 
@@ -193,15 +193,16 @@ namespace radosbuffermanagement
 
       void setObjectSize(const uint64_t size);
 
-      uint64_t getObjectSize() const;
+      uint64_t getObjectSize() const noexcept;
 
+      uint64_t getRemainingObjectSize() const noexcept;
       
-      uint64_t availableBuffer() const;
+      uint64_t availableBuffer() const noexcept;
 
       bool appendBuffer(librados::bufferlist&& buffer);
 
 
-      bool isComplete() const;
+      bool isComplete() const noexcept;
 
       const char* getRawBytes(uint64_t& readBytes);
 
@@ -279,7 +280,7 @@ namespace radosbuffermanagement
 
       void setReadObject(ReadObject* ptr);
 
-      bool isComplete() const;
+      bool isComplete() const noexcept;
 
       const Task& getTask() const noexcept(false);
       Task& getTask(const bool) noexcept(false);

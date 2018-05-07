@@ -156,7 +156,7 @@ DataObject::setObjectOpStatus(const CommonCode::IOStatus status)
 
 
 bool
-DataObject::isComplete() const
+DataObject::isComplete() const noexcept
 {
 
   switch(opType_)
@@ -613,7 +613,7 @@ WriteObject::appendBuffer(const char* addr, const uint64_t wLen)
 
 
 bool
-WriteObject::isComplete() const
+WriteObject::isComplete() const noexcept
 {
   return (buffer_.length() == 0 && backUp_.empty());
 }
@@ -784,13 +784,23 @@ ReadObject::setObjectSize(const uint64_t size)
 }
 
 uint64_t
-ReadObject::getObjectSize() const
+ReadObject::getObjectSize() const noexcept
 {
   return totalObjSize_;
 }
 
+
 uint64_t
-ReadObject::availableBuffer() const
+ReadObject::getRemainingObjectSize() const noexcept
+{
+
+  return (totalObjSize_ - objOffset_);
+
+}
+
+
+uint64_t
+ReadObject::availableBuffer() const noexcept
 {
   return avData_;
 }
@@ -829,7 +839,7 @@ ReadObject::appendBuffer(librados::bufferlist&& buffer)
 
 
 bool
-ReadObject::isComplete() const
+ReadObject::isComplete() const noexcept
 {
   return (totalObjSize_ == objOffset_);
 }
