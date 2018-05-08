@@ -49,7 +49,7 @@
 
 | Data type  | Status      |
 | ---------- | ----------- |
-| `uint16_t` | status_type |
+| `uint8_t` | status_type |
 
 | Data type  | CON_REPLY            |
 | ---------- | -------------------- |
