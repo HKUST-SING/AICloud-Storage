@@ -11,7 +11,6 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncSocket.h>
-#include <folly/io/async/EventBaseManager.h>
 #include <folly/futures/Future.h>
 
 #include "ipc/lib/callback/ServerReadCallback.h"
@@ -203,7 +202,7 @@ void ServerReadCallback::handleAuthenticationRequest(
 
 	UserAuth auth(username,password);
 	folly::Future<Task> future = std::move(sec_->clientConnect(auth));
-	future.via(folly::EventBaseManager::get()->getEventBase())
+	future.via(evb_)
 		  .then([=](Task t){
 		  		t.tranID_ = tranID;
 		  		this->callbackAuthenticationRequest(t);
@@ -375,7 +374,7 @@ bool ServerReadCallback::passReadRequesttoTask(
 	 */
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 
- 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 	future.via(evb_)
  		  .then(&ServerReadCallback::callbackReadRequest,this);
  	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
 	return true;
@@ -418,7 +417,7 @@ void ServerReadCallback::doReadAbort(
 	 */
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 
- 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 	future.via(evb_)
  		  .then(&ServerReadCallback::callbackReadAbort,this);
  	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
 }
@@ -668,15 +667,15 @@ void ServerReadCallback::handleWriteRequest(
 		contextmap->second.workerID_,socket_->getFd());
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	if(isfirst){
- 	 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 	 	future.via(evb_)
  	 		  .then(&ServerReadCallback::callbackWriteCredential,this);
 	}
 	else if(op == CommonCode::IOOpCode::OP_ABORT){
- 	 	future.via(folly::EventBaseManager::get()->getEventBase())
+ 	 	future.via(evb_)
  	 		  .then(&ServerReadCallback::callbackWriteAbort,this);
 	}
 	else{
- 		future.via(folly::EventBaseManager::get()->getEventBase())
+ 		future.via(evb_)
  		  	  .then(&ServerReadCallback::callbackWriteRequest,this);
  	}
 	futurePool_.emplace(std::make_pair(tranID,std::move(future)));
@@ -716,7 +715,7 @@ void ServerReadCallback::handleDeleteRequest(
 			 ,0,0,tranID,0,socket_->getFd());
 
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
-	future.via(folly::EventBaseManager::get()->getEventBase())
+	future.via(evb_)
  		  .then(&ServerReadCallback::callbackDeleteRequest,this);
  	futurePool_.emplace(std::make_pair(task.tranID_,std::move(future)));
 //	futurePool_[task.tranID_] = std::move(future);
@@ -751,7 +750,7 @@ void ServerReadCallback::handleCloseRequest(
 			 ,CommonCode::IOOpCode::OP_CLOSE
 			 ,0,0,close_msg.getID(),0,socket_->getFd());
 	folly::Future<Task> future = std::move(worker_->sendTask(task));
-	future.via(folly::EventBaseManager::get()->getEventBase())
+	future.via(evb_)
  		  .then(&ServerReadCallback::callbackCloseRequest,this);
  	futurePool_.emplace(std::make_pair(task.tranID_,std::move(future)));
 }

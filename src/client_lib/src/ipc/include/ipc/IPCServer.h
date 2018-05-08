@@ -32,7 +32,7 @@ public:
 	    context_.newAllocSize_,context_.readSMSize_,
         context_.writeSMSize_,context_.addr_.getPath(),
         context_.socketsMap_,context_.sec_,context_.worker_),
-	ccb_(context_.socketsMap_),
+	ccb_(context_.socketsMap_,evb_),
 	socket_(folly::AsyncServerSocket::newSocket(evb_))
 	{};
 

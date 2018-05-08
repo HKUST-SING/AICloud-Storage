@@ -9,6 +9,7 @@
 
 #include <folly/io/async/AsyncTransport.h>
 #include <folly/io/async/AsyncSocket.h>
+#include <folly/io/async/EventBase.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/AsyncSocketException.h>
@@ -48,7 +49,8 @@ public:
       readSM_(nullptr),
       writeSM_(nullptr),
       socket_(socket),
-      wcb_(socket.get()->getFd()){};
+      wcb_(socket.get()->getFd()),
+      evb_(evb){};
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
@@ -165,6 +167,7 @@ private:
     std::unordered_map<std::string,ReadRequestContext> readContextMap_;
     std::unordered_map<std::string,WriteRequestContext> writeContextMap_;
 
+    folly::EventBase *evb_;
     /**
      * Handle function of each operation
      */

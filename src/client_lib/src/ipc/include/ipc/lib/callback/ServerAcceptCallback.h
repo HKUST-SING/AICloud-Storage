@@ -5,6 +5,7 @@
 
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/SocketAddress.h>
+#include <folly/io/async/EventBase.h>
 
 
 #include "ipc/IPCContext.h"
@@ -27,7 +28,8 @@ public:
         std::shared_ptr<std::unordered_map<
         int,IPCContext::PersistentConnection>> map,
         std::shared_ptr<Security> sec,
-        std::shared_ptr<WorkerPool> worker){
+        std::shared_ptr<WorkerPool> worker,
+        folly::EventBase *evb){
 
           bufferSize_ = bufferSize;
           minAllocBuf_ = minAllocBuf;
@@ -38,6 +40,7 @@ public:
           socketsMap_ = map;   
           sec_ = sec;
           worker_ = worker;
+          evb_ = evb;
      }
 	/**
      * connectionAccepted() is called whenever a new client connection is
@@ -123,6 +126,8 @@ private:
 */
      std::shared_ptr<Security> sec_;
      std::shared_ptr<WorkerPool> worker_;
+
+     folly::EventBase *evb_;
 };
 
 
