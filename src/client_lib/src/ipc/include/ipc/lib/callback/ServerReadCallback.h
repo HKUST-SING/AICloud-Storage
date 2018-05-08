@@ -14,6 +14,8 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/AsyncSocketException.h>
 
+#include <boost/interprocess/mapped_region.hpp>
+
 #include "ServerWriteCallback.h"
 #include "RequestContext.h"
 #include "ipc/lib/utils/BFCAllocator.h"
@@ -50,7 +52,16 @@ public:
       writeSM_(nullptr),
       socket_(socket),
       wcb_(socket.get()->getFd()),
-      evb_(evb){};
+      evb_(evb)
+    {
+        std::size_t pagesize = boost::interprocess::mapped_region::get_page_size();
+        
+        int scalefactor = (readSMSize_ / pagesize) ? (readSMSize_ / pagesize) : 1;
+        readSMSize_ = static_cast<uint32_t>(scalefactor*pagesize);
+    
+        scalefactor = (writeSMSize_ / pagesize) ? (writeSMSize_ / pagesize) : 1;
+        writeSMSize_ = static_cast<uint32_t>(scalefactor*pagesize);
+    };
 
     /**
      * When data becomes available, getReadBuffer() will be invoked to get the
