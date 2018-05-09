@@ -585,7 +585,7 @@ int main(const int argc, const char* argv[])
   assert(readRes); // ensure no error
  
   
-  auto confIter = configMap.find(std::string("erro_log_file"));
+  auto confIter = configMap.find(std::string("error_log_file"));
   assert(confIter != configMap.end());
 
 
