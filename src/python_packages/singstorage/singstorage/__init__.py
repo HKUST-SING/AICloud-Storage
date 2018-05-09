@@ -33,7 +33,20 @@ import singstorage.singexcept            as errors
 import singstorage.internal.io_ops       as ops
 import singstorage.internal.messages     as messages
 import singstorage.internal.newcontext   as context
-import singstorage.internal.rados		 as rados
+import singstorage.internal.rados        as rados
+
+
+
+
+################### Define values available for user ###################
+from   singstorage.singexcept import StoreOpError as IOException
+from   singstorage.singexcept import SUCCESS      as SUCCESS
+from   singstorage.singexcept import AUTH_USER    as AUTH_USER
+from   singstorage.singexcept import AUTH_PASSWD  as AUTH_PASSWD
+
+
+
+################### Public User Definitions End Here ###################
 
 # per user session context
 cloud_user = None
@@ -76,6 +89,17 @@ def close():
 	ops.close_conn(cloud_user)
 	# reset the close user to None
 	cloud_user = None
+
+
+
+def get_error_message(err_num):
+	
+	err_msg = errors.ERROR_MSGS.get(err_num, None)
+
+	if err_msg:
+		return err_msg
+	else:
+		return "\n'{0}' error code does not exist.\n".format(err_num)
 
 
 def set_properties(**kwargs):
