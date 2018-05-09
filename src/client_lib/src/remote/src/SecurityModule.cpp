@@ -764,9 +764,12 @@ SecurityModule::joinService()
   // send a signal to the security moduel
   // to terminate
   signalTerminate();
-  
-  workerThread_.join(); // wait the worker thread to
-                        // terminate
+ 
+  if(workerThread_.joinable())
+  {
+    workerThread_.join(); // wait the worker thread to
+                          // terminate
+  }
 
 }
 
