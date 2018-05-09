@@ -58,11 +58,13 @@ ServerChannel::closeChannel()
 {
 	LOG(INFO) << "start to close channel";
 
-	try{
+	try{	
+		socket_->shutdown(tcp::socket::shutdown_both);
+		//socket_->close();
 		ioc_->stop();
-		socketThread_.join();
-		socket_->close();
-		socket_->release();
+		if(socketThread_.joinable())
+			socketThread_.join();
+		//socket_->release();
 	}
 	catch(std::exception& e){
 		LOG(ERROR) << "cannot close the socket conneting to the remote server.\n"
