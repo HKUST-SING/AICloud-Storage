@@ -38,7 +38,8 @@ public:
         uint32_t readSMSize,
         uint32_t writeSMSize,
         std::shared_ptr<Security> sec,
-        std::shared_ptr<WorkerPool> worker)
+        std::shared_ptr<WorkerPool> worker,
+	folly::EventBase *evb)
     : sec_(sec),
       worker_(worker),
       bufferSize_(buf),
