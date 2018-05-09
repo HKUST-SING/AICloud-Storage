@@ -170,6 +170,65 @@ void printUsage(const char* programName)
 }
 
 
+
+
+// check if the passed file can be accessed
+bool canWriteFile(const char* file_path)
+{
+
+  // try to open for writing the file
+  std::ofstream logFile(file_path, std::ios_base::app);
+
+  if(!logFile.is_open())
+  {
+    // try to explicitly open the file
+    try
+    {
+      logFile.open(file_path, std::ios_base::app);
+    } catch(const std::exception& exp)
+     {
+       
+     }
+  }
+
+ // check one more time
+ if(logFile.is_open())
+ {
+
+   bool canWrite = true;
+   
+   // try to test writing
+   try
+   {
+     logFile << '\n' << "Testing file for writing." << '\n';
+     logFile.flush();
+   } catch(const std::exception& exp)
+    {
+      canWrite = false; // cannot write the file
+    }
+   
+   // close the file
+   logFile.close();
+
+
+
+   return canWrite;
+ }
+ else
+ {
+   return false; // could not open the file
+ }
+
+
+}
+
+
+
+
+
+
+
+
 void enableLogging(const char* programName, 
                    const char* infoLogFile,
                    const char* warnLogFile,
@@ -180,25 +239,25 @@ void enableLogging(const char* programName,
 // log only if explicitly specialiazed
 #ifdef SING_ENABLE_LOG
   // use Google logging for the project.
-  if(infoLogFile)
+  if(infoLogFile && canWriteFile(infoLogFile))
   {
     google::SetLogDestination(google::GLOG_INFO, 
                               infoLogFile);
   }
 
-  if(warnLogFile)
+  if(warnLogFile && canWriteFile(warnLogFile))
   {
     google::SetLogDestination(google::GLOG_WARNING, 
                               warnLogFile);
   }
 
-  if(errorLogFile)
+  if(errorLogFile && canWriteFile(errorLogFile))
   {
     google::SetLogDestination(google::GLOG_ERROR, 
                               errorLogFile);
   }
 
-  if(fatalLogFile)
+  if(fatalLogFile && canWriteFile(fatalLogFile))
   {
     google::SetLogDestination(google::GLOG_FATAL, 
                               fatalLogFile);
@@ -335,6 +394,9 @@ void logError(const char* errFile, const char* errMsg)
     
   std::exit(EXIT_SUCCESS); // terminate in a proper way
 }
+
+
+
 
 void updateIPCContext(IPCContext &ctx, const std::map<std::string,std::string> &vals)
 {
@@ -548,10 +610,10 @@ int main(const int argc, const char* argv[])
     // need to make sure that the error file exists
     auto errorIter = configMap.find(std::string("error_log_file"));
   
-    if(errorIter == configMap.end())
+    if(errorIter == configMap.end() || !canWriteFile(errorIter->second.c_str()))
     {
       std::cout << "There is no error_log_file in the configuration file"
-                << std::endl;
+                << " or the process is not allowed to write to the file." << std::endl;
  
       return EXIT_SUCCESS;
     } 
