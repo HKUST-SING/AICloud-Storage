@@ -65,4 +65,14 @@ The very first design only provides a few basic functions for the users. It can 
   ```python
   singstorage.close()
   ```
- 
+
+- \# **(Optional)** get error message (error code from connect())
+  \#
+  \# Parameters:
+  \# - **errno[in]**: error code returned by the singstorage.connect()
+  \#                  function.
+  \#
+  \# **return**:      error code message.
+  ```python
+  singstorage.get_error_message(errno)
+  ```
