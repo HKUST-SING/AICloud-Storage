@@ -1,23 +1,32 @@
+# -*- coding: utf-8 -*-
+
 # Modules which contains the interprocess communication components.
 # This module should contain most of the logic and implementation
 # needed for the user.
 
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import print_function
+
 
 # Dependency packages
-
+import six
 
 
 # Python std lib
 import socket
 import time
 import errno
+import abc
 import logging
+
 
 
 # Package modules
 import singstorage.singexcept        as sing_errs
-from   singstorage.messages          import InterMessage  
-import singstorage.messages	         as sing_msgs
+from   singstorage.internal.messages import InterMessage  
+import singstorage.internal.messages as sing_msgs
 import singstorage.utils.loc_logging as sing_log
 
 
@@ -42,6 +51,14 @@ logger.propagate=False
 
 ####### LOGGING ENDS HERE #############
 
+
+
+
+# the IPC process binds to this address
+__IPC_CONN_PATH__ = "/tmp/sing_ipc_socket"
+
+
+
 # Inter-process control types
 CONTROL_EMPTY  = 0
 CONTROL_SOCKET = 1
@@ -50,6 +67,7 @@ CONTROL_MEMORY = 3
 
 
 
+@six.add_metaclass(abc.ABCMeta)
 class ControlIPC(object):
 	"""
 		Generic interface for the control part of the 
@@ -64,40 +82,44 @@ class ControlIPC(object):
 		self._connected = False # is an active ipc
 
 
+	@abc.abstractmethod
 	def init_ipc(self):
 		"""
 			Initialization method of the IPC methods. Call this
 			method before the other methods get called.
 		"""
-		raise NotImplementedError("Method is not implemented.")
+		pass
 
 
 
+	@abc.abstractmethod
 	def connect_to_service(self, username, password):
 		"""
 			Connect to the sing storage service
 		"""
-		raise NotImplementedError("Method is not implemented.")
+		pass
 
 
+	@abc.abstractmethod
 	def close_conn(self):
 		"""
 			Close the connection to the sing service	
 		"""
-		raise NotImplementedError("Method is not implemented.")
+		pass
 
 
 	def is_connected(self):
 		return self._connected
 	
 
-
+	@abc.abstractmethod
 	def send_request(self, req_type, **kwargs):
-		raise NotImplementedError("Method is not implemented.")
+		pass
 
 
+	@abc.abstractmethod
 	def recv_request(self, req_type, **kwargs):
-		raise NotImplementedError("Method is not implemented.")
+		pass
 
 
 
@@ -145,7 +167,7 @@ class SocketIPC(ControlIPC):
 
 	def init_ipc(self):
 		# read the socket configuration file
-		self._rem_addr = "/tmp/sing_ipc_socket"
+		self._rem_addr = __IPC_CONN_PATH__
 		self._sock     = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
 

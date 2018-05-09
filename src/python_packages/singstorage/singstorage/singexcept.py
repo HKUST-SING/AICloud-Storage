@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import print_function
+
 # The file contains custom exceptions for authentication 
 # and IO opearations.
 
@@ -11,6 +18,7 @@
 SUCCESS          =   0  # successful authentication
 AUTH_USER        =   1  # no such user exists
 AUTH_PASSWD      =   2  # wrong password
+
 
 
 # Generic error (for out of memory, socket errors, read errors, etc)
@@ -54,17 +62,14 @@ class StoreOpError(Exception):
 
 	def __init__(self, message):
 		super(StoreOpError, self).__init__(message)
-		self.message  = message
 		
 
 
 	def __str__(self):
-		par_val = super(StoreOpError, self).__str__() # get super 
-											          # class info
+		tmp_msg = super(StoreOpError, self).__str__() 
 		
-		return "".join([par_val, "\n\n", self.message, "\n\n"])
-			
-	
+		return "".join([tmp_msg, "\n\n"])
+
 
 
 class PropertyException(StoreOpError):
@@ -76,8 +81,6 @@ class PropertyException(StoreOpError):
 		else:
 			super(PropertyException, self).__init__("Storage property '{0}' cannot be set to value '{1}'.\nPossible options: {2}.".format(prop, value, av_ops))
 		
-
-   
 
 class QuotaError(StoreOpError):
 	"""
@@ -119,8 +122,20 @@ class AuthError(StoreOpError):
 		This exception is thrown if IO operations are used
 		before connecting to the data cluster.
 	"""
-	def __init__(self):
-		super(AuthError, self).__init__("You are not connected to the storage service.\nPlease connect before any data I/O operations.")
+	def __init__(self, err_msg=""):
+		if err_msg:
+			super(AuthError, self).__init__(err_msg)
+		else:
+			super(AuthError, self).__init__("You are not connected to the storage service.\nPlease connect to the service before performing\nany data I/O operations.\n")
+
+
+class DataError(StoreOpError):
+	"""
+		This exception is thrown if the passed write
+		data is not a string of bytes.
+	"""
+	def __init__(self, message):
+		super(DataError, self).__init__(message)
 
 
 
@@ -133,5 +148,4 @@ class InternalError(StoreOpError):
 	"""
 
 	def __init__(self, error_code):
-		super(InternalError, self).__init__("Internal system error:\n'{0}'".format(__INTERNAL_ERRORS__[error_code]))
-
+		super(InternalError, self).__init__("Internal system error:'{0}'".format(__INTERNAL_ERRORS__[error_code]))

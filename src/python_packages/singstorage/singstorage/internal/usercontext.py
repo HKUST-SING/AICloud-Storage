@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import print_function
+
+
 # The file contains the user's context (its properties and io ops).
 # The class given in the file encamsulates the state that the API has
 # to maintain per active user.
@@ -16,9 +24,9 @@ import logging
 
 # singstorage modules
 import singstorage.singexcept        as sing_errs
-import singstorage.ipc               as sing_ipc
+import singstorage.internal.ipc      as sing_ipc
 import singstorage.utils.hash        as sing_hash
-import singstorage.messages          as sing_msgs
+import singstorage.internal.messages as sing_msgs
 import singstorage.utils.loc_logging as sing_log
 
 
@@ -607,11 +615,11 @@ class UserContext(object):
 		if res.msg_type == sing_msgs.MSG_STATUS:
 			tmp_logger.error("read_raw_data: == MSG_STATUS")
 			
-			if res.op_status == sing_msgs.ERR_PATH:
+			if res.op_status == ERR_PATH:
 				raise sing_errs.PathError(rado_obj.get_data_path(),
                                           False)
 		
-			elif res.op_status == sing_msgs.ERR_DENY:
+			elif res.op_status == ERR_DENY:
 				raise sing_errs.PathError(rados_obj.get_data_path(),
 										  True)
 
@@ -713,12 +721,12 @@ class UserContext(object):
 		res = self._ctrl.recv_request(sing_msgs.MSG_STATUS) 
 		
 		# STATUS message must be received
-		assert res.msg_type == sing_msgs.MSG_STATUS, "Delete receives some different message"
+		assert res.msg_type == sing_msgs>MSG_STATUS, "Delete receives some different message"
 		assert res.msg_id == mark_id, "STATUS id != message id"
 
 
 		# if status is success, return
-		if res.op_status == sing_msgs.STAT_SUCCESS:
+		if res.op_status == sing_msg.STAT_SUCCESS:
 			return	
 
 
@@ -775,4 +783,10 @@ class UserContext(object):
 			State of the user's control socket.
 		"""
 		return self._ctrl.is_connected()
+
+
+	def __bool__(self):
+		return True
+
+	__nonzero__ = __bool__
 		

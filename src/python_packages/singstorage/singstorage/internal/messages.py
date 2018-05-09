@@ -1,8 +1,22 @@
+# -*- coding: utf-8 -*-
+
+
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import print_function
+
+
+
+
+
 # File contains inter-process communication messages described
 # in the 'Inter-Processing Message Structrute' document on github.com
 
 
 # Dependency packages
+from builtins import int
+
 
 # Python std
 import struct
@@ -62,9 +76,9 @@ class InterMessage(object):
 
 	def __init__(self, msg_type=MSG_DEFAULT, 
 					   msg_length=0, msg_id=0):
-		self.msg_type   = msg_type
-		self.msg_id     = msg_id
-		self.msg_length = msg_length + 9
+		self.msg_type   = int(msg_type)
+		self.msg_id     = int(msg_id)
+		self.msg_length = int(msg_length + 9)
 
 
 	def encode_msg(self):
@@ -79,10 +93,11 @@ class InterMessage(object):
 
 
 	def decode_header(self, header_msg):
-		self.msg_type, self.msg_id, self.msg_length =\
-		  struct.unpack("=BII", header_msg[0:9:1])
-
-
+		tmp_tuple = struct.unpack("=BII", header_msg[0:9:1])
+		self.msg_type   = int(tmp_tuple[0])
+		self.msg_id     = int(tmp_tuple[1])
+		self.msg_length = int(tmp_tuple[2])
+		
 
 	def get_header_size(self):
 		return 9
@@ -183,7 +198,7 @@ class AuthMessage(InterMessage):
 			of the message.
 		"""
 		user_length = struct.unpack("=H", message[0:2:1])
-		user_length = user_length[0] # from tuple to int
+		user_length = int(user_length[0]) # from tuple to int
 		chars = "B"*(user_length+HASH_LENGTH)
 		# now unpack the rest of the chars
 		name_pass = struct.unpack("="+chars, message[2::1])
@@ -246,7 +261,7 @@ class ReadMessage(InterMessage):
 			of the message.
 		"""
 		path_length = struct.unpack("=H", message[0:2:1])
-		path_length = path_length[0] # tuple to int
+		path_length = int(path_length[0]) # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
@@ -258,7 +273,7 @@ class ReadMessage(InterMessage):
 		# decode the property bitmap
 		tmp_bit  = struct.unpack("=I", 
 						message[2+path_length:6+path_length:1])
-		self.prop_bitmap = tmp_bit[0] # tuple to int
+		self.prop_bitmap = int(tmp_bit[0]) # tuple to int
 		
 	
 @InterMessage.register_subclass(MSG_WRITE)
@@ -307,7 +322,7 @@ class WriteMessage(InterMessage):
 			of the message.
 		"""
 		path_length = struct.unpack("=H", message[0:2:1])
-		path_length = path_length[0] # tuple to int
+		path_length = int(path_length[0]) # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		path_data = struct.unpack("="+chars, message[2:path_length+2:1])
@@ -320,11 +335,15 @@ class WriteMessage(InterMessage):
 
 		
 		# decode the rest of the message
-		self.prop_bitmap, self.mem_addr, self.data_length =\
-			struct.unpack("=IQQ", message[2+path_length:22+path_length:1])
+		tmp_val_tuple = struct.unpack("=IQQ",\
+							message[2+path_length:22+path_length:1])
+		
+		self.prop_bitmap = int(tmp_val_tuple[0])
+		self.mem_addr    = int(tmp_val_tuple[1])
+		self.data_length = int(tmp_val_tuple[2])
+			
 		
 		
-	
 
 @InterMessage.register_subclass(MSG_STATUS)
 class StatusMessage(InterMessage):
@@ -333,7 +352,7 @@ class StatusMessage(InterMessage):
 	"""
 	def __init__(self, status_type=255):
 		super(StatusMessage, self).__init__(MSG_STATUS, 
-										  2)
+										  1)
 		self.op_status    = status_type
 		    
 
@@ -342,7 +361,7 @@ class StatusMessage(InterMessage):
 			Encode the content of the message into binary form.
 		"""
 		msg_beg, vals = super(StatusMessage, self).encode_msg()
-		code_val =  "".join([msg_beg, "H"])
+		code_val =  "".join([msg_beg, "B"])
 		vals.append(self.op_status)
 
 		# done
@@ -356,8 +375,8 @@ class StatusMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		tmp_status     =  struct.unpack("=H", message[0:2:1])
-		self.op_status =  tmp_status[0] # tuple to int
+		tmp_status     =  struct.unpack("=B", message[0:1:1])
+		self.op_status =  int(tmp_status[0]) # tuple to int
 	
 	
 @InterMessage.register_subclass(MSG_CON_REPLY)
@@ -365,8 +384,8 @@ class ConReplyMessage(InterMessage):
 	"""
 		Connection request  message.
 	"""
-	def __init__(self, w_buf_addr=0,  w_buf_size=0,
-				       r_buf_addr=0,  r_buf_size=0,
+	def __init__(self, w_buf_addr=int(0),  w_buf_size=int(0),
+				       r_buf_addr=int(0),  r_buf_size=int(0),
                        w_buf_name="", r_buf_name=""):
 		super(ConReplyMessage, self).__init__(MSG_CON_REPLY, 
 										      88)
@@ -411,9 +430,13 @@ class ConReplyMessage(InterMessage):
 			Decode the passsed binary message into the fields
 			of the message.
 		"""
-		self.write_buf_addr, self.write_buf_size,\
-		self.read_buf_addr, self.read_buf_size =\
-				struct.unpack('=QIQI', message[0:24:1])
+
+		tmp_val_tuple = struct.unpack('=QIQI', message[0:24:1])
+		self.write_buf_addr = int(tmp_val_tuple[0])
+		self.write_buf_size = int(tmp_val_tuple[1])
+		self.read_buf_addr  = int(tmp_val_tuple[2])
+		self.read_buf_size  = int(tmp_val_tuple[3])
+
 
 		# now unpack the rest of the chars
 		mem_names = struct.unpack('='+HASH_CODE+HASH_CODE, message[24::1])
@@ -480,9 +503,7 @@ class DeleteMessage(InterMessage):
 		# encode chars
 		for char_name in self.data_path:
 			vals.append(ord(char_name))
-		
-		# append property bitmap
-		vals.append(self.prop_bitmap)
+	
 
 		# done
 		return struct.pack(code_val, *vals)
@@ -496,7 +517,7 @@ class DeleteMessage(InterMessage):
 			of the message.
 		"""
 		path_length = struct.unpack("=H", message[0:2:1])
-		path_length = path_length[0] # tuple to int
+		path_length = int(path_length[0]) # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
@@ -547,7 +568,7 @@ class ReleaseMessage(InterMessage):
 			of the message.
 		"""
 		path_length = struct.unpack("=H", message[0:2:1])
-		path_length = path_length[0] # tuple to int
+		path_length = int(path_length[0]) # tuple to int
 		chars = "B"*path_length
 		# now unpack the rest of the chars
 		vals  = struct.unpack("="+chars, message[2:2+path_length:1])
@@ -559,5 +580,5 @@ class ReleaseMessage(InterMessage):
 		# decode the merge ID
 		tmp_bit  = struct.unpack("=I", 
 						message[2+path_length:6+path_length:1])
-		self.merge_id = tmp_bit[0] # tuple to int
+		self.merge_id = int(tmp_bit[0]) # tuple to int
 
