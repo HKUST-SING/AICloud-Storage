@@ -126,7 +126,7 @@ WorkerPool::initialize(const char* cephFile,
     {
       // run a worker in a seprate thread
       std::thread runOp(&Worker::processTasks, workers_[idx].get());
-      threads_[idx] = std::move(runOp);
+      threads_[idx].swap(runOp);
     }
   }
 
@@ -153,7 +153,10 @@ WorkerPool::stopPool()
   // wait all the threads to terminate
   for(auto& runThr : threads_)
   {
-    runThr.join(); // join the thread
+    if(runThr.joinable())
+    {
+      runThr.join(); // join the thread
+    }
   }
 
   active_ = false; // the pool has been stopped  

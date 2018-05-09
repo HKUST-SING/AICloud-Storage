@@ -711,7 +711,8 @@ int main(const int argc, const char* argv[])
 
 
   evb.terminateLoopSoon();
-  ipcserverthread.join();
+  if(ipcserverthread.joinable())
+  	ipcserverthread.join();
   ipcserver.stop();  
   workerPool->stopPool();
 
