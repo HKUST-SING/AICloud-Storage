@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+e -*- coding: utf-8 -*-
 
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -1393,7 +1393,7 @@ class UserContext(object):
 						break
 				
 
-				return (read_len, final_data)
+				return (len(final_data), final_data)
 
 
 			def clear(self):
