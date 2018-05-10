@@ -232,6 +232,10 @@ bool ServerReadCallback::finishThisReadRequest(const std::string& path)
 {
 	auto contextmap = readContextMap_.find(path);
 
+	if(contextmap == readContextMap_.end()){
+		return true;
+	}
+
 	if(contextmap->second.pendingList_.empty()){
 		// No other more requests need to process.
 		readContextMap_.erase(path);
@@ -402,6 +406,22 @@ void ServerReadCallback::callbackReadAbort(Task task)
 
 	DLOG(INFO) << "reply read abort";
 	sendStatus(task.tranID_,task.opStat_);
+
+	/**
+	 * Keep sending read request to worker.
+	 *
+	 * If return true, meaning there may have extra memory.
+	 * Try to send unallocated request.
+	 */
+	if(finishThisReadRequest(task.path_)){
+		for(auto iterator = unallocatedRequest_.begin();
+			iterator != unallocatedRequest_.end();){
+			if(!passReadRequesttoTask(iterator->first,iterator->second)){
+				break;
+			}
+			unallocatedRequest_.erase(iterator++);
+		}
+	}
 }
 
 void ServerReadCallback::doReadAbort(
