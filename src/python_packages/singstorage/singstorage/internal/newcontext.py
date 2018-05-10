@@ -1,4 +1,4 @@
-e -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -1370,16 +1370,17 @@ class UserContext(object):
 				# try to read all the data
 				bin_read_data = []
 				final_data    = None
+                left_read     = read_len
 
 				while 1: 
-					d_read = self._mmap.read(read_len)
-					read_len -= len(d_read)
+					d_read     = self._mmap.read(read_len)
+					left_read -= len(d_read)
 
-					if read_len < 0:
+					if left_read < 0:
 						tmp_logger.error("read_data: read more data than required")
 						raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
 
-					if read_len == 0 and not bin_read_data:
+					if left_read == 0 and not bin_read_data:
 						# avoid copying data
 						final_data = d_read
 						break
@@ -1387,13 +1388,13 @@ class UserContext(object):
 					# combine multiple reads
 					bin_read_data.append(d_read)
 
-					if read_len == 0:
+					if left_read == 0:
 						# create binary data and return
 						final_data = b"".join(bin_read_data)
 						break
 				
 
-				return (len(final_data), final_data)
+				return (read_len, final_data)
 
 
 			def clear(self):
