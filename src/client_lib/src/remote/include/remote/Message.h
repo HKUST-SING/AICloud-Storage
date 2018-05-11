@@ -207,7 +207,7 @@ public:
 
   std::vector<std::unique_ptr<Response>> poll(){
     boost::mutex::scoped_lock lock(mutex_);
-    DLOG(INFO) << "poll the message";
+    //DLOG(INFO) << "poll the message";
     std::vector<std::unique_ptr<Response>> res(std::move(pool_));
     pool_.clear();
     
