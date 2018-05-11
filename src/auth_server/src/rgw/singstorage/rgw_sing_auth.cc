@@ -295,7 +295,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 
 
 
-  siter = info.swift_keys.find(user_str);
+  /*siter = info.swift_keys.find(user_str);
   if(siter == info.swift_keys.end()) // no such user found
   {
     goto done_get_sing_auth;
@@ -306,17 +306,41 @@ RGW_SINGSTORAGE_Auth_Get::execute()
  
 
   sing_key = &siter->second;
+  */
+
+  // This version supports one subuser per user
+  // so need to iterate over all swift_keys 
+  // and check if any of them match.
+
+  bool found_match = false; // if any of the keys matched
+
+  for(const auto& auth_check : info.swift_keys)
+  {
+    if((found_match = check_key(auth_check.second.key.c_str(), key)) == true)
+    {
+      break; // found a match
+    }
+  
+  }
+
+  if(!found_match)
+  {
+    //checked all keys, none of them mathched
+    err_code = rgw::singstorage::SINGErrorCode::PASSWD_ERR;
+    goto done_get_sing_auth;
+
+  }
 
   // the sent auth value is a hashed password
   // need to check if the value matches the retrieved
   // key (compute hash and compare) 
-
+  /*
   if(!check_key(sing_key->key.c_str(), key))
   {
     //dout (0) << "NOTICE: RGW_SING_Auth_Get::execute(): bad singstorage key" << dendl;
     err_code = rgw::singstorage::SINGErrorCode::PASSWD_ERR;
     goto done_get_sing_auth;
-  }
+  }*/
 
   // success
   ret = STATUS_ACCEPTED;

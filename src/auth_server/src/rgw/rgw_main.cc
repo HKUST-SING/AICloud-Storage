@@ -51,13 +51,6 @@
 #include "rgw_tools.h"
 #include "rgw_resolve.h"
 
-
-/*###################### SING Storage ############################*/
-#include "singstorage/rgw_rest_sing.h"
-#include "singstorage/rgw_sing_auth.h"
-/*################## SING Storage Ends Here ######################*/
-
-
 #include "rgw_request.h"
 #include "rgw_process.h"
 #include "rgw_frontend.h"
@@ -72,6 +65,16 @@
 
 #include "include/types.h"
 #include "common/BackTrace.h"
+
+
+/*####################### SING Storage ########################*/
+#ifdef 1
+#include "singstorage/rgw_rest_sing.h"
+#include "singstorage/rgw_sing_auth.h"
+#endif
+/*################# SING Storage Ends Here ####################*/
+
+
 
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
@@ -193,11 +196,7 @@ static RGWRESTMgr *set_logging(RGWRESTMgr *mgr)
 static RGWRESTMgr *rest_filter(RGWRados *store, int dialect, RGWRESTMgr *orig)
 {
   RGWSyncModuleInstanceRef sync_module = store->get_sync_module();
-  if (sync_module) {
-    return sync_module->get_rest_filter(dialect, orig);
-  } else {
-    return orig;
-  }
+  return sync_module->get_rest_filter(dialect, orig);
 }
 
 /*
@@ -377,54 +376,79 @@ int main(int argc, const char **argv)
     apis_map[*li] = true;
   }
 
-  // need to make sure that sing is the only one
+
+  // sing APIs must be defined
   if(apis_map.count("sing") == 0 || apis_map.count("sing_auth") == 0)
   {
-    derr << "Cannot start a Rados Gateway without sing API."
-         << " SING is the only API supported in this version"
-         << " of Rados Gateway." << dendl;
+    derr << "Must define 'sing' and 'sing_auth' for running." << dendl;
+    return EINVAL;
 
-
-     return EINVAL;
   }
 
-  const bool sing_at_root = g_conf->rgw_swift_url_prefix == "/";
 
   // S3 website mode is a specialization of S3
-  //const bool s3website_enabled = apis_map.count("s3website") > 0;
+  const bool s3website_enabled = apis_map.count("s3website") > 0;
   // Swift API entrypoint could placed in the root instead of S3
   //const bool swift_at_root = g_conf->rgw_swift_url_prefix == "/";
-  //if (apis_map.count("s3") > 0 || s3website_enabled) {
-  //  if (! swift_at_root) {
-  //    rest.register_default_mgr(set_logging(rest_filter(store, RGW_REST_S3,
-  //                                                      new RGWRESTMgr_S3(s3website_enabled))));
-  //  } else {
-  //    derr << "Cannot have the S3 or S3 Website enabled together with "
-  //         << "Swift API placed in the root of hierarchy" << dendl;
-  //    return EINVAL;
-  //  }
-  //}
+  const bool swift_at_root   = false;
+  if (apis_map.count("s3") > 0 || s3website_enabled) {
+    if (! swift_at_root) {
+      rest.register_default_mgr(set_logging(rest_filter(store, RGW_REST_S3,
+                                                        new RGWRESTMgr_S3(s3website_enabled))));
+    } else {
+      derr << "Cannot have the S3 or S3 Website enabled together with "
+           << "Swift API placed in the root of hierarchy" << dendl;
+      return EINVAL;
+    }
+  }
 
-  if (apis_map.count("sing") > 0) {
-    RGWRESTMgr_SING* const sing_resource = new RGWRESTMgr_SING();
 
-   
-    if (sing_at_root && store->get_zonegroup().zones.size() > 1) {
+  // sing API must exist
+  RGWRESTMgr_SING* const sing_mgr = new RGWRESTMgr_SING();
+  
+  rest.register_default_mgr(sing_mgr);
+
+
+  if (apis_map.count("swift") > 0) {
+    RGWRESTMgr_SWIFT* const swift_resource = new RGWRESTMgr_SWIFT;
+
+    if (! g_conf->rgw_cross_domain_policy.empty()) {
+      sing_mgr->register_resource("crossdomain.xml",
+                          set_logging(new RGWRESTMgr_SWIFT_CrossDomain));
+    }
+
+    sing_mgr->register_resource("healthcheck",
+                          set_logging(new RGWRESTMgr_SWIFT_HealthCheck));
+
+    rest->register_resource("info",
+                          set_logging(new RGWRESTMgr_SWIFT_Info));
+
+    if (! swift_at_root) {
+      rest.register_resource(g_conf->rgw_swift_url_prefix,
+                          set_logging(rest_filter(store, RGW_REST_SWIFT,
+                                                  swift_resource)));
+    } else {
+      if (store->get_zonegroup().zones.size() > 1) {
         derr << "Placing Swift API in the root of URL hierarchy while running"
              << " multi-site configuration requires another instance of RadosGW"
              << " with S3 API enabled!" << dendl;
-
-            return EINVAL;
+      }
+      sing_mgr->register_resource("swift", swift_resource);
+      //rest.register_default_mgr(set_logging(swift_resource));
     }
-
-    rest.register_default_mgr(set_logging(sing_resource));
-    
   }
 
-  if (apis_map.count("sing_auth") > 0) {
+  /*if (apis_map.count("swift_auth") > 0) {
     rest.register_resource(g_conf->rgw_swift_auth_entry,
-               set_logging(new RGWRESTMgr_SINGSTORAGE_Auth));
+               set_logging(new RGWRESTMgr_SWIFT_Auth));
+  }*/
+
+  // must be correct
+  if(apis_map.count("sing_auth") > 0)
+  {
+    rest.register_resource("auth", new RGWRESTMgr_SING_Auth);
   }
+
 
   if (apis_map.count("admin") > 0) {
     RGWRESTMgr_Admin *admin_resource = new RGWRESTMgr_Admin;
@@ -510,7 +534,7 @@ int main(int argc, const char **argv)
       std::string uri_prefix;
       config->get_val("prefix", "", &uri_prefix);
       RGWProcessEnv env{ store, &rest, olog, port, uri_prefix, auth_registry };
-      fe = new RGWAsioFrontend(env, config);
+      fe = new RGWAsioFrontend(env);
     }
 #endif /* WITH_RADOSGW_BEAST_FRONTEND */
 #if defined(WITH_RADOSGW_FCGI_FRONTEND)
