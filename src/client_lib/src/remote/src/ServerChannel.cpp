@@ -26,27 +26,6 @@ using tcp = boost::asio::ip::tcp;
 
 namespace singaistorageipc{
 
-void
-ServerChannel::check_and_restartSocket(const boost::system::error_code &er)
-{
-	if(er != boost::asio::error::operation_aborted){
-		if(!socket_->is_open()){
-			tcp::endpoint ep(boost::asio::ip::address::from_string(
-							cxt_.remoteServerAddress_.c_str()), cxt_.port_);
-			try{
-				socket_->connect(ep);
-			}
-			catch(boost::system::system_error & err){
-				LOG(WARNING) << "Security socket fail to "
-							 << "reconnect to the gateway\n"
-							 << "the reason is: " << err.what();
-			}
-		}
-		timer_.async_wait(
-			boost::bind(&ServerChannel::check_and_restartSocket,this,_1));
-	}
-}
-
 bool
 ServerChannel::initChannel()
 {
@@ -72,8 +51,6 @@ ServerChannel::initChannel()
 			ioc_->run();});
 	socketThread_ = std::move(tmpthread);
 
-	timer_.async_wait(
-		boost::bind(&ServerChannel::check_and_restartSocket,this,_1));
 	LOG(INFO) << "initial channel successfully";
 	return true;
 }
@@ -84,7 +61,6 @@ ServerChannel::closeChannel()
 	LOG(INFO) << "start to close channel";
 
 	try{	
-		timer_.cancel();
 		socket_->shutdown(tcp::socket::shutdown_both);
 		//socket_->close();
 		ioc_->stop();

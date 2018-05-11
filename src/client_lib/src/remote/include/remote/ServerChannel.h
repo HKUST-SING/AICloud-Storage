@@ -8,8 +8,8 @@
 
 // Boost lib
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ip/address.hpp>
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/deadline_timer.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>  
 
@@ -52,8 +52,7 @@ class ServerChannel
        receivePool_(std::move(other.receivePool_)),
        restReceiver_(std::move(other.restReceiver_)),
        cxt_(std::move(other.cxt_)),
-       socketThread_(std::move(other.socketThread_)),
-       timer_(std::move(other.timer_))
+       socketThread_(std::move(other.socketThread_))
       {}
 
       ServerChannel(ChannelContext cxt)
@@ -62,9 +61,11 @@ class ServerChannel
 		std::move(boost::asio::ip::tcp::socket(*ioc_)))),
        restSender_(socket_),
        receivePool_(std::make_shared<ReceivePool>(new ReceivePool())),
-       restReceiver_(socket_,receivePool_),
-       cxt_(cxt),
-       timer_(*ioc_,boost::posix_time::seconds(10))
+       restReceiver_(socket_,
+        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(
+          cxt.remoteServerAddress_),cxt.port_),
+        receivePool_),
+       cxt_(cxt)
       {}
 
       virtual ~ServerChannel() = default;
@@ -93,12 +94,6 @@ class ServerChannel
        * this thread receive response from remote server
        */
       std::thread socketThread_;
-
-      /**
-       * Timer check and reconnect socket
-       */
-      boost::asio::deadline_timer timer_;
-      void check_and_restartSocket(const boost::system::error_code&);
 
       /**
        * Helper functions
