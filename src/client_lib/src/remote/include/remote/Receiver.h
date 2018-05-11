@@ -54,7 +54,7 @@ public:
 	}
 	void receive();
 
-
+	bool continue_{false};
 private:
 	std::shared_ptr<tcp::socket> socket_;
 	tcp::endpoint ep_;

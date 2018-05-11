@@ -85,6 +85,7 @@ RESTReceiver::receive(){
 void
 RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 	DLOG(INFO) << "receive a response from remote server";
+	continue_ = false;
 	if(er.value() == 0){
 		/**
 		 * successful reception
@@ -97,8 +98,19 @@ RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 		 * That means socket disconnected.
 		 * Connects again.
 		 */
-		socket_.reset(new boost::asio::ip::tcp::socket(socket_->get_io_context()));
-		socket_->connect(ep_);
+		socket_->get_io_context().stop();
+		try{
+			socket_->shutdown(
+				boost::asio::ip::tcp::socket::shutdown_both);
+			socket_->close();
+			socket_->connect(ep_);
+		}
+		catch(boost::system::system_error &er){
+			LOG(FATAL) << "Fail to reconnect to remote socket\n"
+					   << er.what();
+		}
+		socket_->get_io_context().restart();
+		continue_ = true;
 	}
 
 	receive();
