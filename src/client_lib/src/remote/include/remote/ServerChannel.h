@@ -9,6 +9,7 @@
 // Boost lib
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/deadline_timer.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>  
 
@@ -63,7 +64,7 @@ class ServerChannel
        receivePool_(std::make_shared<ReceivePool>(new ReceivePool())),
        restReceiver_(socket_,receivePool_),
        cxt_(cxt),
-       timer_(io,boost::posix_time::second(10))
+       timer_(*ioc_,boost::posix_time::seconds(10))
       {}
 
       virtual ~ServerChannel() = default;
@@ -97,7 +98,7 @@ class ServerChannel
        * Timer check and reconnect socket
        */
       boost::asio::deadline_timer timer_;
-      void check_and_restartSocket(const boost::system::error_code);
+      void check_and_restartSocket(const boost::system::error_code&);
 
       /**
        * Helper functions
