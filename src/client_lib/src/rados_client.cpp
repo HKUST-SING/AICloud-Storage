@@ -484,6 +484,27 @@ void updateIPCContext(IPCContext &ctx, const std::map<std::string,std::string> &
 }
 
 
+
+std::unique_ptr<Security::sec_config_t> createSecurityConfig(const std::map<std::string, std::string>& values)
+{
+
+  auto resPtr = std::make_unique<Security::sec_config_t>();
+
+  // try to get the server_timeout
+  auto confItr = values.find("server_timeout");
+
+  if(confItr != values.end())
+  {
+    auto timeVal = std::stoll(confItr->second);
+    resPtr->timeout = Security::sec_config_t::TimeUnit(timeVal);
+  }
+
+
+  return resPtr; // return the result
+}
+
+
+
 void cleanUpWorkers(std::shared_ptr<WorkerPool> pool,
                     std::shared_ptr<Security> sec,
                     const char* logFile,
@@ -715,9 +736,12 @@ int main(const int argc, const char* argv[])
   std::unique_ptr<ServerChannel> channel = std::make_unique<ServerChannel>(chContext);
 
   assert(channel->initChannel());
-  
+
+  auto secConf = createSecurityConfig(configMap);  
+ 
   auto securityPtr = Security::createSharedSecurityModule("Default", 
-                                          std::move(channel));
+                                          std::move(channel),
+                                          std::move(secConf));
 
   assert(securityPtr);
 

@@ -10,7 +10,6 @@ namespace singaistorageipc
 
 namespace securitymodule
 {
-
 void destroySecurity(Security* const obj)
 {
   if(obj) // non-null object
@@ -19,12 +18,16 @@ void destroySecurity(Security* const obj)
     delete obj;
   }
 }
+}// namespace securitymodule
 
-} // namesapce securitymodule
+
+
+const Security::sec_config_t::TimeUnit Security::sec_config_t::NO_TIMEOUT =  TimeUnit(-1); 
 
 
 Security::Security(Security&& other)
 : channel_(std::move(other.channel_)),
+  confs_(std::move(other.confs_)),
   secret_(std::move(other.secret_)),
   cache_(std::move(other.cache_))
 {}
@@ -36,6 +39,7 @@ Security::operator=(Security&& other)
   if(this != &other)
   {
     channel_ = std::move(other.channel_);
+    confs_   = std::move(other.confs_);
     secret_  = std::move(other.secret_);
     cache_   = std::move(other.cache_);
   }
@@ -44,15 +48,29 @@ Security::operator=(Security&& other)
 }
 
 
+void
+Security::initConfigs()
+{
+  if(!confs_)
+  { // create a default configuration file
+    confs_ = std::move(std::make_unique<Security::sec_config_t>());
+  }
+
+}
+
+
 std::shared_ptr<Security>
 Security::createSharedSecurityModule(const char* secType,
-     std::unique_ptr<ServerChannel>&& channel,
-     std::unique_ptr<SecureKey>&&     secKey,
-     std::unique_ptr<Cache>&&         cache)
+     std::unique_ptr<ServerChannel>&&          channel,
+     std::unique_ptr<Security::sec_config_t>&& configs,
+     std::unique_ptr<SecureKey>&&              secKey,
+     std::unique_ptr<Cache>&&                  cache)
 {
   // now only one type is supported
-  return std::shared_ptr<Security>(new SecurityModule(std::move(channel)),
-                                   securitymodule::destroySecurity);
+  return std::shared_ptr<Security>(new SecurityModule(
+                                     std::move(channel),
+                                     std::move(configs)),
+                                     securitymodule::destroySecurity);
 
 }
 

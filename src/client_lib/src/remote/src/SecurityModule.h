@@ -6,6 +6,7 @@
 #include <thread>
 #include <memory>
 #include <mutex>
+#include <chrono>
 #include <condition_variable>
 
 
@@ -28,6 +29,13 @@ namespace singaistorageipc
  
     private:
 
+
+      using ConfType  = Security::sec_config_t;
+      using TimeClock = std::chrono::steady_clock;
+      using TimePoint = std::chrono::time_point<TimeClock>;
+      using TimeUnit  = std::chrono::milliseconds;
+
+
       enum class MessageSource : int
       {
         MSG_SERVER = 1, 
@@ -43,6 +51,7 @@ namespace singaistorageipc
 
       typedef struct TaskWrapper
       {
+       TimePoint                   start_;   // time the request sent
        std::shared_ptr<Request>    msg_;     // message
        MessageSource               resType_; // response to use
        
@@ -65,7 +74,8 @@ namespace singaistorageipc
       
  
        TaskWrapper(struct TaskWrapper&& other)
-       : msg_(std::move(other.msg_)),
+       : start_(other.start_),
+         msg_(std::move(other.msg_)),
          resType_(other.resType_)
        {
          switch(other.resType_)
@@ -101,7 +111,7 @@ namespace singaistorageipc
 
          if(this != &other)
          {
-    
+           start_   = other.start_;
            msg_     = std::move(other.msg_);
            resType_ = other.resType_;
 
@@ -206,12 +216,13 @@ namespace singaistorageipc
   
 
       // supported constructors
-      SecurityModule(std::unique_ptr<ServerChannel>&& comm);
+      SecurityModule(std::unique_ptr<ServerChannel>&& comm,
+                     std::unique_ptr<Security::sec_config_t>&& configs);
 
 
       bool initialize() override
       {
-        return true;
+        return Security::initialize();
       }      
 
  
@@ -271,7 +282,7 @@ namespace singaistorageipc
         * For ensuring that the object is destroyed in
         * a safe way (no problems with the destructor).
         * (This method is supposed to be used to avoid
-        * dagling pointers in the class).
+        * dangling pointers in the class).
         */
        void destroy() override;
 
@@ -384,6 +395,17 @@ namespace singaistorageipc
        */
        void closeSecurityModule();
 
+
+      /**
+       * Sets a request timeout.
+       */  
+       void setTimeout(TaskWrapper& task) const;
+
+
+     /**
+      * Check if the timeout of a task has finished.
+      */
+     bool expiredTimeout(const TaskWrapper& task) const;
 
 
     private:

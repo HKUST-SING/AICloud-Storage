@@ -3,7 +3,7 @@
 // C++ std lib
 #include <limits>
 #include <exception>
-
+#include <chrono>
 
 
 // Google libs
@@ -74,8 +74,9 @@ SecurityModule::FollySocketCallback::writeErr(
 }
 
 
-SecurityModule::SecurityModule(std::unique_ptr<ServerChannel>&& comm)
-: Security(std::move(comm)),
+SecurityModule::SecurityModule(std::unique_ptr<ServerChannel>&& comm,
+         std::unique_ptr<Security::sec_config_t>&& configs)
+: Security(std::move(comm), std::move(configs)),
   nextID_(0),
   backID_(0),
   active_(false)
@@ -209,7 +210,7 @@ SecurityModule::processRequests()
     if(pendTrans_.empty()) // nothing to process
     {
       // check if the system has any sent requests
-      if(responses_.empty()) // no sent request
+      if(responses_.empty()) // no sent requests
       {
 
         // try to handle any socket errors
@@ -346,7 +347,9 @@ SecurityModule::processClientTasks()
 
     // enqueue the message
     issTask.msg_->tranID_ = nextID_;
-      
+    // set the timeout
+    setTimeout(issTask);    
+  
     sendRes = channel_->sendMessage(issTask.msg_, 
                           new FollySocketCallback(this, 
                                                   nextID_));
@@ -441,7 +444,8 @@ SecurityModule::queryServerChannel()
        
       if(mapIter == responses_.end()) // log the event
       {
-        LOG(ERROR) << "Received message fron the auth server has invalid tranID";
+        LOG(WARNING) << "Received message from "
+                     << "the auth server has invalid tranID";
       }
       else
       {
@@ -465,6 +469,7 @@ SecurityModule::queryServerChannel()
           {
             // log the event
             LOG(ERROR) << "Forgot to set a request type (neither MSG_SERVER nor MSG_WORKER)";
+            break;
           }
         } // switch
 
@@ -476,7 +481,78 @@ SecurityModule::queryServerChannel()
 
     } // for 
   } // if
+ 
+  else
+  {
 
+    if(Security::confs_->timeout == ConfType::NO_TIMEOUT)
+    {
+      return; // no need to check for timeouts
+    }
+
+
+    auto mapIter = responses_.begin();
+    decltype(responses_.begin()) prevIter;
+
+
+    while(mapIter != responses_.end())
+    {
+      
+      if(expiredTimeout(mapIter->second))
+      {
+        // need to terminate the request. 
+        // send an error message
+        switch(mapIter->second.resType_)
+        {
+          case MessageSource::MSG_SERVER:
+          {
+            Task errRes(mapIter->second.msg_->userID_, 
+                        CommonCode::IOStatus::ERR_INTERNAL);
+                         
+
+            mapIter->second.futRes.serverTask_->setValue(
+                                         std::move(errRes));
+
+            break; // handled the case
+
+          }
+
+          case MessageSource::MSG_WORKER:
+          {
+            IOResponse errRes(nullptr, mapIter->second.msg_->opType_,
+                              CommonCode::IOStatus::ERR_INTERNAL);
+
+            mapIter->second.futRes.workerTask_->setValue(
+                                         std::move(errRes));
+
+            break; // handled the case
+          }
+
+          default:
+          {
+            LOG(ERROR) << "TaskWrapper does not have a resType_";
+            break;
+
+          }
+        } // switch
+
+        // can reuse the ID
+        completedTransaction(mapIter->first);
+     
+        // prepare deleting an item
+        prevIter = mapIter;
+        ++mapIter;
+        responses_.erase(prevIter);
+      }//if expired
+    
+      else
+      { // move the iterator by one
+        ++mapIter;
+      }
+
+    }// while loop 
+     
+  } // else (no messages have been received)
   
   // finished processing messages
   
@@ -772,6 +848,36 @@ SecurityModule::joinService()
   }
 
 }
+
+
+
+void
+SecurityModule::setTimeout(TaskWrapper& task) const
+{
+ 
+  // set the sending time
+  task.start_ = SecurityModule::TimeClock::now();
+
+}
+
+
+bool
+SecurityModule::expiredTimeout(const SecurityModule::TaskWrapper& task) const
+{
+
+ // get current time
+ auto checkTime = SecurityModule::TimeClock::now();
+
+ if(std::chrono::duration_cast<SecurityModule::TimeUnit>(checkTime - task.start_) >= Security::confs_->timeout)
+ {
+   return true; // hass expired
+ }
+
+ return false; // not yet
+  
+}
+
+
 
 
 void
