@@ -1370,7 +1370,7 @@ class UserContext(object):
 				# try to read all the data
 				bin_read_data = []
 				final_data    = None
-                left_read     = read_len
+				left_read     = read_len
 
 				while 1: 
 					d_read     = self._mmap.read(read_len)
