@@ -727,7 +727,10 @@ int main(const int argc, const char* argv[])
   securityPtr->startService();
   
 
-  auto workerPool = WorkerPool::createWorkerPool("Default", 0, 0);
+  // get the worker pool size
+  const unsigned long workerPoolSize = ((confIter = configMap.find("worker_pool_size")) == configMap.end()) ? 0 : std::stoul(confIter->second);
+
+  auto workerPool = WorkerPool::createWorkerPool("Default", 0, static_cast<const unsigned int>(workerPoolSize));
 
   initWorkers( childLogFile.c_str(),
       workerPool, argv[2], configMap, securityPtr);
