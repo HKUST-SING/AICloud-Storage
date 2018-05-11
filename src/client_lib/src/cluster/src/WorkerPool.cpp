@@ -14,7 +14,8 @@
 #include "cluster/RemoteProtocol.h"
 
 
-const constexpr unsigned int LEAVE_FREE = 3;
+const constexpr unsigned int MAX_WORKERS = 48;
+const constexpr unsigned int LEAVE_FREE  = 3;
 
 
 namespace singaistorageipc
@@ -53,7 +54,7 @@ WorkerPool::WorkerPool(const unsigned int poolId,
   }//if
   else
   {
-    poolSize_ = static_cast<uint32_t>(poolSize); // use the value
+    poolSize_ = (poolSize > MAX_WORKERS) ? static_cast<uint32_t>(MAX_WORKERS) : static_cast<uint32_t>(poolSize); // use the value
   }
 
   // preallocate memory
