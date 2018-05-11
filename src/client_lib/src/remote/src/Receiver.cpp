@@ -97,7 +97,7 @@ RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 		 * That means socket disconnected.
 		 * Connects again.
 		 */
-		socket_->reset(new boost::asio::ip::tcp::socket(socket_->get_io_context()));
+		socket_.reset(new boost::asio::ip::tcp::socket(socket_->get_io_context()));
 		socket_->connect(ep_);
 	}
 

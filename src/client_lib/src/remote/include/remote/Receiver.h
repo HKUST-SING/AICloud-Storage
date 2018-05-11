@@ -43,7 +43,7 @@ public:
 		:socket_(socket),ep_(ep),receivePool_(receivePool){}
 	RESTReceiver(RESTReceiver&& other)
 	:socket_(std::move(other.socket_)),
-	 ep_(std::move(other.ep_))
+	 ep_(std::move(other.ep_)),
 	 receivePool_(std::move(other.receivePool_))
 	{}
 
