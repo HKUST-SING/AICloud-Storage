@@ -10,6 +10,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/system/system_error.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>  
 
 
 // Facebook folly lib
@@ -50,7 +51,8 @@ class ServerChannel
        receivePool_(std::move(other.receivePool_)),
        restReceiver_(std::move(other.restReceiver_)),
        cxt_(std::move(other.cxt_)),
-       socketThread_(std::move(other.socketThread_))
+       socketThread_(std::move(other.socketThread_)),
+       timer_(std::move(other.timer_))
       {}
 
       ServerChannel(ChannelContext cxt)
@@ -60,7 +62,8 @@ class ServerChannel
        restSender_(socket_),
        receivePool_(std::make_shared<ReceivePool>(new ReceivePool())),
        restReceiver_(socket_,receivePool_),
-       cxt_(cxt)
+       cxt_(cxt),
+       timer_(io,boost::posix_time::second(10))
       {}
 
       virtual ~ServerChannel() = default;
@@ -89,6 +92,12 @@ class ServerChannel
        * this thread receive response from remote server
        */
       std::thread socketThread_;
+
+      /**
+       * Timer check and reconnect socket
+       */
+      boost::asio::deadline_timer timer_;
+      void check_and_restartSocket(const boost::system::error_code);
 
       /**
        * Helper functions
