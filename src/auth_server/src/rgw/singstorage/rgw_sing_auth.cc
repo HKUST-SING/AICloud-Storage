@@ -270,7 +270,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   RGWAccessKey* sing_key;
   map<string, RGWAccessKey>::iterator siter;
   string tenant_path; // tenant path
-  
+  bool found_match = false;   // if any password/key matches the received one 
 
 
   if(!key || !user) 
@@ -312,7 +312,6 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   // so need to iterate over all swift_keys 
   // and check if any of them match.
 
-  bool found_match = false; // if any of the keys matched
 
   for(const auto& auth_check : info.swift_keys)
   {

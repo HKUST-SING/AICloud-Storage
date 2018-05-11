@@ -68,10 +68,8 @@
 
 
 /*####################### SING Storage ########################*/
-#ifdef 1
 #include "singstorage/rgw_rest_sing.h"
 #include "singstorage/rgw_sing_auth.h"
-#endif
 /*################# SING Storage Ends Here ####################*/
 
 
@@ -420,7 +418,7 @@ int main(int argc, const char **argv)
     sing_mgr->register_resource("healthcheck",
                           set_logging(new RGWRESTMgr_SWIFT_HealthCheck));
 
-    rest->register_resource("info",
+    sing_mgr->register_resource("info",
                           set_logging(new RGWRESTMgr_SWIFT_Info));
 
     if (! swift_at_root) {
@@ -446,7 +444,7 @@ int main(int argc, const char **argv)
   // must be correct
   if(apis_map.count("sing_auth") > 0)
   {
-    rest.register_resource("auth", new RGWRESTMgr_SING_Auth);
+    rest.register_resource("auth", new RGWRESTMgr_SINGSTORAGE_Auth);
   }
 
 
