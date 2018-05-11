@@ -92,6 +92,14 @@ RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 		poolInsert(std::move(msgParse()));	
 		DLOG(INFO) << "insert the response into the pool";
 	}
+	else if(er.value() == 1){
+		/**
+		 * That means socket disconnected.
+		 * Connects again.
+		 */
+		socket_->reset(new boost::asio::ip::tcp::socket(socket_->get_io_context()));
+		socket_->connect(ep_);
+	}
 
 	receive();
 }

@@ -38,10 +38,12 @@ class RESTReceiver : public Receiver{
 public:
 	RESTReceiver() = delete;
 	explicit RESTReceiver(std::shared_ptr<tcp::socket> socket, 
+		tcp::endpoint ep,
 		std::shared_ptr<ReceivePool> receivePool)
-		:socket_(socket),receivePool_(receivePool){}
+		:socket_(socket),ep_(ep),receivePool_(receivePool){}
 	RESTReceiver(RESTReceiver&& other)
 	:socket_(std::move(other.socket_)),
+	 ep_(std::move(other.ep_))
 	 receivePool_(std::move(other.receivePool_))
 	{}
 
@@ -55,6 +57,7 @@ public:
 
 private:
 	std::shared_ptr<tcp::socket> socket_;
+	tcp::endpoint ep_;
 
 	std::shared_ptr<ReceivePool> receivePool_;
 
