@@ -49,6 +49,7 @@ ServerChannel::initChannel()
 	std::thread tmpthread([&]{
 			restReceiver_.startReceive();
 			do{
+				restReceiver_.continue_ = false;
 				ioc_->run();
 			}while(restReceiver_.continue_);});
 	socketThread_ = std::move(tmpthread);

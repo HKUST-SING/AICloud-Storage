@@ -19,6 +19,20 @@ namespace http = boost::beast::http;
 
 namespace singaistorageipc{
 
+bool
+receiveSuccessfromRemote(http::status s){
+	int sval = static_cast<int>(s);
+
+	switch(sval / 100)
+	{
+	case 1:
+	case 2:
+	case 3: return true;
+	default: return false;
+	}
+
+}
+
 std::unique_ptr<Response>
 RESTReceiver::msgParse(){
 	std::unique_ptr<Response> response = nullptr;
@@ -26,7 +40,7 @@ RESTReceiver::msgParse(){
 		/**
 		 * Check the status code in response message
 		 */
-		if(response_.result() == http::status::ok){
+		if(receiveSuccessfromRemote(response_.result())){
 			response.reset(new Response(
 					std::stoul(response_.at(RESTHeadField::TRANSACTION_ID).data()
 					  ,nullptr,10)
