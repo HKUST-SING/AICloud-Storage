@@ -70,6 +70,7 @@
 /*####################### SING Storage ########################*/
 #include "singstorage/rgw_rest_sing.h"
 #include "singstorage/rgw_sing_auth.h"
+#include "glog/logging.h"
 /*################# SING Storage Ends Here ####################*/
 
 
@@ -215,6 +216,10 @@ int main(int argc, const char **argv)
          << std::endl;
     return ENOSYS;
   }
+
+
+  google::InitGoogleLogging(argv[0]);
+  LOG(INFO) << "rgw_main::main";
 
   /* alternative default for module */
   vector<const char *> def_args;

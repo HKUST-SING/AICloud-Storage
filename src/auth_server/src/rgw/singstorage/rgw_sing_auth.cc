@@ -7,6 +7,8 @@
 #include <cstring>
 
 
+#include <glog/logging.h>
+
 #include "../rgw_client_io.h"
 #include "../rgw_http_client.h"
 #include "../rgw_rest.h"
@@ -99,7 +101,7 @@ SignedMachineEngine::authenticate(const req_state* const state) const
   // the 'is_applicable()' method.
   std::string user_str(state->info.env->get("HTTP_X_AUTH_USER", ""));
 
-  int ret = rgw_get_user_info_by_swift(store_, user_str, user_info);
+  int ret = rgw_get_user_info_by_uid(store_, user_str, user_info);
   if (ret < 0)
   {
     throw ret;
@@ -248,6 +250,8 @@ void
 RGW_SINGSTORAGE_Auth_Get::execute()
 {
 
+  LOG(INFO) << "RGW_SINGSTORAGE_Auth_Get::execute";
+
   int ret = -EPERM;
   uint64_t err_code = rgw::singstorage::SINGErrorCode::USER_ERR; // no such username  
 
@@ -275,6 +279,8 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 
   if(!key || !user) 
   {
+
+    LOG(WARNING) << "key or user name is not found in the header";
     ret = -EACCES;
     goto done_get_sing_auth; // no authentication possible
   }
@@ -285,8 +291,10 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 
   // use SWIFT authentication procedure as it matches our current
   // design. Later, we need to change and move to our own system.
-  if((ret = rgw_get_user_info_by_swift(store, user_str, info)) < 0)
+  if((ret = rgw_get_user_info_by_uid(store, user_str, info)) < 0)
   {
+
+    LOG(ERROR) << "rgw_get_user_info_by_uid() < 0";
     // user error (no such user) 
     //err_code = rgw::singstorage::SINGErrorCode::INTERNAL_ERR; 
     ret = -EACCES;
@@ -313,6 +321,8 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   // and check if any of them match.
 
 
+  LOG(INFO) << "RGW_SINGSTORAGE_Auth_Get::execute: looping through all swift_keys";
+
   for(const auto& auth_check : info.swift_keys)
   {
     if((found_match = check_key(auth_check.second.key.c_str(), key)) == true)
@@ -324,6 +334,8 @@ RGW_SINGSTORAGE_Auth_Get::execute()
 
   if(!found_match)
   {
+
+    LOG(WARNING) << "NO Swift key has been found";
     //checked all keys, none of them mathched
     err_code = rgw::singstorage::SINGErrorCode::PASSWD_ERR;
     goto done_get_sing_auth;
@@ -342,6 +354,7 @@ RGW_SINGSTORAGE_Auth_Get::execute()
   }*/
 
   // success
+  LOG(INFO) << "RGW_SINGSTORAGE_Auth_Get::execute: ret = STATUS_ACCEPTED";
   ret = STATUS_ACCEPTED;
 
   // send the tenant path

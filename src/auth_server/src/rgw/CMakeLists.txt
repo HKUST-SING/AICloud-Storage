@@ -153,6 +153,7 @@ target_compile_definitions(rgw_a PUBLIC BOOST_COROUTINES_NO_DEPRECATION_WARNING)
 
 # Need to find OpenSSL
 find_package(OpenSSL REQUIRED)
+list(APPEND SING_LOG_REQS "glog")
 
 target_link_libraries(rgw_a librados cls_lock_client cls_rgw_client cls_refcount_client
   cls_log_client cls_statelog_client cls_timeindex_client cls_version_client
@@ -160,7 +161,8 @@ target_link_libraries(rgw_a librados cls_lock_client cls_rgw_client cls_refcount
   ${CURL_LIBRARIES}
   ${EXPAT_LIBRARIES}
   ${OPENLDAP_LIBRARIES} ${CRYPTO_LIBS}
-  OpenSSL::Crypto)
+  OpenSSL::Crypto
+  ${SING_LOG_REQS})
 
 set(radosgw_srcs
   rgw_loadgen_process.cc
