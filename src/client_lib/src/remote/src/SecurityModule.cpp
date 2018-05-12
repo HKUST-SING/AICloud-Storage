@@ -624,9 +624,17 @@ SecurityModule::processServerResponse(TaskWrapper& taskRef,
                              std::unique_ptr<Response>&& resValue)
 {
 
-   if(resValue->msgEnc_ != Message::MessageEncoding::JSON_ENC)
+   if(resValue->data_->length() == 0 ||
+      resValue->msgEnc_ != Message::MessageEncoding::JSON_ENC)
    {
-     LOG(WARNING) << "Message uses non-JSON encoding. Message is being discarded";
+     LOG(WARNING) << "Message content is empty or " 
+                  << "message uses non-JSON encoding. "
+                  << "Message is being discarded";
+
+     // send response as an error
+     Task errRes(taskRef.msg_->userID_, CommonCode::IOStatus::ERR_INTERNAL);
+     taskRef.futRes.serverTask_->setValue(std::move(errRes));
+
      return;
    }
 
@@ -812,7 +820,7 @@ SecurityModule::doStartService()
 
   std::thread tmpThread(&SecurityModule::processRequests, this);
   // move the reference to the class attribute
-  workerThread_ = std::move(tmpThread);
+  workerThread_.swap(tmpThread);
   active_ = true; 
 }
 

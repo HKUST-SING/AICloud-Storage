@@ -225,7 +225,7 @@ class Security
       const auto startVal = done_.load(std::memory_order_acquire);
       if(!startVal) // the service must be started
       {
-        done_.store(true, std::memory_order_relaxed); // stop the service
+        done_.store(true, std::memory_order_release); // stop the service
         joinService();                                // wait to complete
       }
     }
@@ -245,7 +245,7 @@ class Security
    */
    inline void startService()
    {
-     done_.store(false, std::memory_order_relaxed);
+     done_.store(false, std::memory_order_acquire);
      doStartService(); // start the implementation
    }
 
