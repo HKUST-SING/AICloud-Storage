@@ -241,7 +241,10 @@ class SocketIPC(ControlIPC):
 
 		# try to write the message 
 		tmp_logger.info("Encoded message is being sent to the service")
-		self._sock.sendall(bin_data, 0)
+		try:
+			self._sock.sendall(bin_data, 0)
+		except:
+			raise sing_errs.InternalError(sing_errs.INT_ERR_IPC)
 		
 
 	def recv_request(self, req_type, **kwargs):
@@ -262,17 +265,21 @@ class SocketIPC(ControlIPC):
 		# read the header of the received message
 		tmp_header = [] 
 		header_size = msg.get_header_size();
-        
-		while header_size > 0:
-			tm_hr = self._sock.recv(header_size, 0)
+       
+		try: 
+			while header_size > 0:
+				tm_hr = self._sock.recv(header_size, 0)
           
-			if not tm_hr: # internal error
-				tmp_logger.error("Cannot read header") 
-				raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
+				if not tm_hr: # internal error
+					tmp_logger.error("Cannot read header") 
+					raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
           
-			# append the data and update the byte counter
-			tmp_header.append(tm_hr)
-			header_size -= len(tm_hr)
+				# append the data and update the byte counter
+				tmp_header.append(tm_hr)
+				header_size -= len(tm_hr)
+		except:
+			tmp_logger.error("Reading header: self._sock.recv: raised an exception")
+			raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
                	
 		# combine the header into one binary string
 		header = b"".join(tmp_header)
@@ -306,18 +313,23 @@ class SocketIPC(ControlIPC):
 		left_to_read = msg.msg_length - msg.get_header_size()
 		raw_data = [] # store a list of binary strings	
 
-		while left_to_read > 0: # read until data is read or 
-								# an error occurs
+		try:
+			while left_to_read > 0: # read until data is read or 
+									# an error occurs
 
-			read_data = self._sock.recv(left_to_read, 0)
+				read_data = self._sock.recv(left_to_read, 0)
 			
-			if not read_data:
-				# Error occured
-				tmp_logger.error("socket.recv returns None")
-				raise sing_errs.InternalError(sing_errs.INT_ERR_UNKNOWN)
+				if not read_data:
+					# Error occured
+					tmp_logger.error("socket.recv returns None")
+					raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
 
-			raw_data.append(read_data)
-			left_to_read -= len(read_data)
+				raw_data.append(read_data)
+				left_to_read -= len(read_data)
+
+		except:
+			tmp_logger.error("Reading message: self._sock.recv raised exception.")
+			raise sing_errs.InternalError(sing_errs.INT_ERR_READ)
 
 
 		# message has successfully been read
