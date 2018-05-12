@@ -74,8 +74,14 @@ class Worker
 
     inline void stopWorker() 
      {
-      done_.store(true, std::memory_order_release); // stop the worker
-      joinWorker();
+      const bool curDone = done_.load(std::memory_order_acquire);
+      
+      if(!curDone)
+      {
+        done_.store(true, std::memory_order_release); // stop the worker
+        joinWorker();
+      }
+
      } 
               
   

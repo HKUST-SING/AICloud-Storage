@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <atomic>
+#include <chrono>
 
 // Facebook folly
 #include <folly/futures/Future.h>
@@ -54,6 +55,63 @@ class Security
 
   public:
 
+     typedef struct sec_config_t
+     {
+       /**
+        * A structure used to initialize a security module.
+        */
+
+        using TimeUnit = std::chrono::milliseconds;
+
+        static const TimeUnit NO_TIMEOUT;
+
+
+       /*After how many milliseconds terminate a request*/
+       TimeUnit timeout; 
+       /* TO BE CONTINUED */
+
+       
+       sec_config_t()
+       : timeout(NO_TIMEOUT)
+       {}
+
+       sec_config_t(const sec_config_t& other)
+       : timeout(other.timeout)
+       {}
+
+       sec_config_t(sec_config_t&& other)
+       : timeout(other.timeout)
+       {}
+
+       sec_config_t& operator=(const sec_config_t& other)
+       {
+         if(this != &other)
+         {
+           timeout = other.timeout;
+
+         }
+
+         return *this;
+ 
+       }
+
+
+       sec_config_t& operator=(sec_config_t&& other)
+       {
+         if(this != &other)
+         {
+           timeout = other.timeout;
+         }
+
+         return *this;
+       }
+
+
+       ~sec_config_t() = default;
+
+     } sec_config_t; // struct sec_config_t
+
+
      // for deleteting an object
      using SecurityDeleter = void (*) (Security* const obj);
 
@@ -62,13 +120,17 @@ class Security
      Security& operator=(const Security&) = delete;
 
      Security(std::unique_ptr<ServerChannel>&& comm,
+              std::unique_ptr<Security::sec_config_t>&& configs,
               std::unique_ptr<SecureKey>&& secretKey = nullptr,
               std::unique_ptr<Cache>&&     userCache = nullptr)
      : done_(true),
        channel_(std::move(comm)),
+       confs_(std::move(configs)),
        secret_(std::move(secretKey)),
        cache_(std::move(userCache))
-     {}
+     {
+       initConfigs();
+     }
 
      Security(Security&&); // support move constructor
      Security& operator=(Security&&); // support assignment
@@ -163,7 +225,7 @@ class Security
       const auto startVal = done_.load(std::memory_order_acquire);
       if(!startVal) // the service must be started
       {
-        done_.store(true, std::memory_order_relaxed); // stop the service
+        done_.store(true, std::memory_order_release); // stop the service
         joinService();                                // wait to complete
       }
     }
@@ -174,7 +236,7 @@ class Security
      */
     virtual bool initialize()
     { 
-      return true;
+      return (channel_ != nullptr);
     }
 
 
@@ -183,7 +245,7 @@ class Security
    */
    inline void startService()
    {
-     done_.store(false, std::memory_order_relaxed);
+     done_.store(false, std::memory_order_acquire);
      doStartService(); // start the implementation
    }
 
@@ -197,6 +259,7 @@ class Security
    static std::shared_ptr<Security> createSharedSecurityModule(
         const char* secType,
         std::unique_ptr<ServerChannel>&& channel,
+        std::unique_ptr<Security::sec_config_t>&& configs = nullptr,
         std::unique_ptr<SecureKey>&& secKey = nullptr,
         std::unique_ptr<Cache>&& cache = nullptr);
 
@@ -205,6 +268,7 @@ class Security
     virtual ~Security() // shall be virtual
     {
        channel_.reset(nullptr); // destroy the managed channel
+       confs_.reset(nullptr);   // destroy configurations
        secret_.reset(nullptr);  // destroy the managed secret key
        cache_.reset(nullptr);   // destroy the user data cache
     }
@@ -242,9 +306,17 @@ class Security
     std::atomic<bool> done_;                 // if the service is done
 
 
+
+  private:
+    void initConfigs();                      // initialize configurations
+
+
   protected:
     std::unique_ptr<ServerChannel> channel_; // communication channel 
                                              // with the remote server
+
+    std::unique_ptr<Security::sec_config_t> confs_; // configurations
+
     std::unique_ptr<SecureKey>      secret_; // secret key 
     std::unique_ptr<Cache>           cache_; // user op cache
     
