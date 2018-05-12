@@ -261,6 +261,13 @@ class CephContext
 
 
 
+
+       /**
+        * Start the Rados Operation handler for handling
+        * incoming Rados IOs.
+        */
+        bool startRadosOpHandler();
+
        /**
         * Ensure that the handler completes all its operations
         * or at least tries its best to clean up properly.

@@ -149,6 +149,7 @@ CephContext::initAndConnect()
  
   // initialize the rados op handler
   opHandler_ = new CephContext::RadosOpHandler(&cluster_);
+  opHandler_->startRadosOpHandler();
  
 
   // mark the Ceph context as initliazed
@@ -251,7 +252,7 @@ CephContext::closeRadosContext(const string& poolName)
 
 CephContext::RadosOpHandler::RadosOpHandler(librados::Rados* rados) noexcept
 : activeIOs_(0),
-  done_(false),
+  done_(true),
   cluster_(rados)
 {
   // make sure non-null
@@ -437,7 +438,7 @@ CephContext::getCompletedOps(std::deque<CephContext::RadosOpCtx*>& ops)
 CephContext::RadosOpHandler::~RadosOpHandler()
 {
 
-  if(!done_.load(std::memory_order_relaxed))
+  if(!done_.load(std::memory_order_acquire))
   { // need to stop the handler
     stopRadosOpHandler();
   }
@@ -472,6 +473,16 @@ CephContext::RadosOpHandler::clearPendingAIOs()
 }
 
 
+bool
+CephContext::RadosOpHandler::startRadosOpHandler()
+{
+
+  // start the handler
+  done_.store(false, std::memory_order_release);
+
+  return true;
+}
+
 
 void
 CephContext::RadosOpHandler::stopRadosOpHandler()
@@ -479,23 +490,18 @@ CephContext::RadosOpHandler::stopRadosOpHandler()
 
   // notify everyone that it has been completed
   done_.store(true, std::memory_order_release);
-  const unsigned int pendOps = activeIOs_.load(std::memory_order_relaxed);
+  const unsigned int pendOps = activeIOs_.load(std::memory_order_acquire);
 
   DLOG(INFO) << "RadosOpHandler:stopRadosOpHandler";
 
-  if(!pendOps)
+  if(pendOps > 0)
   {
-    return; // no active IO operations (safe to close)
-  }
-
-  // wait for all operations to complete
-  {
+    // wait for all operations to complete 
     std::unique_lock<std::mutex> tmpLock(termLock_);
-    while(activeIOs_.load(std::memory_order_acquire))
+    while(activeIOs_.load(std::memory_order_acquire) > 0)
     {
       termCond_.wait(tmpLock);
     }    
-
 
   } // lock scope
   
@@ -557,7 +563,7 @@ CephContext::RadosOpHandler::radosAsyncCompletionCallback(
 
   // mark the operation as completed one
   const unsigned int leftVal =\
-                 activeIOs_.fetch_sub(1, std::memory_order_release);
+                 activeIOs_.fetch_sub(1, std::memory_order_acquire);
 
   if(leftVal == 1) // no more operations left (this one is the last one)
   {
