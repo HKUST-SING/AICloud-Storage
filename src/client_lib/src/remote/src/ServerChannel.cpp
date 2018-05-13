@@ -7,10 +7,10 @@
 /**
  * External lib
  */
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/ip/address.hpp>
+//#include <boost/asio/ip/tcp.hpp>
+//#include <boost/asio/ip/address.hpp>
 #include <boost/system/system_error.hpp>
-#include <boost/thread/mutex.hpp>
+//#include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
 #include <folly/io/async/AsyncSocketException.h>
 
@@ -22,22 +22,15 @@
 #include "remote/Sender.h"
 #include "remote/ChannelContext.h"
 
-using tcp = boost::asio::ip::tcp;
+//using tcp = boost::asio::ip::tcp;
 
 namespace singaistorageipc{
 
 bool
 ServerChannel::initChannel()
-{
-	tcp::endpoint ep(boost::asio::ip::address::from_string(
-							cxt_.remoteServerAddress_.c_str()), cxt_.port_);	
+{	
 	LOG(INFO) << "start to initial channel";
-	try{
-		socket_->connect(ep);
-	}
-	catch(boost::system::system_error & err){
-		LOG(WARNING) << "fail to initial channel"
-					 <<" due to error in socket connection";
+	if(!socket_.initialize()){
 		return false;
 	}
 
@@ -64,7 +57,8 @@ ServerChannel::closeChannel()
 	LOG(INFO) << "start to close channel";
 
 	try{	
-		socket_->shutdown(tcp::socket::shutdown_both);
+		//socket_->shutdown(tcp::socket::shutdown_both);
+		socket_.close();
 		//socket_->close();
 		ioc_->stop();
 		if(socketThread_.joinable())

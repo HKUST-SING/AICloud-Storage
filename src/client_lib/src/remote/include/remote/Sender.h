@@ -16,6 +16,7 @@
  * Internal lib
  */
 #include "remote/Message.h"
+#include "remote/SecuritySocket.h"
 
 /**
  * External lib
@@ -42,10 +43,10 @@ class RESTSender : public Sender{
 public:
 	RESTSender() = delete;
 	
-	explicit RESTSender(std::shared_ptr<tcp::socket> socket)
+	explicit RESTSender(SecuritySocket* socket)
 		:socket_(socket){}
 	RESTSender(RESTSender&& other)
-        :socket_(std::move(other.socket_)),
+        :socket_(other.socket_),
          reqMap_(std::move(other.reqMap_))
 	{}
 
@@ -59,7 +60,8 @@ public:
 			,std::size_t)>) override;
 
 private:
-	std::shared_ptr<tcp::socket> socket_;
+	//std::shared_ptr<tcp::socket> socket_;
+	SecuritySocket* socket_;
 	std::map<uint32_t,http::request<http::string_body>> reqMap_;
 
 	void sendCallback(uint32_t id,

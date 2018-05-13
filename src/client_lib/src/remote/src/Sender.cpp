@@ -26,7 +26,7 @@ RESTSender::send(std::shared_ptr<Request> request
 		,boost::function<void(boost::system::error_code const&
 				     ,std::size_t)> callback)
 {
-	if(!socket_->is_open()){
+	if(socket_->getSocket().is_open()){
 		return -2;
 	}
 
@@ -71,9 +71,9 @@ RESTSender::send(std::shared_ptr<Request> request
 	http::request<http::string_body> req{verb,target,version};
 	
 	// Host
-	std::string host = socket_->remote_endpoint().address().to_string();
+	std::string host = socket_->getSocket().remote_endpoint().address().to_string();
 	host += ":";
-	host += std::to_string(socket_->remote_endpoint().port());
+	host += std::to_string(socket_->getSocket().remote_endpoint().port());
 	req.set(http::field::host,host);
 
 	// Standard head field
@@ -121,7 +121,7 @@ RESTSender::send(std::shared_ptr<Request> request
 	 * send the http request
 	 */
 	reqMap_[request->tranID_] = std::move(req);
-	http::async_write(*socket_, reqMap_[request->tranID_], 
+	http::async_write(socket_->getSocket()., reqMap_[request->tranID_], 
 		boost::bind(&RESTSender::sendCallback,this,request->tranID_,callback,_1,_2));
 	return 0;
 }

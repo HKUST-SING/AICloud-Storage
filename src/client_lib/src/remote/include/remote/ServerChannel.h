@@ -11,7 +11,6 @@
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/system/system_error.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>  
 
 
 // Facebook folly lib
@@ -24,6 +23,7 @@
 #include "Receiver.h"
 #include "ChannelContext.h"
 #include "Message.h"
+#include "SecuritySocket.h"
 
 namespace singaistorageipc
 {
@@ -57,14 +57,10 @@ class ServerChannel
 
       ServerChannel(ChannelContext cxt)
       :ioc_(new boost::asio::io_context),
-       socket_(std::make_shared<boost::asio::ip::tcp::socket>(
-		std::move(boost::asio::ip::tcp::socket(*ioc_)))),
-       restSender_(socket_),
+       socket_(cxt.remoteServerAddress_,cxt.port_,ioc_),
+       restSender_(&socket_),
        receivePool_(std::make_shared<ReceivePool>(new ReceivePool())),
-       restReceiver_(socket_,
-        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(
-          cxt.remoteServerAddress_),cxt.port_),
-        receivePool_),
+       restReceiver_(&socket_,receivePool_),
        cxt_(cxt)
       {}
 
@@ -78,8 +74,8 @@ class ServerChannel
  
     private:
       std::unique_ptr<boost::asio::io_context> ioc_;
-      std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
-
+      //std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
+      SecuritySocket socket_;
       RESTSender restSender_;
 
       /**

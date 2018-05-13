@@ -92,14 +92,14 @@ RESTReceiver::receive(){
 	boost::beast::http::response<
 			boost::beast::http::string_body> newresponse;
 	response_ = std::move(newresponse);
-	http::async_read(*socket_,buffer_,response_,
+	http::async_read(socket_->getSocket(),buffer_,response_,
 		boost::bind(&RESTReceiver::onRead,this,_1,_2));
 }
 
 void
 RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 	DLOG(INFO) << "receive a response from remote server";
-	continue_ = false;
+	//continue_ = false;
 	if(er.value() == 0){
 		/**
 		 * successful reception
@@ -115,6 +115,7 @@ RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 		 * That means socket disconnected.
 		 * Connects again.
 		 */
+		/*
 		socket_->get_io_context().stop();
 		try{
 			socket_->shutdown(
@@ -128,6 +129,8 @@ RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 		}
 		socket_->get_io_context().restart();
 		continue_ = true;
+		*/
+		socket_->reconnect();
 	}
 
 	receive();
