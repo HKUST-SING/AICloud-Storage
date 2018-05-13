@@ -387,7 +387,16 @@ StoreWorker::closeStoreWorker()
   // clear all tasks
   cancelTasks.clear();
   
-  
+ 
+
+  // deallocate memory allocated for
+  // Rados operations.
+  for(const auto& acRadOp : termRados_)
+  {
+    delete acRadOp.second; // delete an instance of 
+                           // StoreWorker::UserCtx
+  }
+ 
 
 
   // once everything has been cleaned up
