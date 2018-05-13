@@ -1389,7 +1389,8 @@ StoreWorker::processWriteOp(StoreWorker::UpperRequest&& task)
   // need to find an active write operation; otherwise,
   // reject the operation.
   auto ctxIter = activeOps_.find(task.second.path_);
-  if(ctxIter == activeOps_.end())
+  if(ctxIter == activeOps_.end() || 
+     ctxIter->second.object.getObjectOpType() != OpCode::OP_WRITE)
   {
     //error (reject operation)
     notifyUserStatus(std::move(task), StoreWorker::Status::ERR_DENY);
@@ -1398,15 +1399,6 @@ StoreWorker::processWriteOp(StoreWorker::UpperRequest&& task)
   {
     // found an active write operation
     auto& opIter = ctxIter->second;
-
-    // need to make sure that the same user
-    // is accessing
-    if(opIter.object.getObjectOpType() != OpCode::OP_WRITE
-       || !checkOpAuth(task.second, opIter.object.getTask()))
-    {
-      notifyUserStatus(std::move(task), Status::ERR_DENY);
-      return;
-    }    
 
     // append the context to the operation
     if(opIter.object.validUserContext())
@@ -1428,7 +1420,8 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
   // need to find an active write operation; otherwise,
   // reject the operation.
   auto ctxIter = activeOps_.find(task.second.path_);
-  if(ctxIter == activeOps_.end())
+  if(ctxIter == activeOps_.end() || 
+     ctxIter->second.object.getObjectOpType() != OpCode::OP_READ)
   {
     // need to issue a new READ request
     auto opIter = pendTasks_.find(task.second.path_);
@@ -1448,30 +1441,6 @@ StoreWorker::processReadOp(StoreWorker::UpperRequest&& task)
   {
     // found an active read operation
     auto& opIter = ctxIter->second;
-
-    // need to make sure that the same user
-    // is accessing   
-    // if the user's do no match, then make the 
-    // operation as a pendTask
-    if(opIter.object.getObjectOpType() != OpCode::OP_READ
-       || !checkOpAuth(task.second, opIter.object.getTask(false)))
-    {
-      //append to the pending tasks
-      auto pendIter = pendTasks_.find(task.second.path_);
-      // if it's empty (no pending operations)
-      // create one
-      if(pendIter == pendTasks_.end())
-      {
-     
-        auto insRes = createPendContainer(task.second.path_);
-        pendIter = insRes.first;
- 
-      }// created a new list
-      
-      pendIter->second.push_back(std::move(task));
-
-      return; // a new pending task has been issued
-    }
 
     // set the read as a pending read
     opIter.object.setObjectOpStatus(Status::STAT_PARTIAL_READ);

@@ -19,6 +19,11 @@ namespace singaistorageipc{
 class WorkerPool{
 
 
+
+  public:
+    using BroadResult = std::vector<folly::Future<Task> >;
+
+
   public:
 
     static const constexpr uint32_t DEFAULT_POOL_SIZE = 1;
@@ -48,19 +53,30 @@ class WorkerPool{
     void stopPool(); 
 
 
-	/**
-	 * Assign the task to a worker according to
-	 * `task.workerID_`. If the `workerID_` is 0,
-	 * assign to the worker based on the dispatching
-	 * protocol.
-	 */
-	folly::Future<Task> sendTask(Task task);
+    /**
+     * Assign the task to a worker according to
+     * `task.workerID_`. If the `workerID_` is 0, 
+     * assign to the worker based on the dispatching
+     * protocol.
+     */
+     folly::Future<Task> sendTask(Task task);
 
-	// Assign the task to specific worker
-	folly::Future<Task> sendTask(Task task, const uint32_t workerID);
+     // Assign the task to specific worker
+     folly::Future<Task> sendTask(Task task, const uint32_t workerID);
 
-	inline uint32_t getSize()   const noexcept;
-    inline uint32_t getPoolID() const noexcept;
+
+     
+     /**
+      * Send a result to all the workers.
+      *
+      * @return: an std container of folly::Future.
+      */
+     BroadResult broadcastTask(Task task);
+
+
+
+     inline uint32_t getSize()   const noexcept;
+     inline uint32_t getPoolID() const noexcept;
 
 
     static std::shared_ptr<WorkerPool> createWorkerPool(
