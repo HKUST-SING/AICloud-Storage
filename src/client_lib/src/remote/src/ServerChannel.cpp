@@ -131,9 +131,15 @@ ServerChannel::sendMessage(std::shared_ptr<Request> msg
 				callback->writeErr(size,ex);
 			}
 		  };
-	restSender_.send(msg,f);
-	DLOG(INFO) << "send a message";
-	return true;
+	int r = restSender_.send(msg,f);
+	if(r == 0){
+		DLOG(INFO) << "send a message";
+		return true;
+	}
+	else{
+		DLOG(INFO) << "fail to send a message, error code: " << r;
+		return false;
+	}
 }
 
 std::vector<std::unique_ptr<Response>>

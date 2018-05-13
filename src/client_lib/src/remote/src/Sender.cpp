@@ -49,7 +49,7 @@ RESTSender::send(std::shared_ptr<Request> request
 	case CommonCode::IOOpCode::OP_READ:
 		verb = http::verb::get;
 		break;
-	case CommonCode::IOOpCode::OP_WRITE:
+	case CommonCode::IOOpCode::OP_CHECK_WRITE:
 		verb = http::verb::put;
 		break;
 	case CommonCode::IOOpCode::OP_DELETE:
