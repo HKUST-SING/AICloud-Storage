@@ -104,7 +104,9 @@ RESTReceiver::onRead(boost::system::error_code const& er, std::size_t size){
 		/**
 		 * successful reception
 		 */
-		poolInsert(std::move(msgParse()));	
+		std::unique_ptr<Response> res = std::move(msgParse());
+		if(res != nullptr)
+			poolInsert(std::move(res));	
 		DLOG(INFO) << "insert the response into the pool";
 	}
 	else if(er.value() == 1){
