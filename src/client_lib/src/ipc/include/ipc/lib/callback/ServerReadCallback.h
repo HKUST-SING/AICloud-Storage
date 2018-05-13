@@ -199,7 +199,7 @@ private:
     void callbackWriteRequest(Task);
     void callbackWriteAbort(Task task);  
     void callbackDeleteRequest(Task);  
-    void callbackCloseRequest(Task); 
+    void callbackCloseRequest(const WorkerPool::BroadResult); 
 
     /**
      * Helper functions

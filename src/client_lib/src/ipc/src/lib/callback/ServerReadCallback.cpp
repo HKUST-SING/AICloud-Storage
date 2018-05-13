@@ -743,14 +743,17 @@ void ServerReadCallback::handleDeleteRequest(
 
 //===================== Close =======================
 
-void ServerReadCallback::callbackCloseRequest(Task task)
+void ServerReadCallback::callbackCloseRequest(
+	const WorkerPool::BroadResult &tasks)
 {
-	futurePool_.erase(task.tranID_);
-
-	/**
-	 * Reply the result.
-	 */
-	sendStatus(task.tranID_,task.opStat_);
+	CommonCode::IOStatus status = CommonCode::IOStatus::STAT_CLOSE;
+	for(const auto& t : tasks){
+		if(t.opStat_ != status){
+			status = t.opStat_;
+			break;
+		}
+	}
+	sendStatus(tasks.begin()->tranID_,status);
 }
 
 void ServerReadCallback::handleCloseRequest(
@@ -769,10 +772,14 @@ void ServerReadCallback::handleCloseRequest(
 	Task task(username_,""
 			 ,CommonCode::IOOpCode::OP_CLOSE
 			 ,0,0,close_msg.getID(),0,socket_->getFd());
-	folly::Future<Task> future = std::move(worker_->sendTask(task));
+/*	folly::Future<Task> future = std::move(worker_->sendTask(task));
 	future.via(evb_)
  		  .then(&ServerReadCallback::callbackCloseRequest,this);
  	futurePool_.emplace(std::make_pair(task.tranID_,std::move(future)));
+*/
+	WorkerPool::BroadResult futures = std::move(worker_->broadcastTask(task));
+	folly::Future::collectAll(futures).via(evb_)
+		then(&ServerReadCallback::callbackCloseRequest,this);
 }
 
 //================================================================
@@ -889,7 +896,7 @@ void ServerReadCallback::readEOF() noexcept
 	Task task(username_,""
 			 ,CommonCode::IOOpCode::OP_CLOSE
 			 ,0,0,0,0,socket_->getFd());
-	folly::Future<Task> future = std::move(worker_->sendTask(task));
+	WorkerPool::BroadResult futures = std::move(worker_->broadcastTask(task));
 	future.get();
 	release();
 }
