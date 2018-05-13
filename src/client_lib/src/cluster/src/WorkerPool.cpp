@@ -236,6 +236,25 @@ WorkerPool::sendTask(Task task, const uint32_t workerID)
 }
 
 
+WorkerPool::BroadResult
+WorkerPool::broadcastTask(Task task)
+{
+
+  BroadResult futures;
+
+  // call on each of the worker to broadcast the task
+  
+  for(const auto& oneWork : workers_)
+  {
+    futures.push_back(std::move(oneWork->readStoreObj(task)));
+  }
+
+
+  return futures;
+
+}
+
+
 std::shared_ptr<WorkerPool>
 WorkerPool::createWorkerPool(const char* poolType,
                              const unsigned poolID,
