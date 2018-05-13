@@ -183,6 +183,9 @@ class StoreWorker: public Worker
        bool insertUserCtx(struct UserCtx* const opCtx);
        bool removeUserCtx(struct UserCtx* const opCtx);
 
+
+       void garbageCollectRados(
+           std::unordered_map<void*, struct UserCtx* const>& terms);
        void closeContext();
 
        bool isActive() const noexcept;
@@ -198,19 +201,15 @@ class StoreWorker: public Worker
     {
       std::string      path;  // data path (key)
       uint32_t         opID;  // Rados operation id
-      volatile bool    valid; // is a valid operation
 
       UserCtx()
       : path(""), 
-        opID(0),
-        valid(true)
+        opID(0)
       {}
       
-      UserCtx(const std::string& pVal, const uint32_t tranID = 0,
-              const bool opState = true)
+      UserCtx(const std::string& pVal, const uint32_t tranID = 0)
       : path(pVal),
-        opID(tranID),
-        valid(opState)
+        opID(tranID)
       {}
 
        
@@ -548,6 +547,15 @@ class StoreWorker: public Worker
                                // (accesing the Cluster)
 
     RemoteProtocol* remProt_;  // remote protocol
+
+
+
+    std::unordered_map<void*, UserCtx* const> termRados_; // map for
+                                                          // deleting
+                                                          // terminated 
+                                                          // active Rados
+                                                          // ops
+
 }; // class StoreWorker
 
 

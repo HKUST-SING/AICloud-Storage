@@ -232,6 +232,25 @@ StoreWorker::OpContext::removeUserCtx(
   return true; // succeeded
 }
 
+
+void
+StoreWorker::OpContext::garbageCollectRados(std::unordered_map<void*, StoreWorker::UserCtx* const>& terms)
+{
+
+  if(!issuedOps.empty())
+  {
+    // store references to active Rados for
+    // cleaning them up later
+    decltype(terms.emplace()) checkRes;
+    for(const auto& opPair : issuedOps)
+    {
+      checkRes = terms.emplace(opPair.first, opPair.second);
+      assert(checkRes.second);
+    }
+
+  }
+
+}
   
 void
 StoreWorker::OpContext::closeContext()
@@ -267,13 +286,7 @@ StoreWorker::OpContext::closeContext()
   pendRequests.clear();
 
 
-  // set all Rados Operations
-  // to be invalid
-  for(auto& acOp : issuedOps)
-  {
-    acOp.second->valid = false; // mark the operation as
-                                // no more valid 
-  }
+  // clear Rados operations
 
   issuedOps.clear();
 
@@ -348,6 +361,7 @@ StoreWorker::closeStoreWorker()
   for(auto& canTsk : activeOps_)
   {
     // close all the contexts
+    canTsk.second.garbageCollectRados(termRados_);
     canTsk.second.closeContext();
   }
 
@@ -837,9 +851,13 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
 
   // need to make sure that this Rados operation
   // is still valid
-  if(!procCtx->valid)
+  auto invalidRados = termRados_.find(opCtx->userCtx);
+  if(invalidRados != termRados_.end())
   { // the IO operation has been cancelled
     delete procCtx; // handled the operation
+    
+    termRados_.erase(invalidRados);    
+
     return; 
   }
 
@@ -884,6 +902,7 @@ StoreWorker::processCompletedRadosWrite(CephContext::RadosOpCtx* const opCtx)
     assert(opIter.object.setResponse(std::move(resTask)));
 
     // close the context since there is no more operations
+    opIter.garbageCollectRados(termRados_);
     opIter.closeContext();
     activeOps_.erase(writeIter); // completed op
     
@@ -1006,7 +1025,7 @@ StoreWorker::issueRadosWrite(StoreWorker::OpItr& iter)
   assert(objWrite);
 
   // must always be a valid context
-  StoreWorker::UserCtx* const procCtx = new StoreWorker::UserCtx(iter->first, 0, true);
+  StoreWorker::UserCtx* const procCtx = new StoreWorker::UserCtx(iter->first, 0);
    
   auto resData = opIter.prot->writeData(objWrite->getDataBuffer(),
                                  static_cast<void*>(procCtx));
@@ -1015,6 +1034,7 @@ StoreWorker::issueRadosWrite(StoreWorker::OpItr& iter)
   {
     // failed to write
     delete procCtx;
+    opIter.garbageCollectRados(termRados_);
     opIter.closeContext();
     
     activeOps_.erase(iter);
@@ -1047,10 +1067,13 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
 
   // might be that the Rados Operation
   // has been cancelled
-  if(!procCtx->valid)
+  auto invalidRados = termRados_.find(opCtx->userCtx);
+  if(invalidRados != termRados_.end())
   {
     // no need to handle this Rados Operation
     delete procCtx;
+    termRados_.erase(invalidRados);
+
     return;
   }
 
@@ -1085,6 +1108,7 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
       assert(opIter.object.setResponse(std::move(resTask)));
 
       // close the context since there is no more operations
+      opIter.garbageCollectRados(termRados_);
       opIter.closeContext();
       activeOps_.erase(readIter); // completed op
        
@@ -1097,6 +1121,7 @@ StoreWorker::processCompletedRadosRead(CephContext::RadosOpCtx* const opCtx){
         }
         else
         {  // are some pending Read OPs (negate both)
+          opIter.garbageCollectRados(termRados_);
           opIter.closeContext();
           activeOps_.erase(readIter);
         }
@@ -1143,6 +1168,8 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
     resTask.opStat_   = opIter.object.getObjectOpStatus();
     
     opIter.object.setResponse(std::move(resTask));
+
+    opIter.garbageCollectRados(termRados_);
     opIter.closeContext();
     // remove from active operations
     activeOps_.erase(pendItr);
@@ -1200,6 +1227,8 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
          readObj->setResponse(std::move(resTask));
 
          // close the operation context
+         // (no need to garbage collect Rados since
+         //  there are no active ops anymore)
          opIter.closeContext();
          
          //remove the operation
@@ -1234,7 +1263,7 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
     {
       // need to read more data
       StoreWorker::UserCtx* userCtx = new StoreWorker::UserCtx(
-               pendItr->first, opIter.tranID, true);
+               pendItr->first, opIter.tranID);
 
       // update transaction ID
       ++(opIter.tranID);
@@ -1247,6 +1276,7 @@ StoreWorker::processPendingRead(StoreWorker::OpItr& pendItr)
         LOG(ERROR) << "StoreWorker::processPendingRead: "
                    << "opIter.prot->readData() == 0";
         delete userCtx;
+        opIter.garbageCollectRados(termRados_);
         opIter.closeContext();
         activeOps_.erase(pendItr);
           
@@ -1494,6 +1524,7 @@ StoreWorker::processAbortOp(StoreWorker::UpperRequest&& task)
     }
     else
     { // terminate the operation
+      opIter.garbageCollectRados(termRados_);
       opIter.closeContext();
       activeOps_.erase(iterVal);
       notifyUserStatus(std::move(task), Status::STAT_SUCCESS);
@@ -1530,6 +1561,7 @@ StoreWorker::processCloseOp(StoreWorker::UpperRequest&& task)
     
     if(closeOp)
     { // need to close the operation
+      pendOp->second.garbageCollectRados(termRados_);
       pendOp->second.closeContext();
     }
 
