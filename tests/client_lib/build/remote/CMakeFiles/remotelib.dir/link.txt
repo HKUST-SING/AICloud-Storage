@@ -1,0 +1,2 @@
+/usr/bin/ar qc libremotelib.a  CMakeFiles/remotelib.dir/src/Message.cpp.o CMakeFiles/remotelib.dir/src/SecuritySocket.cpp.o CMakeFiles/remotelib.dir/src/Security.cpp.o CMakeFiles/remotelib.dir/src/Sender.cpp.o CMakeFiles/remotelib.dir/src/ServerChannel.cpp.o CMakeFiles/remotelib.dir/src/Receiver.cpp.o CMakeFiles/remotelib.dir/src/SecurityModule.cpp.o
+/usr/bin/ranlib libremotelib.a

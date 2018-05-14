@@ -1,0 +1,2 @@
+/usr/bin/ar qc libipclib.a  CMakeFiles/ipclib.dir/src/IPCServer.cpp.o CMakeFiles/ipclib.dir/src/lib/callback/ServerAcceptCallback.cpp.o CMakeFiles/ipclib.dir/src/lib/callback/ServerReadCallback.cpp.o CMakeFiles/ipclib.dir/src/lib/callback/ServerWriteCallback.cpp.o CMakeFiles/ipclib.dir/src/lib/utils/BFCAllocator.cpp.o
+/usr/bin/ranlib libipclib.a
