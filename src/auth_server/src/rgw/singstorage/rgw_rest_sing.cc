@@ -461,7 +461,7 @@ RGWDeleteObj_ObjStore_SING::send_response()
 
   set_req_state_err(s, r);
   dump_errno(s);
-  dump_header(s, "X-Tran-Id", tranID); 
+  //dump_header(s, "X-Tran-Id", tranID); 
 
   if(multipart_delete)
   {
@@ -615,7 +615,7 @@ RGWGetObjLayout_SING::send_response()
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
-  dump_header(s, "X-Tran-Id", tranID);
+  //dump_header(s, "X-Tran-Id", tranID);
   
   if(manifest && op_ret >=0)
   {
@@ -1074,7 +1074,7 @@ RGWPutObj_ObjStore_SING::do_error_response()
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
-  dump_header(s, "X-Tran-Id", tranID);
+  //dump_header(s, "X-Tran-Id", tranID);
   set_req_state_err(s, op_ret);
   dump_errno(s);
 
@@ -1298,7 +1298,7 @@ RGWPutObj_ObjStore_SING::do_send_response(const RGWObjManifest& manifest)
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
-  dump_header(s, "X-Tran-Id", tranID);
+  //dump_header(s, "X-Tran-Id", tranID);
   
   // no errors occurred
   // send a manifest
@@ -1706,7 +1706,7 @@ RGWPost_Manifest_SING::send_response()
   const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
   assert(tranID);
   
-  dump_header(s, "X-Tran-Id", tranID);
+  //dump_header(s, "X-Tran-Id", tranID);
   
   if(sing_err == sing_err_name::SUCCESS)
   {

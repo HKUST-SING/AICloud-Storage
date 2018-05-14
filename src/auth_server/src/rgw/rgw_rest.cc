@@ -649,9 +649,17 @@ void dump_start(struct req_state *s)
 
 void dump_trans_id(req_state *s)
 {
+
+  /****************** SINGSTROAGE *********************/
+  
+  /******************* ENDS HERE *********************/
+
   if (s->prot_flags & RGW_REST_SWIFT) {
-    dump_header(s, "X-Trans-Id", s->trans_id);
-    dump_header(s, "X-Openstack-Request-Id", s->trans_id);
+    //dump_header(s, "X-Trans-Id", s->trans_id);
+    //dump_header(s, "X-Openstack-Request-Id", s->trans_id);
+    const char* tranID = s->info.env->get("HTTP_X_TRAN_ID", nullptr);
+    assert(tranID);
+    dump_header(s, "X-Tran-Id", tranID);
   } else if (s->trans_id.length()) {
     dump_header(s, "x-amz-request-id", s->trans_id);
   }
