@@ -1,0 +1,18 @@
+info_log_file    =  /home/jlingys/logs/info_log
+warning_log_file =  /home/jlingys/logs/warning_log
+error_log_file   =  /home/jlingys/logs/error_log
+fatal_log_file   =  /home/jlingys/logs/fatal_log
+
+auth_server_ip = 192.168.2.134
+auth_server_port = 42650
+
+ipc_socket = /tmp/sing_ipc_socket
+ipc_backlog = 10
+ipc_readsmsize = 40000000
+ipc_writesmsize = 40000000
+
+ceph_USERNAME     = client.worker
+ceph_clustername  = ceph
+worker_pool_size  = 4
+server_timeout    = 6000 
+auth_worker_protocol = default
