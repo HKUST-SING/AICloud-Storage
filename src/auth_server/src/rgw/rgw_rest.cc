@@ -25,6 +25,12 @@
 
 #include <numeric>
 
+
+#include "singstorage/rgw_sing_error_code.h"
+using  SingError = rgw::singstorage::SINGErrorCode::sing_err_t;
+#define HTTP_OK_VAL 200
+
+
 #define dout_subsys ceph_subsys_rgw
 
 struct rgw_http_status_code {
@@ -735,6 +741,40 @@ void end_header(struct req_state* s, RGWOp* op, const char *content_type,
   ACCOUNTING_IO(s)->set_account(true);
   rgw_flush_formatter_and_reset(s, s->formatter);
 }
+
+
+
+void abort_sing(struct req_state *s, SingError err_no)
+{
+
+  // make sure to create a clean version
+  // of the formatter
+  if(s->formatter)
+  {
+    delete s->formatter;
+    s->formatter = nullptr;
+  }
+
+
+  // make sure a JSON formatter is used
+  s->formatter = JSONFormatter;
+  s->format    = RGW_FORMAT_JSON;
+  s->prot_falgs |= RGW_REST_SWIFT;
+  s->err.http_ret = HTT_OK_VAL; // always SUCCESS
+  dump_status(s, HTTP_OK_VAL, http_status_names[HTTP_OK_VAL]);
+
+  // Build a JSON object for a Result error
+  s->formatter->open_object_section(""); // empty JSOn wrapper
+  s->formatter->open_object_section("Result"); // result (error)
+  s->formatter->dump_unsigned("Error_Type", err_no);
+  s->formatter->close_section(); // close JSON object 'Result'
+  s->formatter->close_section(); // close the wrapper
+  
+
+  end_header(s, nullptr, nullptr, NO_CONTENT_LENGTH, true, false);
+
+}
+
 
 void abort_early(struct req_state *s, RGWOp* op, int err_no,
 		RGWHandler* handler)

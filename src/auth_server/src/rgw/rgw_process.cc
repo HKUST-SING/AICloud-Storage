@@ -13,6 +13,12 @@
 #include "rgw_loadgen.h"
 #include "rgw_client_io.h"
 
+
+#include "singstorage/rgw_sing_error_code.h"
+
+
+using SingError = rgw::singstorage::SINGErrorCode;
+
 #define dout_subsys ceph_subsys_rgw
 
 void RGWProcess::RGWWQ::_dump_queue()
@@ -42,6 +48,7 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   req->log(s, "init permissions");
   int ret = handler->init_permissions(op);
   if (ret < 0) {
+    abort_sing(s, SingError::ACL_ERR);
     return ret;
   }
 
@@ -53,6 +60,7 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
     req->log(s, "recalculating target");
     ret = handler->retarget(op, &op);
     if (ret < 0) {
+      abort_sing(s, SingError::INTERNAL_ERR);
       return ret;
     }
     req->op = op;
@@ -64,18 +72,21 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   req->log(s, "reading permissions");
   ret = handler->read_permissions(op);
   if (ret < 0) {
+    abort_sing(s, SingError::ACL_ERR);
     return ret;
   }
 
   req->log(s, "init op");
   ret = op->init_processing();
   if (ret < 0) {
+    abort_sing(s, SingError::INTERNAL_ERR);
     return ret;
   }
 
   req->log(s, "verifying op mask");
   ret = op->verify_op_mask();
   if (ret < 0) {
+    abort_sing(s, SingError::INTERNAL_ERR);
     return ret;
   }
 
@@ -87,6 +98,7 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
     } else if (s->auth.identity->is_admin_of(s->user->user_id)) {
       dout(2) << "overriding permissions due to admin operation" << dendl;
     } else {
+      abort_sing(s, SingError::ACL_ERROR);
       return ret;
     }
   }
@@ -94,6 +106,7 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   req->log(s, "verifying op params");
   ret = op->verify_params();
   if (ret < 0) {
+    abort_sing(s, SingError::BAD_PARAMS);
     return ret;
   }
 
@@ -138,7 +151,8 @@ int process_request(RGWRados* const store,
 
   if (ret < 0) {
     s->cio = client_io;
-    abort_early(s, nullptr, ret, nullptr);
+    abort_sing(s, SingError::INTERNAL_ERR);
+    //abort_early(s, nullptr, ret, nullptr);
     return ret;
   }
 
@@ -157,7 +171,8 @@ int process_request(RGWRados* const store,
                                                frontend_prefix,
                                                client_io, &mgr, &init_error);
   if (init_error != 0) {
-    abort_early(s, nullptr, init_error, nullptr);
+    //abort_early(s, nullptr, init_error, nullptr);
+    abort_sing(s, SingError::INTERNAL_ERR);
     goto done;
   }
   dout(10) << "handler=" << typeid(*handler).name() << dendl;
@@ -167,7 +182,8 @@ int process_request(RGWRados* const store,
   req->log_format(s, "getting op %d", s->op);
   op = handler->get_op(store);
   if (!op) {
-    abort_early(s, NULL, -ERR_METHOD_NOT_ALLOWED, handler);
+    //abort_early(s, NULL, -ERR_METHOD_NOT_ALLOWED, handler);
+    abort_sing(s, SingError::BAD_PARAMS);
     goto done;
   }
 
@@ -180,7 +196,8 @@ int process_request(RGWRados* const store,
   ret = op->verify_requester(auth_registry);
   if (ret < 0) {
     dout(10) << "failed to authorize request" << dendl;
-    abort_early(s, NULL, ret, handler);
+    //abort_early(s, NULL, ret, handler);
+    abort_sing(s, SingError::ACL_ERR);
     goto done;
   }
 
@@ -194,19 +211,22 @@ int process_request(RGWRados* const store,
   ret = handler->postauth_init();
   if (ret < 0) {
     dout(10) << "failed to run post-auth init" << dendl;
-    abort_early(s, op, ret, handler);
+    //abort_early(s, op, ret, handler);
+    abort_sing(s, SingError::ACL_ERR);
     goto done;
   }
 
   if (s->user->suspended) {
     dout(10) << "user is suspended, uid=" << s->user->user_id << dendl;
-    abort_early(s, op, -ERR_USER_SUSPENDED, handler);
+    //abort_early(s, op, -ERR_USER_SUSPENDED, handler);
+    abort_sing(s, SingError::ACL_ERR);
     goto done;
   }
 
   ret = rgw_process_authenticated(handler, op, req, s);
   if (ret < 0) {
-    abort_early(s, op, ret, handler);
+    //abort_early(s, op, ret, handler);
+   
     goto done;
   }
 done:

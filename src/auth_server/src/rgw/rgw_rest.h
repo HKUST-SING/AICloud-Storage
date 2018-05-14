@@ -15,6 +15,9 @@
 #include "rgw_formats.h"
 #include "rgw_client_io.h"
 
+
+#include "singstorage/rgw_sing_error_code.h"
+
 extern std::map<std::string, std::string> rgw_to_http_attrs;
 
 extern string camelcase_dash_http_attr(const string& orig);
@@ -743,6 +746,8 @@ extern void dump_etag(struct req_state *s,
 extern void dump_epoch_header(struct req_state *s, const char *name, real_time t);
 extern void dump_time_header(struct req_state *s, const char *name, real_time t);
 extern void dump_last_modified(struct req_state *s, real_time t);
+
+extern void abort_sing(struct req_state* s, rgw::singstorage::SINGErroCode::sing_err_t err_no);
 extern void abort_early(struct req_state* s, RGWOp* op, int err,
 			RGWHandler* handler);
 extern void dump_range(struct req_state* s, uint64_t ofs, uint64_t end,

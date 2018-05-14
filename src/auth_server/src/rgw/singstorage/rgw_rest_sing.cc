@@ -13,6 +13,10 @@
 #include "common/utf8.h"
 #include "common/ceph_json.h"
 
+
+#include <glog/logging.h>
+
+
 #include "rgw_rest_sing.h"
 #include "../rgw_acl_swift.h"
 #include "../rgw_formats.h"

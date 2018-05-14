@@ -15,9 +15,10 @@ namespace singstorage
     */
 
 
+    public:
+
       using sing_err_t = const uint64_t;
 
-    public:
 
       /* Internal SING ERROR Codes */
       static sing_err_t INTERNAL_ERR   = 255;
