@@ -121,7 +121,7 @@ RESTSender::send(std::shared_ptr<Request> request
 	 * send the http request
 	 */
 	reqMap_[request->tranID_] = std::move(req);
-	http::async_write(socket_->getSocket()., reqMap_[request->tranID_], 
+	http::async_write(socket_->getSocket(), reqMap_[request->tranID_], 
 		boost::bind(&RESTSender::sendCallback,this,request->tranID_,callback,_1,_2));
 	return 0;
 }

@@ -1,8 +1,9 @@
 #include "remote/SecuritySocket.h"
 
 #include <boost/system/system_error.hpp>
+#include <glog/logging.h>
 
-namespace singaistorage{
+namespace singaistorageipc{
 
 bool
 SecuritySocket::initialize()
@@ -36,7 +37,7 @@ void
 SecuritySocket::close()
 {
 	try{
-		socket_->shutdown(tcp::socket::shutdown_both);
+		socket_->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
 	}
 	catch(std::exception& e){
 		LOG(ERROR) << "cannot close the socket conneting to the remote server.\n"

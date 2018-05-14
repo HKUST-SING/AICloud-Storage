@@ -14,7 +14,8 @@ find_package(Threads REQUIRED)
 
 # Define the library for linking with others
 
-add_library(remotelib 
+add_library(remotelib
+    src/SecuritySocket.cpp 
     src/Message.cpp
     src/Security.cpp
     src/Sender.cpp

@@ -29,6 +29,10 @@ using tcp = boost::asio::ip::tcp;
 
 namespace singaistorageipc{
 
+/*Wrapper for a TCP socket.*/
+class SecuritySocket;
+
+
 class Receiver{
 public:
 	virtual ~Receiver() = default;
@@ -38,13 +42,10 @@ public:
 class RESTReceiver : public Receiver{
 public:
 	RESTReceiver() = delete;
-	explicit RESTReceiver(SecuritySocket *socket,
-		std::shared_ptr<ReceivePool> receivePool)
-		:socket_(socket),receivePool_(receivePool){}
-	RESTReceiver(RESTReceiver&& other)
-	:socket_(other.socket_),
-	 receivePool_(std::move(other.receivePool_))
-	{}
+	RESTReceiver(SecuritySocket *socket,
+		std::shared_ptr<ReceivePool> receivePool);
+
+	RESTReceiver(RESTReceiver&& other);
 
 	~RESTReceiver() = default;
 

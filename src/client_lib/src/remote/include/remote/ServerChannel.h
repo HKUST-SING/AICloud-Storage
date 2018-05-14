@@ -19,11 +19,11 @@
 
 
 // Project lib
+#include "SecuritySocket.h"
 #include "Sender.h"
 #include "Receiver.h"
 #include "ChannelContext.h"
 #include "Message.h"
-#include "SecuritySocket.h"
 
 namespace singaistorageipc
 {
@@ -57,7 +57,7 @@ class ServerChannel
 
       ServerChannel(ChannelContext cxt)
       :ioc_(new boost::asio::io_context),
-       socket_(cxt.remoteServerAddress_,cxt.port_,ioc_),
+       socket_(cxt.remoteServerAddress_,cxt.port_, *ioc_),
        restSender_(&socket_),
        receivePool_(std::make_shared<ReceivePool>(new ReceivePool())),
        restReceiver_(&socket_,receivePool_),

@@ -79,9 +79,14 @@ JSONRemoteProtocol::handleMessage(shared_ptr<IOResponse> ioRes,
                                   CephContext& cephCtx)
 {
   // Pass JSONDecoder to the handler (share one 
-  // (among all JSON messages decoder among)
+	  // (among all JSON messages decoder among)
 
-  if(ioRes->msg_->msgEnc_ != Message::MessageEncoding::JSON_ENC || ioRes->opStat_ != CommonCode::IOStatus::STAT_SUCCESS)
+  if(!ioRes || 
+     !ioRes->msg_ ||
+     ioRes->msg_->msgEnc_ != Message::MessageEncoding::JSON_ENC || 
+     ioRes->opStat_ != CommonCode::IOStatus::STAT_SUCCESS ||
+     !ioRes->msg_->data_ || 
+     ioRes->msg_->data_->length() == 0)
   {
     // log this error
     LOG(WARNING) << "JSONRemoteProtocol::handleMessage: "

@@ -82,6 +82,19 @@ RESTReceiver::msgParse(){
 	}
 }
 
+
+RESTReceiver::RESTReceiver(SecuritySocket* socket,
+           std::shared_ptr<ReceivePool> receivePool)
+: socket_(socket),
+  receivePool_(receivePool)
+{}
+
+
+RESTReceiver::RESTReceiver(RESTReceiver&& other)
+: socket_(other.socket_),
+  receivePool_(std::move(other.receivePool_))
+{}
+
 void
 RESTReceiver::poolInsert(std::unique_ptr<Response> msg){
 	receivePool_->insert(std::move(msg));
