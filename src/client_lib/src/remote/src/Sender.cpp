@@ -26,7 +26,7 @@ RESTSender::send(std::shared_ptr<Request> request
 		,boost::function<void(boost::system::error_code const&
 				     ,std::size_t)> callback)
 {
-	if(socket_->getSocket().is_open()){
+	if(!socket_->getSocket().is_open()){
 		return -2;
 	}
 
