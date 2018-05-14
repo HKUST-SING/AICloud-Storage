@@ -41,10 +41,8 @@ ServerChannel::initChannel()
 	 */
 	std::thread tmpthread([&]{
 			restReceiver_.startReceive();
-			do{
-				restReceiver_.continue_ = false;
-				ioc_->run();
-			}while(restReceiver_.continue_);});
+			ioc_->run();
+			});
 	socketThread_ = std::move(tmpthread);
 
 	LOG(INFO) << "initial channel successfully";
