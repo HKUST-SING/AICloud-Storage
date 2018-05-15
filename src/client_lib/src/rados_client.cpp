@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <syslog.h>
+#include <fcntl.h>
 
 
 // Facebook folly
@@ -154,11 +155,13 @@ static void signal_fd_finalize()
 
 static void handle_sigterm(int signum)
 {
-  #ifdef SING_ENABLE_LOG
-  LOG(INFO) << "signum: " << signum;
-  #endif
- 
-  signal_shutdown();
+  int r = fcntl(signal_fd[1],F_GETFL);
+  if(r != -1 && (r & O_WRONLY || r & O_RDWR)){
+    #ifdef SING_ENABLE_LOG
+    LOG(INFO) << "signum: " << signum;
+    #endif
+    signal_shutdown();
+  }
 }
 
 void printUsage(const char* programName)
