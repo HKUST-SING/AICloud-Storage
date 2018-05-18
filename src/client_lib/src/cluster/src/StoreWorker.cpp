@@ -577,6 +577,59 @@ StoreWorker::completeReadStoreObj(const Task& task)
 }
 
 
+Future<Task> 
+StoreWorker::abortStoreObj(const Task& task)
+{
+
+  // this method shall be called from a Unix thread and
+  // shall enqueue tasks for the worker.
+
+  // create a promise for returing a future
+  Promise<Task> prom;  
+
+  auto res = prom.getFuture(); // for async computation
+ 
+  // enqueue the promise and the task for the worker
+  auto taskPair = std::make_pair(std::move(prom), task);
+
+  // append a task
+  tasks_.push(std::move(taskPair));
+
+
+  // return the future   
+  return res;   
+}
+
+
+Future<Task> 
+StoreWorker::closeStoreObj(const Task& task)
+{
+
+  // this method shall be called from a Unix thread and
+  // shall enqueue tasks for the worker.
+
+  // create a promise for returing a future
+  Promise<Task> prom;  
+
+  auto res = prom.getFuture(); // for async computation
+ 
+  // enqueue the promise and the task for the worker
+  auto taskPair = std::make_pair(std::move(prom), task);
+
+  // append a task
+  tasks_.push(std::move(taskPair));
+
+
+  // return the future   
+  return res;   
+}
+
+
+
+
+
+
+
 void
 StoreWorker::processTasks()
 {

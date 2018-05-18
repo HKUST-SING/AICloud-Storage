@@ -10,6 +10,7 @@
 #include <folly/futures/Future.h>
 
 // Project lib
+#include "include/CommonCode.h"
 #include "include/Task.h"
 #include "remote/Security.h"
 #include "cluster/Worker.h"
@@ -19,6 +20,10 @@ namespace singaistorageipc{
 class WorkerPool{
 
 
+
+  protected:
+    using OpCode = CommonCode::IOOpCode;
+    using IOStat = CommonCode::IOStatus;
 
   public:
     using BroadResult = std::vector<folly::Future<Task> >;
@@ -93,6 +98,21 @@ class WorkerPool{
                                          const char*     protocolType,
                                          std::shared_ptr<Security> sec,
                                          const uint32_t workerID) const;
+
+
+    inline folly::Future<Task> enqueueTask(const Task& task,
+                                           const uint32_t workIdx);
+    /**
+     * An inline utility method which helps to send a task
+     * to a worker.
+     *
+     * @param task:       task received for the IPC server 
+     *                    and forwarded to a worker
+     * @param workIdx:    worker index of the worker which 
+     *                    is assigned the task
+     *
+     * @return: future of a result
+     */ 
 
 
   private:

@@ -115,7 +115,23 @@ class Worker
      * or in the machine's memory at all. Due to this, multiple
      * object read operations should be issued.
      */
-     
+
+
+    virtual folly::Future<Task> abortStoreObj(const Task& task) = 0;
+    /**
+     * Interface for aborting an operation on an object. It may 
+     * happen that reading/writing fails on client side, so 
+     * this interface allows the worker to release all preallocated
+     * resources for an IO operation.
+     */
+
+
+    virtual folly::Future<Task> closeStoreObj(const Task& task) = 0;
+    /**
+     * Interface for closing a user context. When this gets called,
+     * the operations related to one user/socket id are released
+     * terminated.
+     */
 
 
     inline uint32_t getWorkerId() const

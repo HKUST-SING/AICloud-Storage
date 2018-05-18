@@ -8,6 +8,10 @@
 #include <stdexcept>
 
 
+// Google libs
+#include <glog/logging.h>
+
+
 // project libs
 #include "cluster/WorkerPool.h"
 #include "cluster/CephContext.h"
@@ -206,19 +210,23 @@ folly::Future<Task>
 WorkerPool::sendTask(Task task)
 {
 
+  uint32_t memIdx; // worker id for processing 
+                   // the task
+
+
   if (task.workerID_ == 0 || task.workerID_ > poolSize_)
   {
     // pick a random worker
-    auto workIdx = static_cast<const uint32_t>(std::rand()) % poolSize_;
-
-    task.workerID_ = workIdx + 1;
-    
-    return workers_[workIdx]->readStoreObj(task);
+    memIdx = static_cast<const uint32_t>(std::rand()) % poolSize_;
+    task.workerID_ = memIdx + 1; // set the correct worker ID
   }
   else
   {
-    return workers_[task.workerID_ - 1]->readStoreObj(task);
+    memIdx = task.workerID_ - 1;
   }
+
+  return enqueueTask(task, memIdx);
+
 }
 
 
@@ -231,7 +239,7 @@ WorkerPool::sendTask(Task task, const uint32_t workerID)
     throw std::logic_error("WorkerPool::sendTask(Task task, const uint32_t workerID): workerID cannot be 0 or greater than poolSize_");
   }
 
-  return workers_[workerID-1]->readStoreObj(task);
+  return enqueueTask(task, (workerID - 1));
 
 }
 
@@ -244,9 +252,10 @@ WorkerPool::broadcastTask(Task task)
 
   // call on each of the worker to broadcast the task
   
-  for(const auto& oneWork : workers_)
+  for(uint32_t idx = 0; idx < poolSize_; ++idx)
   {
-    futures.push_back(std::move(oneWork->readStoreObj(task)));
+    task.workerID_ = idx + 1; // update worker id
+    futures.push_back(std::move(enqueueTask(task, idx)));
   }
 
 
@@ -264,5 +273,64 @@ WorkerPool::createWorkerPool(const char* poolType,
   return std::make_shared<WorkerPool>(poolID, poolSize);
 
 }
+
+
+folly::Future<Task>
+WorkerPool::enqueueTask(const Task& task, const uint32_t workerIdx)
+{
+
+  // enqueue the task at the given index
+
+  switch(task.opType_)
+  {
+    case OpCode::OP_READ:
+    {
+      return workers_[workerIdx]->readStoreObj(task);
+    }
+
+    case OpCode::OP_WRITE:
+    case OpCode::OP_CHECK_WRITE:
+    case OpCode::OP_APPEND:
+    {
+      return workers_[workerIdx]->writeStoreObj(task);
+    }
+
+    case OpCode::OP_DELETE:
+    {
+      return workers_[workerIdx]->deleteStoreObj(task);
+    }
+    
+    case OpCode::OP_ABORT:
+    {
+      return workers_[workerIdx]->abortStoreObj(task);
+    }
+
+    case OpCode::OP_CLOSE:
+    {
+      return workers_[workerIdx]->closeStoreObj(task);
+    }
+
+    default:
+    {
+      LOG(WARNING) << "WorkerPool::enqueueTask: "
+                   << "no valid operation code.";
+
+       folly::Promise<Task> errProm; // notify the user
+                                     // about the error
+       auto resFut = errProm.getFuture();
+       Task tmpTask(task); // copy the task
+       tmpTask.opStat_ = IOStat::ERR_INTERNAL;
+       errProm.setValue(std::move(tmpTask));
+
+       return resFut; // return the future to notify
+                      // the error
+
+    }
+    
+  }// switch
+
+
+}
+
 
 } // namespace singaistorageipc

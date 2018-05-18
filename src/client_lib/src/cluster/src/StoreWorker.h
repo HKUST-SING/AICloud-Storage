@@ -292,6 +292,23 @@ class StoreWorker: public Worker
      * or in the machine's memory at all. Due to this, multiple
      * object read operations should be issued.
      */
+
+
+
+    virtual folly::Future<Task> abortStoreObj(const Task& task) override;
+    /**
+     * Interface for aborting IO operations on some storage item.
+     * This call releases all allocated resources by the worker
+     * to complete the previously issued IO call.
+     */
+     
+
+    virtual folly::Future<Task> closeStoreObj(const Task& task) override;
+    /**
+     * Interface for closing/releasing resources allocated to a socket
+     * identified by this task.
+     */
+
     
 
 
